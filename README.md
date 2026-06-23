@@ -1,2 +1,2 @@
-# Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography
+# Optimising Structure Tensors 
 UCL MPBE 
