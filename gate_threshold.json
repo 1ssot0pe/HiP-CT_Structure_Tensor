@@ -1,0 +1,12 @@
+{
+  "lam3_threshold": 0.3965410143136978,
+  "train_seeds": [
+    0,
+    1
+  ],
+  "recall_target": 0.95,
+  "train_catch": 0.9555555555555556,
+  "train_fire_fraction": 0.648,
+  "normalisation": "patch volume scaled to [0,1] as in make_plus",
+  "note": "ABSOLUTE lambda3; consumer MUST normalise its volume to [0,1] before comparing. Fit on synthetic tube phantoms; transfer to real tissue is unverified -- check the printed percentile diagnostic on real data."
+}
