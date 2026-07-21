@@ -219,10 +219,42 @@ rather than hallucinates). So the joint global model **separates kissing from
 crossing where the local per-peak certifier could not** — the Phase-2 conclusion,
 now demonstrated constructively.
 
-**Next:** (i) scale the 2D mechanism to 3D and run on real i74 (reuse HOST FODs as
-the multi-orientation seeder); (ii) the fully-honest Phase 3 then adds the L2
-generative term + the **calibrated half-map noise likelihood**, so the prior is
-pinned against real data and cannot silently hallucinate continuity.
+### On real 3D i74 (`phase3_i74.py`)
+
+Scaled the 2D mechanism to real tissue: the two workhorses (`candidate_links`,
+`greedy_forest`) are dimension-agnostic, so only a 3D **HOST-FOD multi-orientation
+seeder** (one segment per HOST peak) and an i74 readout were added. Honest question
+(no i74 ground truth): at each voxel the PER-VOXEL HOST pipeline calls a 2-way
+crossing, does the GLOBAL model link BOTH peaks into extended tracts (CONFIRMED) or
+leave a peak with no collinear continuation (DEMOTED)?
+
+Result on the central 96³ crop (produces coherent tracts, longest ~22–23 segments ≈
+1.8–2.6 mm):
+
+| stride | confirmed | demoted | n crossings |
+|--------|-----------|---------|-------------|
+| 6 | 23% (92/405) | 77% | 405 |
+| 4 | 24% (286/1186) | 76% | 1186 |
+
+- **Stable across stride** (23% vs 24% on the *same* crop) → the demotion rate is
+  **not** a coarse-sampling artifact. (An earlier 56³ crop gave 8% — that gap is a
+  **region** effect, not stride; the rate varies spatially.)
+- So the joint global model **demotes ~76% of HOST-flagged crossings** on this crop
+  (a peak has no collinear continuation) and confirms ~23–24% as real (both fibres
+  continue) — consistent with the recurring thesis that per-voxel crossings are
+  over-called, and now shown by the model that *passed* the phantom test (kissing=0),
+  unlike the rejected local certifier.
+
+**Honest gaps:** no i74 ground truth, so this is descriptive (≈24% confirmed is best
+read as a spatially-varying lower bound, not an accuracy); the confirmed/demoted
+split uses a length≥3-segment threshold (stability across stride is reassuring but
+it is still a choice); dense-tissue over/under-linking is not independently
+calibrated. Those are exactly what the fully-honest Phase 3 addresses.
+
+**Next:** the fully-honest Phase 3 adds the L2 generative term + the **calibrated
+half-map noise likelihood**, so the continuity prior is pinned against real data and
+cannot silently hallucinate (or over-demote) — the noise model finally doing double
+duty here as well.
 
 ---
 
