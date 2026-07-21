@@ -68,6 +68,7 @@ why the noise model (half-map) matters even here.
 | **0 — mechanism** | 2D/small-3D proof that global continuity resolves a locally-ambiguous junction (crossing, then kissing). Data term = image/FOD; prior = curvature. | No |
 | **1 — 3D on phantoms** | Rep (A)→(B), MRF/segment inference, validated on the `host_geometry_test` crossing **and kissing** phantoms (known truth). Milestone: correctly separate kissing from crossing. **✓ MET (wide-angle scope)** — gated energy rule separates θ₂∈[70,90°], tracking the fundamental narrow-crossing limit; narrow = genuinely ambiguous. See Phase-1c/1d note. | No (FOD data term, L1) |
 | **2 — real i74, FOD likelihood** | Run L1 on i74 tissue; compare the global field to the per-voxel one; does it demote spurious crossings and connect real tracts? **◐ STARTED, local certifier REJECTED** — both straightness (kissing demote 27%) and tight-cone min-reach (13%) confirm true crossings but miss kissing. Local per-peak certification is insufficient; kissing/crossing on real data needs the full joint global model (Phase 3). See Phase-2 note. | Weakly (FOD weight) |
+| **2.5 — joint global model** | The segment/particle representation (option B) with continuity + parsimony over ALL tracts at once — the model Phase 2 showed is required. **✓ MECHANISM PROVEN in 2D** (`phase3_global.py`): separates kissing from crossing where the local certifier could not. See Phase-2.5 note. | No |
 | **3 — generative, honest** | L2 forward model (LIC) + **calibrated noise likelihood**; full posterior / uncertainty. | **Yes** — the residual term is meaningless without the measured noise |
 
 So: **Phases 0–1 can start immediately**; the half-map is required only to make
@@ -180,8 +181,48 @@ tweaks do not rescue them.
 crossing on realistic tissue; it can only flag noise-like peaks. Honest kissing/
 crossing separation on real data needs the **full joint global model** — parsimony
 over all tracts at once (does an individual fibre LINE connect across a junction?),
-not one peak scored in isolation. That is the Phase-3 build, and it is now the
-motivated next step rather than a guess.
+not one peak scored in isolation. That is the joint global model below.
+
+### Phase-2.5 result — the joint global model works (2D mechanism, `phase3_global.py`)
+
+Built the model Phase 2 proved is required: solve for a whole configuration of tracts
+at once and score it jointly, so the *relational* fact (which segment connects to
+which) is in the objective instead of thrown away.
+
+- **Representation:** oriented segments from a 2D **multi-orientation** seeder (a
+  gradient-orientation histogram, peaks → one segment per fibre direction; a single
+  structure-tensor direction is near-isotropic at a crossing and cannot seed it —
+  the same reason HOST-FOD exists, rediscovered here as a bug then fixed).
+- **Energy (joint):** `E = w_c·Σ curvature(links) + w_n·(#tracts)` over segment-to-
+  segment links (degree ≤ 2, acyclic → tracts are chains). Continuity wants smooth
+  links; parsimony wants few tracts. Neither term is per-voxel-local.
+- **Inference:** greedy min-curvature degree-constrained forest (Kruskal + union-
+  find) — the exact global solve for this per-link-decomposable energy; `anneal()`
+  keeps a Metropolis sampler for the general (coupled) case. **Direction-aware
+  candidate links** (search along each segment's own tangent, not nearest-by-
+  distance) were essential — raw nearest-neighbour links let the perpendicular
+  family crowd out each fibre's continuation at a crossing.
+
+**Result (test = tracts that reach ≥15 vox through the junction on both sides):**
+
+| θ₂ | 45° | 60° | 70° | 90° |
+|----|-----|-----|-----|-----|
+| crossing through-tracts | 1 | 7 | 12 | 15 |
+| kissing through-tracts | **0** | **0** | **0** | **0** |
+
+**Kissing is 0 at every angle** — the global model *never* fabricates a through-
+connection (zero false crossings), exactly the failure the local Phase-2 certifiers
+could not avoid (they passed 73–87% of kissing). A true crossing is connected
+through; its through-count scales with angle and goes weak at 45° (=1) — the same
+narrow-crossing resolution limit as Phase 1 — but it fails **safely** (under-connects
+rather than hallucinates). So the joint global model **separates kissing from
+crossing where the local per-peak certifier could not** — the Phase-2 conclusion,
+now demonstrated constructively.
+
+**Next:** (i) scale the 2D mechanism to 3D and run on real i74 (reuse HOST FODs as
+the multi-orientation seeder); (ii) the fully-honest Phase 3 then adds the L2
+generative term + the **calibrated half-map noise likelihood**, so the prior is
+pinned against real data and cannot silently hallucinate continuity.
 
 ---
 
