@@ -59,26 +59,60 @@ EPS = 1e-12
 # loading
 # ---------------------------------------------------------------------------
 
-def load_any(path, dtype=np.float64):
+def _center_span(n, k):
+    """(start, stop) of a length-k central window in [0, n); full axis if k<=0
+    or k>=n."""
+    if k <= 0 or k >= n:
+        return 0, n
+    s = (n - k) // 2
+    return s, s + k
+
+
+def load_any(path, dtype=np.float64, crop=0):
     """Load a volume from a TIFF stack folder, a (multipage) .tif, .npy, or
-    NIfTI. Returns a float64 3D array."""
+    NIfTI. Returns a float64 3D array. If crop>0, reads only a central
+    crop^3 block WITHOUT materialising the full volume first -- essential for
+    lung-scale stacks that would otherwise exhaust memory before the crop."""
     if os.path.isdir(path):
         import tifffile
         from pathlib import Path
         files = sorted(Path(path).glob("*.tif")) + sorted(Path(path).glob("*.tiff"))
         if not files:
             raise FileNotFoundError(f"no TIFF slices in {path}")
-        return np.stack([tifffile.imread(f) for f in files]).astype(dtype)
+        z0, z1 = _center_span(len(files), crop)          # slice only central z
+        first = tifffile.imread(files[z0])                # probe H, W lazily
+        y0, y1 = _center_span(first.shape[0], crop)
+        x0, x1 = _center_span(first.shape[1], crop)
+        out = np.empty((z1 - z0, y1 - y0, x1 - x0), dtype=dtype)
+        for i, f in enumerate(files[z0:z1]):
+            out[i] = tifffile.imread(f)[y0:y1, x0:x1]      # crop per slice on read
+        return out
     ext = os.path.splitext(path)[1].lower()
     if ext in (".tif", ".tiff"):
         import tifffile
-        return tifffile.imread(path).astype(dtype)
-    if ext == ".npy":
-        return np.load(path).astype(dtype)
-    if ext in (".nii", ".gz"):
+        vol = tifffile.imread(path)
+    elif ext == ".npy":
+        vol = np.load(path, mmap_mode="r")                # lazy; crop before copy
+    elif ext in (".nii", ".gz"):
         import nibabel as nib
-        return np.asarray(nib.load(path).dataobj).astype(dtype)
-    raise ValueError(f"unrecognised volume format: {path}")
+        vol = nib.load(path).dataobj                      # lazy proxy
+    else:
+        raise ValueError(f"unrecognised volume format: {path}")
+    sp = [_center_span(n, crop) for n in vol.shape]
+    return np.asarray(vol[sp[0][0]:sp[0][1], sp[1][0]:sp[1][1],
+                          sp[2][0]:sp[2][1]]).astype(dtype)
+
+
+def report_clipping(V, name, log):
+    """Log the fraction of voxels pinned at the volume min/max -- a clipping
+    (saturated air / bone) signature. On a clipped scan the half-map difference
+    n=(A-B)/sqrt(2) is exactly 0 there, so T1 noise stats come only from
+    unclipped tissue (which is what we want, but worth knowing)."""
+    vmin, vmax = float(V.min()), float(V.max())
+    fmin = float((V == vmin).mean()); fmax = float((V == vmax).mean())
+    flag = "  <- likely clipped" if (fmin > 0.02 or fmax > 0.02) else ""
+    log(f"[preflight] {name}: range [{vmin:.3g}, {vmax:.3g}], "
+        f"{fmin:.0%} at min / {fmax:.0%} at max{flag}")
 
 
 def make_synthetic(shape=(96, 96, 96), noise_sigma=0.25, seed=0):
@@ -246,17 +280,17 @@ def task3_certify(A, B, log, truth=None, save="halfmap_T3_certify.png"):
 # T4 -- image resolution: plain FSC(A, B)
 # ---------------------------------------------------------------------------
 
-def task4_resolution(A, B, log, save="halfmap_T4_resolution.png"):
+def task4_resolution(A, B, log, save="halfmap_T4_resolution.png", vox_um=VOX_UM):
     freqs, curve = fsc(A, B, nbins=50)
     fcut = resolution_frequency(freqs, curve, 0.143)
     res_vox = 1.0 / fcut if fcut > 0 else np.inf
     log(f"[T4] image FSC cutoff = {fcut:.4f} cyc/vox -> resolution ~{res_vox:.2f} vox "
-        f"(~{res_vox*VOX_UM:.0f} um)")
+        f"(~{res_vox*vox_um:.0f} um)")
     fig, ax = plt.subplots(figsize=(7, 5))
     ax.plot(freqs, curve, "o-"); ax.axhline(0.143, color="r", ls="--", label="0.143")
     ax.axvline(fcut, color="0.5", ls=":", label=f"cutoff {fcut:.3f}")
     ax.set_xlabel("cycles/voxel"); ax.set_ylabel("FSC(A,B)")
-    ax.set_title(f"T4: reconstruction resolution ~{res_vox:.1f} vox (~{res_vox*VOX_UM:.0f} um)")
+    ax.set_title(f"T4: reconstruction resolution ~{res_vox:.1f} vox (~{res_vox*vox_um:.0f} um)")
     ax.legend(); fig.tight_layout(); fig.savefig(save, dpi=130); plt.close(fig)
     log(f"[T4] saved {save}")
     return fcut, res_vox
@@ -268,6 +302,7 @@ def main():
     ap.add_argument("--a"); ap.add_argument("--b")
     ap.add_argument("--synthetic", action="store_true")
     ap.add_argument("--crop", type=int, default=0, help="central NxNxN crop for speed")
+    ap.add_argument("--vox", type=float, default=VOX_UM, help="voxel size in um (T4 resolution readout)")
     args = ap.parse_args()
 
     LOG = []
@@ -281,20 +316,19 @@ def main():
         if not (args.a and args.b):
             ap.error("provide --a and --b (or --synthetic)")
         log(f"=== HALF-MAP ANALYSIS  A={args.a}  B={args.b} ===")
-        A, B = load_any(args.a), load_any(args.b)
+        A = load_any(args.a, crop=args.crop)
+        B = load_any(args.b, crop=args.crop)
         if A.shape != B.shape:
             ap.error(f"shape mismatch {A.shape} vs {B.shape}")
-    if args.crop and args.crop < min(A.shape):
-        c = [(s - args.crop) // 2 for s in A.shape]; k = args.crop
-        A = A[c[0]:c[0]+k, c[1]:c[1]+k, c[2]:c[2]+k]
-        B = B[c[0]:c[0]+k, c[1]:c[1]+k, c[2]:c[2]+k]
     log(f"volume {A.shape}, A mean={A.mean():.3g} B mean={B.mean():.3g}")
+    if not args.synthetic:
+        report_clipping(A, "A", log); report_clipping(B, "B", log)
 
     log("-" * 66)
     N_full = task1_noise(A, B, log, truth_sigma_n=truth_sigma)
     log("-" * 66); task2_premise(A, B, N_full, log)
     log("-" * 66); sig_c, rho_c, ok = task3_certify(A, B, log, truth=truth)
-    log("-" * 66); task4_resolution(A, B, log)
+    log("-" * 66); task4_resolution(A, B, log, vox_um=args.vox)
     log("-" * 66)
     log(f"SUMMARY: certified sigma~{sig_c:.2g}, rho~{rho_c:.2g}"
         + (f" (certifier VALID on self-test)" if ok else
