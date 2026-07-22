@@ -46,13 +46,17 @@ def build_kissing(same_size=True, gap=8.0, curv=0.028):
     """Two curved fibres bulging toward each other, closest in the middle (gap),
     tangent there. same_size -> both radius 1.6; else A thin 1.1, B thick 2.6."""
     C = _coords(SHAPE)
-    rA, rB = (1.6, 1.6) if same_size else (1.1, 2.6)
+
+    rA, rB = (1.6, 1.6)
+
     ptsA, ptsB = _curve_pts(-1, gap, curv), _curve_pts(+1, gap, curv)
     A = curved_bundle(C, ptsA, rA)   # ) on the left
     B = curved_bundle(C, ptsB, rB)   # ( on the right
+    
     # honest minimum true gap between the two curve centrelines (not just the
     # parametric tip separation) -- report it so we KNOW they don't touch
     dmin = float(np.min(np.linalg.norm(ptsA[:, None, :] - ptsB[None, :, :], axis=-1)))
+    
     return _finalise(A + B), dict(rA=rA, rB=rB, gap=gap, curv=curv, true_min_gap=dmin)
 
 
@@ -75,3 +79,6 @@ if __name__ == "__main__":
                  "separates them", fontsize=12)
     fig.tight_layout(); fig.savefig("kissing_phantom_geom.png", dpi=130); plt.close(fig)
     print("Saved kissing_phantom_geom.png")
+
+
+build_kissing(same_size=True, gap=12.0, curv=0.028)
