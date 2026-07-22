@@ -313,10 +313,32 @@ So the calibrated likelihood is the ingredient that makes the model robust to th
 real noise that eroded the un-calibrated pipeline — the mechanism the whole thread
 was pointing at, now demonstrated with the actual measured noise.
 
-**Next (full build):** wire this likelihood into the joint global model's inference
-(replace the curvature-only data term), and derive the parsimony weight from σ so the
-data-vs-prior balance is set by the noise rather than tuned — then re-run the i74
-over-calling estimate end-to-end under calibration.
+**Full-build attempt — `phase3_calibrated.py` (honest negative).** Derived the linking
+curvature budget from the noise (`gate* = P90` of single-fibre link costs under the
+real noise = **0.90** vs the default 0.30 — confirming noise inflates true-link costs
+~3×, the fragmentation cause) and swept the gate end-to-end:
+
+| gate | sens | fconf | i74 real-frac |
+|---|---|---|---|
+| 0.20 | 35% | 6% | 62% |
+| 0.30 | 57% | 17% | 17% |
+| 0.45 | 71% | 28% | below floor |
+| 0.90 | 79% | 61% | below floor |
+
+Raising the gate recovers sensitivity but inflates false-confirm just as fast — a
+scalar curvature gate **cannot separate a noise-inflated real link from a noise link**
+(they overlap at this noise). Consequently the **over-calling magnitude is not robustly
+estimable**: the inferred real-crossing fraction swings 62% → 17% → ~all-over-called
+across operating points, so the earlier **~4% and ~17% were operating-point artifacts**
+— do not quote them as the answer. What is robust: at the best-discriminating gates
+i74's 24% confirm sits at/below the non-crossing floor (crossings ≈ non-crossings), but
+the *amount* of over-calling is under-determined by threshold-based confirmation.
+
+**What the number actually needs:** likelihood-based confirmation — score each tract by
+the noise-whitened generative likelihood (phase3_generative's term) *inside* the
+inference, which distinguishes structure that genuinely explains the image under the
+measured noise from noise-induced structure (a scalar gate cannot). That is the real
+remaining build; the calibration attempt showed a gate is not a substitute for it.
 
 ---
 
