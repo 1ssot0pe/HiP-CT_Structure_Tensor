@@ -69,7 +69,7 @@ why the noise model (half-map) matters even here.
 | **1 — 3D on phantoms** | Rep (A)→(B), MRF/segment inference, validated on the `host_geometry_test` crossing **and kissing** phantoms (known truth). Milestone: correctly separate kissing from crossing. **✓ MET (wide-angle scope)** — gated energy rule separates θ₂∈[70,90°], tracking the fundamental narrow-crossing limit; narrow = genuinely ambiguous. See Phase-1c/1d note. | No (FOD data term, L1) |
 | **2 — real i74, FOD likelihood** | Run L1 on i74 tissue; compare the global field to the per-voxel one; does it demote spurious crossings and connect real tracts? **◐ STARTED, local certifier REJECTED** — both straightness (kissing demote 27%) and tight-cone min-reach (13%) confirm true crossings but miss kissing. Local per-peak certification is insufficient; kissing/crossing on real data needs the full joint global model (Phase 3). See Phase-2 note. | Weakly (FOD weight) |
 | **2.5 — joint global model** | The segment/particle representation (option B) with continuity + parsimony over ALL tracts at once — the model Phase 2 showed is required. **✓ MECHANISM PROVEN in 2D** (`phase3_global.py`): separates kissing from crossing where the local certifier could not. See Phase-2.5 note. | No |
-| **3 — generative, honest** | L2 forward model (LIC) + **calibrated noise likelihood**; full posterior / uncertainty. | **Yes** — the residual term is meaningless without the measured noise |
+| **3 — generative, honest** | L2 forward model (LIC) + **calibrated noise likelihood**; full posterior / uncertainty. **✓ MECHANISM PROVEN** (`phase3_generative.py`): noise-whitened generative likelihood selects the true geometry, confidence shrinks with noise (honest uncertainty), and the measured anisotropic spectrum beats a white model (100% vs 93% at high noise; white is overconfident). See Phase-3 note. | **Yes** — used, now that the half-maps give the noise |
 
 So: **Phases 0–1 can start immediately**; the half-map is required only to make
 Phase 3 (the honest generative posterior) rigorous — and, per the noise thread,
@@ -280,11 +280,43 @@ transfer this project has repeatedly found unreliable ([[host-gate-decision]],
 [[noise-floor-result]]). So treat p≈4% as indicative; the *qualitative* claim
 (i74 crossings ≈ non-crossing behaviour) is what is solid.
 
-**Next:** the fully-honest Phase 3 adds the L2 generative term + the **calibrated
-half-map noise likelihood**, so the continuity prior is pinned against real data and
-cannot silently hallucinate (or over-demote) — and the half-maps would also let us
-re-derive these confirm/demote rates on real noise instead of a phantom, closing the
-transfer caveat.
+**Transfer caveat CLOSED with the real noise (`phase3_realnoise.py`).** Re-ran the 3D
+validation injecting the REAL lung half-map noise `n=(A−B)/√2` (anisotropy 2.33,
+correlated) instead of white, at the same amplitude. It **degrades**: true-crossing
+confirm **89% → 57%** (realistic directional noise fragments real fibres); kissing
+false-confirm held (21% → 17%). Re-inverting i74's observed 24% confirm with these
+*realistic* rates (sens 0.57, false-confirm 0.17) gives real-crossing fraction
+**p ≈ 17%**, not ~4%. So the white-noise validation was **optimistic**; the honest
+figure is ~17% real / ~83% over-called — still over-called, but far less extreme. The
+qualitative claim survives; the quantitative one was corrected by measuring, not
+assuming.
+
+### Phase-3 note — noise-calibrated generative model (`phase3_generative.py`)
+
+The degradation above is exactly what a **noise-aware** model should fix. Phase 3
+replaces the hand-weighted data term with a GENERATIVE likelihood pinned by the
+measured noise: each hypothesis predicts its clean image (the tube pattern; LIC
+generalises this to a tract direction field), and the residual is **whitened by the
+measured noise power spectrum** `P_n=|FFT(n)|²`, so `logL(H) = −‖whiten(obs−predict_H)‖²/2σ²`.
+
+Result (kissing-vs-crossing model selection, real noise injected):
+- **Selects the true geometry** — 100% across all noise levels.
+- **Honest uncertainty** — confidence `|log-odds|` shrinks monotonically as σ rises
+  (2104 → 8 over σ 0.5→8).
+- **Measured beats white** — at high noise the calibrated spectrum stays 100% while a
+  white model drops to **93%**, and the white model is *overconfident* (10× larger
+  `|log-odds|` yet less accurate) — the miscalibration from assuming white noise when
+  it is actually correlated. The gap is modest here (an easy 70° discrimination) and
+  would widen for narrow-angle/subtler cases.
+
+So the calibrated likelihood is the ingredient that makes the model robust to the
+real noise that eroded the un-calibrated pipeline — the mechanism the whole thread
+was pointing at, now demonstrated with the actual measured noise.
+
+**Next (full build):** wire this likelihood into the joint global model's inference
+(replace the curvature-only data term), and derive the parsimony weight from σ so the
+data-vs-prior balance is set by the noise rather than tuned — then re-run the i74
+over-calling estimate end-to-end under calibration.
 
 ---
 
