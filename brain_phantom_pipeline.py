@@ -47,7 +47,9 @@ def build(kind, seed=0):
     elif kind == "crossing":
         s = _tube_family(c, _dir_inplane(0.0), 11.0, 1.5) + _tube_family(c, _dir_inplane(70.0), 11.0, 1.5)
     elif kind == "kissing":
-        s = np.where(c[2] < 0.0, _tube_family(c, _dir_inplane(0.0), 11.0, 1.5),
+        # split along x (axis2, c[0]) so the two touching halves are visible in a
+        # z-slice: left = horizontal fibres, right = 70-deg fibres, meeting at x=0
+        s = np.where(c[0] < 0.0, _tube_family(c, _dir_inplane(0.0), 11.0, 1.5),
                      _tube_family(c, _dir_inplane(70.0), 11.0, 1.5))
     else:                                       # complex: 3 random fibres
         s = sum(_tube_family(c, d, 11.0, 1.5) for d in _random_dirs(3, 30.0, seed=seed))
