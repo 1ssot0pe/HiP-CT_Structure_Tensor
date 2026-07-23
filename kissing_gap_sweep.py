@@ -17,8 +17,8 @@ SHRINK and vanish as gap grows past the ~17-vox window width.
 from kissing_phantom import build_kissing
 from test_kissing_phantom import classify_grid, tractography_gap_test
 
-GAPS = (4.0, 8.0, 12.0, 16.0, 20.0)
-RADIUS = 1.6                # both bundles this width (see build_kissing's current hardcode)
+GAPS = (2.0, 2.5, 3.0, 4.0, 8.0, 12.0, 16.0, 20.0)
+RADIUS = 1.5                # both bundles this width (see build_kissing's current hardcode)
 
 
 def valley_ratio(vol):
