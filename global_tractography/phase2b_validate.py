@@ -27,6 +27,9 @@ Pass = confirms true crossings AND demotes kissing contacts. Only then is the i7
 demotion number (phase2_i74_demote.py) measuring what we claim.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 
 from host_geometry_test import make_kissing_phantom, make_true_crossing_same_angles

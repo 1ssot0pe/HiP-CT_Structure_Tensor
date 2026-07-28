@@ -28,6 +28,9 @@ ambiguous -- the same narrow-crossing limit seen throughout this project.
        disc low. Tests that the SIGNAL, not a tuned threshold, still points right.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

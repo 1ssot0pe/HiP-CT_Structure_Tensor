@@ -17,6 +17,9 @@ Checks, for SAME-size and DIFFERENT-size fibre variants:
       should end as SEPARATE tracts, not one continuous tract spanning the midline.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 
 from kissing_phantom import build_kissing, SHAPE

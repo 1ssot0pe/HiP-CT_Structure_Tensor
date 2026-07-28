@@ -15,6 +15,9 @@ noise really does erode the pipeline -- and the i74 numbers were optimistic. Eit
 way it is measured, not assumed.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import os
 import numpy as np
 

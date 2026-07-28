@@ -20,6 +20,9 @@ separates real crossings from false ones). Only then is the i74 number trustwort
 Run:  .venv/Scripts/python -u phase3_validate3d.py [--crop N] [--stride S]
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import argparse
 import numpy as np
 

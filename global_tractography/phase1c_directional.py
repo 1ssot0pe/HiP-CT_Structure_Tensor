@@ -35,6 +35,9 @@ takes BOTH ingredients -- a directional data term AND global parsimony. The gate
 angles instead of only at 70 deg -- see phase1d_generalize.py.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

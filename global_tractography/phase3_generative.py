@@ -26,6 +26,9 @@ We show three things:
       the noise rather than assuming it white.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import os
 import numpy as np
 from scipy.ndimage import gaussian_filter

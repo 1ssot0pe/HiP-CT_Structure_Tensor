@@ -1,24 +1,11 @@
-"""
-kissing_gap_sweep.py -- same fibre width (radius 1.6/1.6), GAP swept over five values,
-to see where the pipeline still works. Reuses the B/C tests from test_kissing_phantom.
-
-HOST's analysis window is 17 vox wide (HALF=8), so the sweep spans "gap smaller than
-the window" to "gap clearly bigger than it":
-    gap = 4, 8, 12, 16, 20 vox
-
-Expect: (C) global tractography should refuse to bridge the gap at EVERY gap (0
-spanning tracts) -- even a small gap is still a real gap, and the whole point of
-Phase 2.5 was that continuity+parsimony do not need a big gap to get this right.
-(B) the RARE spurious local "crossing" near the closest approach (a resolution-scale
-partial-volume effect, see kissing_phantom / test_kissing_phantom docstrings) should
-SHRINK and vanish as gap grows past the ~17-vox window width.
-"""
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
 
 from kissing_phantom import build_kissing
 from test_kissing_phantom import classify_grid, tractography_gap_test
 
-GAPS = (2.0, 2.5, 3.0, 4.0, 8.0, 12.0, 16.0, 20.0)
-RADIUS = 1.5                # both bundles this width (see build_kissing's current hardcode)
+GAPS = (2.0, 3.0, 4.0, 8.0, 10.0)
+RADIUS = 2.0  # same width as target resolution limit 4vxs wide 
 
 
 def valley_ratio(vol):
@@ -38,6 +25,7 @@ def run():
     print(f"  {'gap':>5} | {'valley':>7} | {'HOST single':>13} {'spurious x-ing':>16} | "
           f"{'tracts':>7} {'spanning':>9}")
     rows = []
+    
     for gap in GAPS:
         vol, meta = build_kissing(same_size=True, gap=gap)
         vr = valley_ratio(vol)
@@ -51,6 +39,7 @@ def run():
               f"{singles:4d}/{tot:<4d} ({singles/tot:4.0%}) {cross:4d}/{tot:<4d} "
               f"({cross/tot:4.0%})   | {ntracts:7d} {spanning:9d}")
     print("-" * 88)
+    
     bridged = [r for r in rows if r[6] > 0]
     if bridged:
         g, vr, *_ = bridged[0]
@@ -70,11 +59,9 @@ def run():
           ", ".join(f"{g:.0f}v={r:.0%}" for g, r in xs))
     shrinking = all(xs[i][1] >= xs[i+1][1] for i in range(len(xs)-1)) if len(xs) > 1 else True
     print(f"      {'shrinks monotonically with gap (as expected)' if shrinking else 'not perfectly monotonic (small-sample noise in the estimate)'}")
+    
     print("=" * 88)
 
 
 if __name__ == "__main__":
     run()
-
-
-run()

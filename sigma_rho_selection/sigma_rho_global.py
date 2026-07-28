@@ -2,7 +2,7 @@
   (1) The gamma-normalised response sigma^2 * mean(plane energy) peaks at the fibre's own scale ->
       sigma_L. Its rho-stability plateau (where e3 stops changing with rho) ->
       rho_L. Resists over-smoothing via first-interior-local-max, not a
-      global argmax (see lindeberg_stability_3d.first_local_max).
+      global argmax (see pick_sigma_rho.first_local_max).
 
   (2) The sigma >= ~0.85 vox DISCRETISATION FLOOR (from noise_floor.py T1):
       below it the Gaussian derivative stops being a faithful derivative. A
@@ -18,7 +18,7 @@ import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root, for reconstruction
 from reconstruction import load_volume, VOXEL_SIZE_UM
-from lindeberg_stability_3d import (lindeberg_response_3d, first_local_max,
+from pick_sigma_rho import (lindeberg_response_3d, first_local_max,
                                     sweep_rho_stability_3d)
 from lindeberg_sigma_phantoms import refined_peak_sigma
 

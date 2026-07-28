@@ -44,9 +44,98 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor, orthogonality_residual, reconstruction)
 import noise_floor as nf
-from resolution_sweep import fsc, resolution_frequency, _shell_index
-from orthogonality_residual import fibre_direction, crop_margin
+from reconstruction import (grid_cells, iter_progress, _demo_principal_direction,
+                            suggested_margin, crop_region)
+
+
+# ---------------------------------------------------------------------------
+# FSC + supervised angular-error helpers, inlined from the (deleted)
+# resolution_sweep.py -- half_map_analysis was its only remaining user.
+# ---------------------------------------------------------------------------
+
+def _shell_index(shape, nbins):
+    """Radial-frequency shell index (0..nbins-1) per voxel, and shell centres.
+    Frequencies in cycles/voxel via fftfreq; only bin 0..0.5 (Nyquist)."""
+    ks = [np.fft.fftfreq(n) for n in shape]
+    KZ, KY, KX = np.meshgrid(*ks, indexing="ij")
+    kr = np.sqrt(KZ ** 2 + KY ** 2 + KX ** 2).ravel()
+    edges = np.linspace(0.0, 0.5, nbins + 1)
+    idx = np.digitize(kr, edges) - 1
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    return idx, centres
+
+
+def fsc(vol_a, vol_b, nbins=50, eps=1e-12):
+    """Fourier Shell Correlation curve between two equal-shape volumes.
+    Returns (freqs, curve): freqs in cycles/voxel, curve in [-1, 1] per shell."""
+    a = np.asarray(vol_a, float)
+    b = np.asarray(vol_b, float)
+    if a.shape != b.shape:
+        raise ValueError("fsc: volumes must have the same shape")
+    Fa = np.fft.fftn(a).ravel()
+    Fb = np.fft.fftn(b).ravel()
+    idx, freqs = _shell_index(a.shape, nbins)
+    cross = np.real(Fa * np.conj(Fb))
+    pa = np.abs(Fa) ** 2
+    pb = np.abs(Fb) ** 2
+    keep = (idx >= 0) & (idx < nbins)
+    idx = idx[keep]
+    num = np.bincount(idx, weights=cross[keep], minlength=nbins)
+    da = np.bincount(idx, weights=pa[keep], minlength=nbins)
+    db = np.bincount(idx, weights=pb[keep], minlength=nbins)
+    curve = num / (np.sqrt(da * db) + eps)
+    return freqs, curve
+
+
+def resolution_frequency(freqs, curve, threshold=0.143):
+    """First frequency (cyc/vox) where the FSC curve crosses `threshold` downward,
+    linearly interpolated. Nyquist-limited -> highest shell frequency."""
+    below = np.where(curve < threshold)[0]
+    if below.size == 0:
+        return float(freqs[-1])
+    i = int(below[0])
+    if i == 0:
+        return float(freqs[0])
+    f0, f1 = freqs[i - 1], freqs[i]
+    c0, c1 = curve[i - 1], curve[i]
+    t = (threshold - c0) / ((c1 - c0) if (c1 - c0) != 0 else 1e-12)
+    return float(f0 + t * (f1 - f0))
+
+
+def _mean_angular_error(field, truth, margin):
+    """Mean angular error (deg) between the demo eigenvector field and truth
+    (both (Nx,Ny,Nz,3), same index basis). Sign-agnostic (v ~ -v)."""
+    f = crop_region(field, margin)
+    t = crop_region(truth, margin)
+    valid = np.isfinite(f).all(-1) & np.isfinite(t).all(-1)
+    fn = f / (np.linalg.norm(f, axis=-1, keepdims=True) + 1e-12)
+    cos = np.clip(np.abs(np.sum(fn * t, axis=-1)), 0.0, 1.0)
+    ang = np.degrees(np.arccos(cos))
+    return float(np.mean(ang[valid])) if valid.any() else float("nan")
+
+
+def sweep_angular_error(volume, truth, sigmas, rhos,
+                        length=8, step_size=0.5, verbose=True):
+    """Grid-evaluate supervised mean angular error over sigmas x rhos."""
+    sigmas = np.asarray(sigmas, float)
+    rhos = np.asarray(rhos, float)
+    A = np.full((sigmas.size, rhos.size), np.nan)
+    cells = grid_cells(sigmas.size, rhos.size)
+    for i, j in iter_progress(cells, desc="angular    sweep", enable=verbose):
+        s, r = sigmas[i], rhos[j]
+        field = _demo_principal_direction(volume, s, r)
+        A[i, j] = _mean_angular_error(field, truth,
+                                      suggested_margin(s, r, length, step_size))
+    i, j = np.unravel_index(np.nanargmin(A), A.shape)
+    best = dict(sigma=float(sigmas[i]), rho=float(rhos[j]), i=int(i), j=int(j),
+                value=float(A[i, j]))
+    if verbose:
+        print(f"[angular   ] argmin err = {best['value']:.3f} deg "
+              f"at sigma={best['sigma']:.3g}, rho={best['rho']:.3g} (grid cell [{i},{j}])")
+    return A, best
 
 VOX_UM = 20.0
 SIGMAS_N = np.array([0.5, 0.7, 1.0, 1.4, 2.0, 2.8, 4.0, 5.7, 8.0])
@@ -256,7 +345,6 @@ def task3_certify(A, B, log, truth=None, save="halfmap_T3_certify.png"):
     # self-test: does it coincide with supervised angular error?
     passed = None
     if truth is not None:
-        from resolution_sweep import sweep_angular_error
         Aerr, bA = sweep_angular_error((A + B) / 2.0, truth, SIG_GRID, RHO_GRID, verbose=False)
         d = int(max(abs(i - bA["i"]), abs(j - bA["j"])))
         ok = np.isfinite(Q) & np.isfinite(Aerr)

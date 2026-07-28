@@ -26,6 +26,9 @@ local curvature limit, that resolves kissing vs crossing. That is the concrete
 requirement the full Bayesian model must implement.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 from scipy.ndimage import map_coordinates
 import matplotlib

@@ -143,7 +143,7 @@ crossing, walk both peaks as continuity streamlines and test whether each traces
 **coherent, persistent line**. Answers the design-doc question "does global
 continuity demote spurious crossings?".
 
-- **Reach saturated — the phantom threshold did NOT transfer.** In dense lung tissue
+- **Reach saturated — the phantom threshold did NOT transfer.** In dense i74 tissue
   a continuity walk almost always finds *some* in-cone fibre above `R_STOP`, so
   "reach" hit the cap for ~every peak (100% confirmed = non-discriminating). This is
   the **same synthetic→real transfer failure** as the [[host-gate-decision]]
@@ -290,6 +290,45 @@ false-confirm held (21% → 17%). Re-inverting i74's observed 24% confirm with t
 figure is ~17% real / ~83% over-called — still over-called, but far less extreme. The
 qualitative claim survives; the quantitative one was corrected by measuring, not
 assuming.
+
+**⚠️ CROSS-ORGAN NOISE CAVEAT (`i74_noise_transfer_falsify.py`).** The "real noise"
+above — and in *every* real-noise validation in this project (mass-conservation,
+σ/ρ robustness, the 89%→57% degradation) — is **lung** half-map noise
+(`lung_A.npy`/`lung_B.npy`). But **i74 is brain, and has no half-maps**, so its own
+noise cannot be measured by the clean `n=(A−B)/√2` route at all. The lung noise is a
+**cross-organ proxy**, and with no i74 half-maps the transfer cannot be *validated*,
+only *falsified*. Falsification attempt: with a single averaged volume there is no
+signal-free region (i74 air is clipped to exactly 0), so the one place i74 noise is
+visible is the **high-frequency tail of its radial power spectrum** (above the fibre
+scale = noise + unresolved structure + reconstruction roll-off, an upper bound).
+Compared against pure lung noise through the identical estimator
+(`noise_floor.power_spectrum_3d`):
+
+| block | high-freq tail slope (0.30–0.48 cyc/vox) |
+|---|---|
+| i74 tissue | **−4.04** |
+| lung pure noise (the proxy) | **−4.01** |
+| white reference (anchor) | −0.13 (≈0 = uncorrelated ✓) |
+
+**Result: SURVIVES — but read the mechanism.** i74 and lung differ by 0.04 against a
+lung-vs-white gap of 3.87, i.e. essentially identical. A match that tight is *too*
+good to be two independent tissue noises coinciding — it almost certainly reflects the
+**shared HiP-CT reconstruction roll-off** (same beamline/detector/recon pipeline
+colors any volume's high-freq tail the same way, brain or lung). So:
+- ✅ the *isotropic spectral shape* ("correlated / low-pass", slope ≈ −4) is **not
+  falsified** and plausibly transfers via shared reconstruction physics — arguably the
+  part of the noise that most matters to the pipeline;
+- ⚠️ the **anisotropy** (the lung "2.33" directional number) is **NOT covered** — it is
+  the most organ-specific component (fibre orientation, ring artifacts vs rotation
+  axis) and is unmeasurable on i74 because the fibres themselves make the signal
+  anisotropic, confounding it;
+- ⚠️ "survives" ≠ "validated": the i74 tail is an upper bound (noise + structure +
+  recon filter), so this is weak corroboration only.
+
+**Bottom line for the numbers above:** the isotropic noise transfer is defensible; the
+directional/anisotropic part remains an **open limitation that half-map acquisition on
+i74 is the only clean way to close.** Quote the 89%→57% / p≈17% figures with this
+caveat attached.
 
 ### Phase-3 note — noise-calibrated generative model (`phase3_generative.py`)
 
