@@ -2,7 +2,7 @@
 lindeberg_sigma_phantoms.py
 
 A CLEAN, isolated test of the Lindeberg sigma criterion (see
-lindeberg_stability_3d.lindeberg_response_3d): on a phantom whose fibres have
+pick_sigma_rho.lindeberg_response_3d): on a phantom whose fibres have
 ONE known cross-sectional width, does the gamma-normalised response
 
         sigma^2 * mean(sum of two LARGEST structure-tensor eigenvalues)
@@ -22,7 +22,7 @@ pure sigma read:
   * orthogonality_residual.make_fanning_phantom rotates the fibre orientation
     across the volume (by design, to give rho a real optimum). That spatial
     orientation change is exactly the large-scale content the
-    lindeberg_stability_3d.first_local_max docstring warns can hijack the
+    pick_sigma_rho.first_local_max docstring warns can hijack the
     response at large sigma.
 
 This module strips all of that away: a SINGLE population of straight, parallel
@@ -37,13 +37,13 @@ criterion measures scale (rather than some fixed grid artefact) is that the peak
 MOVES with the width: sweep several widths and the peak-sigma vs width curve
 should be monotonic and roughly linear. That sweep is the main() experiment.
 
-Reuses lindeberg_response_3d + first_local_max from lindeberg_stability_3d so the
+Reuses lindeberg_response_3d + first_local_max from pick_sigma_rho so the
 exact response being tested here is the same code the real-data recipe uses.
 """
 
 import numpy as np
 
-from lindeberg_stability_3d import lindeberg_response_3d, first_local_max
+from pick_sigma_rho import lindeberg_response_3d, first_local_max
 
 
 # ---------------------------------------------------------------------------
@@ -66,13 +66,12 @@ def make_tube_phantom(shape=(96, 96, 96), width=2.0, spacing=None, axis=0,
     width : Gaussian sigma of each tube's cross-section, in voxels. This is the
         scale the Lindeberg peak should recover.
     spacing : centre-to-centre tube spacing, in voxels. Defaults to 6*width so
-        neighbouring tubes barely overlap (the same 6x rule used in
-        toy2d/width_sense_check.py) -- close enough to fill the volume, far
+        neighbouring tubes barely overlap -- close enough to fill the volume, far
         enough that the spacing does not introduce a second competing scale.
     axis : fibre axis (0, 1 or 2). The tubes run along it; the lattice lives in
         the other two axes.
     noise_sigma : std of additive Gaussian noise (0 = clean). Kept OFF by
-        default so this is a pure-scale test; the lindeberg_stability_3d caveat
+        default so this is a pure-scale test; the pick_sigma_rho caveat
         is that the pick is not fully noise-adaptive, which is a separate
         experiment.
     seed : RNG seed for the noise.

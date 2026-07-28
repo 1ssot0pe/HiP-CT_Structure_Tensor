@@ -61,8 +61,12 @@ floor. That is a defensible pick, not a two-method certification.
 
 ## Reproduce
 
-- `python sigma_rho_final.py` — Lindeberg pick vs FSC optimum on real i74
-  (`sigma_rho_final.png`, `sigma_rho_trustgate.png`).
+- `python sigma_rho_selection/sigma_rho_global.py` — single global Lindeberg
+  (σ, ρ) pick on real i74 + discretisation-floor check (`sigma_rho_global.png`).
+  (FSC corroboration was removed after it failed its trust gate — see
+  `sigma_rho_selection/README.md`.)
+- `python sigma_rho_selection/sigma_rho_adaptive.py` — per-region adaptive pick
+  (current best; the single global pick drifts across tissue).
 - `python quality_metric.py` — the cross-scale residual trust-gate
   (`quality_metric_validate.png`); `tensor_reproducibility` / `sweep_reproducibility`
   for the reproducibility metric.

@@ -33,16 +33,19 @@ Rather than forcing a direction everywhere, triage each patch:
     on genuinely unresolvable voxels, so no new ad hoc threshold is invented
     for the hard cases; only the easy majority gets a shortcut.
 
-Reuses lindeberg_response_3d + first_local_max (lindeberg_stability_3d.py,
+Reuses lindeberg_response_3d + first_local_max (pick_sigma_rho.py,
 validated real-data scale selector), analyse + classify (host_fod.py, the
 validated order-6 HOST), and the phantom suite (host_geometry_test.py). Only
 new code is the two-step orchestration (pick_local_sigma_grad, triage_patch)
 and its test against the SAME phantoms that exposed the original problems.
 """
 
+import os
+import sys
 import numpy as np
 
-from lindeberg_stability_3d import lindeberg_response_3d, first_local_max
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "sigma_rho_selection"))
+from pick_sigma_rho import lindeberg_response_3d, first_local_max
 from host_fod import analyse, classify
 from host_geometry_test import (
     make_two_region_phantom, make_messy_crossing, make_kissing_phantom,

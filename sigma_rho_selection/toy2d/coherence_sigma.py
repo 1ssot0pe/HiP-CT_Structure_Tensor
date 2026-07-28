@@ -9,7 +9,7 @@ picks sigma at the peak of sigma^2 * mean(largest structure-tensor eigenvalue).
 On noisy data that peak collapses onto the smallest sigma: noise is the sharpest
 fine-scale "structure", so gradient energy is maximal there. Demonstrated to
 fail on the real HiP-CT chunk (see repo-root lindeberg_real_test.py) and flagged
-in lindeberg_stability_3d.py.
+in pick_sigma_rho.py.
 
 Idea
 ----
