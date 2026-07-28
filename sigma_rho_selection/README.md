@@ -89,7 +89,7 @@ From the repo root, e.g. `.venv\Scripts\python -u sigma_rho_selection\sigma_rho_
 
 # Downstream consumers outside this folder
 
-`adaptive_triage.py` (root) uses `pick_sigma_rho` for a *different* job — a
-per-patch scale for HOST-FOD, not the volume-wide pick here.
+`host_classification/adaptive_triage.py` uses `pick_sigma_rho` for a *different*
+job — a per-patch scale for HOST-FOD, not the volume-wide pick here.
 `crossing_shape_3d.py` (root) uses `toy2d/coherence_sigma.knee_sigma`. Both
 reach in the same `sys.path.insert` way.

@@ -44,7 +44,9 @@ import os
 import sys
 import numpy as np
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "sigma_rho_selection"))
+_ROOT = os.path.dirname(os.path.dirname(__file__))          # repo root (host_fod, host_geometry_test)
+sys.path.insert(0, _ROOT)
+sys.path.insert(0, os.path.join(_ROOT, "sigma_rho_selection"))   # pick_sigma_rho
 from pick_sigma_rho import lindeberg_response_3d, first_local_max
 from host_fod import analyse, classify
 from host_geometry_test import (

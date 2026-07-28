@@ -8,6 +8,7 @@ Features (four independent 64^3 blocks, known label each):
   CROSSING -- two fibres through each other   -> classify "crossing"; tracts TRAVERSE
   KISSING  -- two fibres touching, not crossing-> classify "single" per voxel; tracts
                                                   TERMINATE (only tractography tells it
+
                                                   from a crossing -- the stage division)
   COMPLEX  -- three random fibres             -> classify "complex"/"disorganised"
 
@@ -22,6 +23,8 @@ Stages scored:
 """
 
 import os
+import sys as _sr_sys
+_sr_sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (shared kernels)
 import numpy as np
 from scipy.ndimage import gaussian_filter
 

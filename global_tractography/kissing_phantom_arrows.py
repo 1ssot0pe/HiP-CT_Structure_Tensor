@@ -5,6 +5,9 @@ Every patch should read "single" (blue) -- never "crossing" -- since the two bun
 are never co-located; the gap at the middle should be visibly empty of glyphs.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

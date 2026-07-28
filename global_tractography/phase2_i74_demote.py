@@ -25,6 +25,9 @@ hidden.
 Run:  .venv/Scripts/python -u phase2_i74_demote.py [--crop N] [--n-cross N]
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import argparse
 import numpy as np
 import matplotlib

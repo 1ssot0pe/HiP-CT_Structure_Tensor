@@ -12,6 +12,8 @@ Report the distribution over blocks, so the verdict rests on the spread, not one
 import os
 import numpy as np
 
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor)
 import noise_floor as nf
 
 VOX_UM = 16.547

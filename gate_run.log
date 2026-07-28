@@ -1,22 +1,0 @@
-i74 slice z=100, 36 patches, lambda3 HOST-gate
-lambda3-gate patches:   0%|          | 0/36 [00:00<?, ?it/s]lambda3-gate patches:   3%|2         | 1/36 [00:17<10:02, 17.20s/it]lambda3-gate patches:   6%|5         | 2/36 [00:35<10:01, 17.70s/it]lambda3-gate patches:   8%|8         | 3/36 [00:52<09:31, 17.31s/it]lambda3-gate patches:  11%|#1        | 4/36 [01:10<09:22, 17.57s/it]lambda3-gate patches:  14%|#3        | 5/36 [01:27<09:03, 17.52s/it]lambda3-gate patches:  17%|#6        | 6/36 [01:39<07:47, 15.60s/it]lambda3-gate patches:  19%|#9        | 7/36 [01:52<07:11, 14.87s/it]lambda3-gate patches:  22%|##2       | 8/36 [02:05<06:37, 14.19s/it]lambda3-gate patches:  25%|##5       | 9/36 [02:18<06:11, 13.75s/it]lambda3-gate patches:  28%|##7       | 10/36 [02:32<06:00, 13.86s/it]lambda3-gate patches:  31%|###       | 11/36 [02:48<06:05, 14.64s/it]lambda3-gate patches:  33%|###3      | 12/36 [03:04<05:57, 14.92s/it]lambda3-gate patches:  36%|###6      | 13/36 [03:18<05:38, 14.72s/it]lambda3-gate patches:  39%|###8      | 14/36 [03:33<05:27, 14.87s/it]lambda3-gate patches:  42%|####1     | 15/36 [03:48<05:08, 14.69s/it]lambda3-gate patches:  44%|####4     | 16/36 [04:02<04:50, 14.50s/it]lambda3-gate patches:  47%|####7     | 17/36 [04:16<04:32, 14.35s/it]lambda3-gate patches:  50%|#####     | 18/36 [04:32<04:27, 14.84s/it]lambda3-gate patches:  53%|#####2    | 19/36 [04:46<04:08, 14.60s/it]lambda3-gate patches:  56%|#####5    | 20/36 [05:00<03:51, 14.48s/it]lambda3-gate patches:  58%|#####8    | 21/36 [05:14<03:34, 14.33s/it]lambda3-gate patches:  61%|######1   | 22/36 [05:28<03:18, 14.17s/it]lambda3-gate patches:  64%|######3   | 23/36 [05:41<03:02, 14.06s/it]lambda3-gate patches:  67%|######6   | 24/36 [05:55<02:45, 13.79s/it]lambda3-gate patches:  69%|######9   | 25/36 [06:09<02:33, 13.92s/it]lambda3-gate patches:  72%|#######2  | 26/36 [06:24<02:22, 14.27s/it]lambda3-gate patches:  75%|#######5  | 27/36 [06:36<02:02, 13.60s/it]lambda3-gate patches:  78%|#######7  | 28/36 [06:51<01:52, 14.11s/it]lambda3-gate patches:  81%|########  | 29/36 [07:04<01:35, 13.67s/it]lambda3-gate patches:  83%|########3 | 30/36 [07:18<01:22, 13.68s/it]lambda3-gate patches:  86%|########6 | 31/36 [07:32<01:09, 13.84s/it]lambda3-gate patches:  89%|########8 | 32/36 [07:47<00:57, 14.34s/it]lambda3-gate patches:  92%|#########1| 33/36 [08:02<00:43, 14.45s/it]lambda3-gate patches:  94%|#########4| 34/36 [08:17<00:28, 14.48s/it]lambda3-gate patches:  97%|#########7| 35/36 [08:29<00:13, 13.89s/it]lambda3-gate patches: 100%|##########| 36/36 [08:43<00:00, 13.94s/it]lambda3-gate patches: 100%|##########| 36/36 [08:43<00:00, 14.55s/it]
-====================================================================
-FITTED lambda3 gate (high-recall, from gate_threshold.json)
-  fit on phantoms: train catch 96%, fires 65% of patches -> percentile-35 rule
-  applied to i74: thr=0.1717, fires HOST on 64% of patches
-  (diagnostic: the phantom ABSOLUTE thr=0.3965 lands at the 100th i74 percentile -> absolute lambda3 does NOT transfer, so the fire-fraction is used instead)
-====================================================================
-====================================================================
-lambda3 HOST-gate -- threshold sweep (HOST run everywhere for truth)
-   pct        thr  HOST-run  skipped crossings MISSED
-    40     0.1729        21       15          3/15 crossings
-    50     0.1932        18       18          3/15 crossings
-    55      0.198        16       20          4/15 crossings
-    60     0.2061        14       22          6/15 crossings
-    70     0.2206        11       25          7/15 crossings
-   FIT     0.1717        23       13          1/15 crossings   <-- fitted high-recall gate
-  (per-patch HOST cost ~14.5s; gate saves that on every skipped patch)
-====================================================================
-
-(525s)  HOST-everywhere {'single': 9, 'crossing': 8, 'other': 19}  ->  gated {'single': 21, 'crossing': 6, 'other': 9}
-Saved i74_lambda3_gated.png

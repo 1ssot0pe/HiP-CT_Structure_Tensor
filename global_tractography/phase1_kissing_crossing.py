@@ -23,6 +23,9 @@ incoming direction has enough support. That data+continuity balance is what
 separates kissing from crossing -- the key design claim for the full method.
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")

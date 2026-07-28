@@ -1,6 +1,4 @@
 """
-reconstruction.py - DRAFT
-
 Single-eigenvector image reconstruction from a structure-tensor principal-
 direction field, via 3D Line Integral Convolution (LIC).
 

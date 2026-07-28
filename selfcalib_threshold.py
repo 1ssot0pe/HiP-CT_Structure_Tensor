@@ -2,10 +2,9 @@
 selfcalib_threshold.py
 
 Make the sphericity guard's threshold SELF-CALIBRATING -- derived from a
-volume's own c_s distribution shape, never from ground-truth angular error --
-so it can be set on real HiP-CT data that has no ground truth.
+volume's own c_s distribution shape, never from ground-truth angular error 
 
-Layer 0 (this file, run first, then STOP): does the REAL i74 chunk's per-voxel
+Layer 0: does the REAL i74 chunk's per-voxel
 sphericity histogram actually have a low-c_s bulk + separable high-c_s tail with
 a valley, or is it one smooth unimodal smear? If no separable structure, the
 whole self-calibration idea is void and we stop.

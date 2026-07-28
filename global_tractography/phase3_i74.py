@@ -22,6 +22,9 @@ it does, we do not claim an accuracy.
 Run:  .venv/Scripts/python -u phase3_i74.py [--crop N] [--stride S]
 """
 
+import os as _sr_os, sys as _sr_sys
+_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+
 import argparse
 import numpy as np
 import matplotlib

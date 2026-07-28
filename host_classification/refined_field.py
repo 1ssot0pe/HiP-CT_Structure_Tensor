@@ -29,7 +29,11 @@ Reuses analyse (host_fod), load_interior (selfcalib_threshold). Validated on
 synthetic (genuine crossings must SURVIVE both filters) before real data.
 """
 
+import os
+import sys
 import warnings
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (host_fod, selfcalib_threshold)
 warnings.filterwarnings("ignore")
 
 import numpy as np

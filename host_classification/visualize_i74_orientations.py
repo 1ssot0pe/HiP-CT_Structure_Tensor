@@ -33,6 +33,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
 
+import os
+import sys
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "host_classification"))  # adaptive_triage moved here
 from selfcalib_threshold import load_interior
 from adaptive_triage import triage_patch_v2
 

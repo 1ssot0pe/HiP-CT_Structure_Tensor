@@ -20,6 +20,8 @@ Report the medians over blocks + the PSD-clip guard (over-subtraction).
 import os
 import numpy as np
 
+import sys as _sys, os as _os
+_sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor)
 import noise_floor as nf
 
 SIGMA, RHO, K = 4.0, 4.0, 80

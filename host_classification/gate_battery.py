@@ -39,7 +39,11 @@ crossing_trigger_test (make_perp_bundles) generalised here to arbitrary crossing
 angle and a spatial contrast-gain field.
 """
 
+import os
+import sys
 import warnings
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (crossing_shape_3d, host_fod)
 warnings.filterwarnings("ignore")
 
 import numpy as np
