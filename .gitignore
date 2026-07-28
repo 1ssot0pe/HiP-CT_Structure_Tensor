@@ -11,3 +11,4 @@ lung_B.npy
 *.tiff
 *.nii
 *.nii.gz
+*.npy
