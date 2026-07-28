@@ -37,7 +37,7 @@ from structure_tensor import structure_tensor_3d, eig_special_3d
 from orthogonality_residual import fibre_direction, crop_margin, _crop3
 
 # Reuse the exact knee detector from the 2D selector (pure function of a curve).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "toy2d"))
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "sigma_rho_selection", "toy2d"))
 from coherence_sigma import knee_sigma  # noqa: E402
 
 EPS = 1e-12

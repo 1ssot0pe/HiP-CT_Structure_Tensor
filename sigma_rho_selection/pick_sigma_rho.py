@@ -1,5 +1,5 @@
 """
-lindeberg_stability_3d.py
+pick_sigma_rho.py
 
 3D port of the toy2d Layer 3 criteria (see toy2d/unsupervised.py) that
 validated against supervised ground truth on a crossing-fibre phantom:
@@ -34,9 +34,12 @@ against, so treat the picked (sigma, rho) as a starting point to sanity
 -check visually, not a certified optimum.
 """
 
+import os
+import sys
 import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root, for the two imports below
 from orthogonality_residual import fibre_direction, crop_margin, _crop3
 from reconstruction import iter_progress
 
