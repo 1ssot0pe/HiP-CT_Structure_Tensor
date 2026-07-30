@@ -67,8 +67,48 @@ from crossing_shape_3d import _tube_family, _coords as _coords_cross
 from kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
 from host_fod import analyse, classify
 
-THRESH = 1.5
+THRESH = 1.5   # PHYSICAL midpoint of the 1x ("one branch") and 2x ("two branches
+               # summed") ratios. Deliberately fixed for the phantom PROOF (an
+               # honest validation must not fit its own threshold). On REAL data,
+               # prefer local_ratio_threshold() below.
 EPS = 1e-9
+
+
+def local_ratio_threshold(ratios, physical=THRESH, min_gap=0.5):
+    """Data-driven crossing/kissing cut from the volume's OWN mass-conservation
+    ratio distribution -- no external constant.
+
+    If the ratios are bimodal (a low kissing/single mode near <=1 and a high
+    crossing mode near ~2), return the Otsu valley between the two modes. If the
+    distribution is unimodal / not separable (as on real i74, where the ratios
+    piled up near ~0.65 with no crossing mode), fall back to the PHYSICAL
+    midpoint -- there is no valley to find, and inventing one would be worse.
+
+    Returns (threshold, reason).
+    """
+    r = np.asarray(ratios, float)
+    r = r[np.isfinite(r)]
+    if r.size < 20:
+        return float(physical), "physical (too few points to calibrate)"
+    lo, hi = np.percentile(r, [1, 99])
+    if hi - lo < 1e-6:
+        return float(physical), "physical (degenerate distribution)"
+    edges = np.linspace(lo, hi, 64)
+    hist, _ = np.histogram(r, bins=edges)
+    p = hist / (hist.sum() + 1e-12)
+    centres = 0.5 * (edges[:-1] + edges[1:])
+    w0 = np.cumsum(p)
+    w1 = 1.0 - w0
+    m0 = np.cumsum(p * centres) / (w0 + 1e-12)
+    mT = float((p * centres).sum())
+    m1 = (mT - w0 * m0) / (w1 + 1e-12)
+    between = w0 * w1 * (m0 - m1) ** 2
+    k = int(np.nanargmax(between))
+    thr = float(centres[k])
+    # bimodality guard: the two class means must sit a real gap either side of thr
+    if (thr - m0[k]) < min_gap or (m1[k] - thr) < min_gap:
+        return float(physical), "physical (unimodal / no separable crossing mode)"
+    return thr, "data-driven Otsu valley of this volume's ratios"
 
 
 # ---------------------------------------------------------------------------

@@ -36,15 +36,49 @@ from host_fod import analyse, classify
 import phase3_global as P                # reuse candidate_links, greedy_forest, tracts_from
 
 HALF = 8                 # HOST patch half-width (17^3), matches phase 1/2
-ANISO_MIN = 0.9          # skip near-isotropic/noise patches (host_fod 'aniso')
-FG_FRAC = 0.25           # skip air/background (patch-mean below this * global max)
+ANISO_MIN = 0.9          # PHYSICAL FALLBACK for the aniso gate (see calibrate_aniso)
+FG_FRAC = 0.25           # skip air/background (patch-mean below this * global max) -- already local
+ANISO_Q = 15.0           # skip the most-isotropic q% of foreground patches (data-driven gate)
 
 
-def seed_segments(vol, stride, max_peaks=2):
+def calibrate_aniso(vol, q=ANISO_Q, n_sample=250, seed=0):
+    """Data-driven anisotropy gate from the volume's OWN distribution -- not 0.9.
+
+    Sample foreground patches, read HOST anisotropy, and set the gate at the
+    q-th percentile: skip the most-isotropic (noise-like) tail relative to THIS
+    volume's tissue. Falls back to the physical ANISO_MIN if too few foreground
+    patches are found. Returns (aniso_min, n_used)."""
+    rng = np.random.default_rng(seed)
+    thr = FG_FRAC * vol.max()
+    los = [HALF] * 3
+    his = [s - HALF for s in vol.shape]
+    anis = []
+    for _ in range(n_sample * 12):
+        z = int(rng.integers(los[0], his[0]))
+        y = int(rng.integers(los[1], his[1]))
+        x = int(rng.integers(los[2], his[2]))
+        patch = vol[z - HALF:z + HALF + 1, y - HALF:y + HALF + 1, x - HALF:x + HALF + 1]
+        if patch.mean() < thr:
+            continue
+        m = analyse(patch)
+        if m is None:
+            continue
+        anis.append(float(m["aniso"]))
+        if len(anis) >= n_sample:
+            break
+    if len(anis) < 20:
+        return ANISO_MIN, len(anis)
+    return float(np.percentile(anis, q)), len(anis)
+
+
+def seed_segments(vol, stride, max_peaks=2, aniso_min=ANISO_MIN):
     """3D multi-orientation seeding via HOST. At each strided, foreground, anisotropic
     voxel, place ONE segment per HOST peak (up to max_peaks). Returns pos [M,3] as
     (x,y,z)=(axis2,axis1,axis0) -- the same frame HOST dirs live in -- unit dirs
-    [M,3], weights, and `is_cross` (did HOST classify that seed a 2-way crossing?)."""
+    [M,3], weights, and `is_cross` (did HOST classify that seed a 2-way crossing?).
+
+    aniso_min: the anisotropy gate; pass calibrate_aniso(vol)[0] for the
+    data-driven value (defaults to the physical ANISO_MIN)."""
     from reconstruction import iter_progress
     Z, Y, X = vol.shape
     thr = FG_FRAC * vol.max()
@@ -58,7 +92,7 @@ def seed_segments(vol, stride, max_peaks=2):
         if patch.mean() < thr:
             continue
         m = analyse(patch)
-        if m is None or m["aniso"] < ANISO_MIN or m["dirs"] is None:
+        if m is None or m["aniso"] < aniso_min or m["dirs"] is None:
             continue
         cross = (classify(m) == "crossing")
         for d in m["dirs"][:max_peaks]:
@@ -92,7 +126,10 @@ def run(crop=96, stride=5, save="phase3_i74.png"):
     vol = load_volume(crop=(c0, c0 + crop)).astype(np.float64)
     print(f"  volume {vol.shape}, mean={vol.mean():.1f}, {(vol == 0).mean():.0%} clipped air")
 
-    pos, dirs, w, is_cross, seed_id = seed_segments(vol, stride)
+    aniso_min, n_a = calibrate_aniso(vol)
+    a_src = "volume anisotropy null" if n_a >= 20 else "PHYSICAL FALLBACK"
+    print(f"  aniso gate (data-driven, {a_src}, n={n_a}): ANISO_MIN={aniso_min:.2f}")
+    pos, dirs, w, is_cross, seed_id = seed_segments(vol, stride, aniso_min=aniso_min)
     n_cross_seeds = len(set(seed_id[is_cross]))
     print(f"  seeded {len(pos)} segments from {len(set(seed_id))} voxels "
           f"({n_cross_seeds} HOST-'crossing')")

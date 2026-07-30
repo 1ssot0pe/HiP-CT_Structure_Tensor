@@ -35,7 +35,7 @@ import matplotlib.pyplot as plt
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR
 from host_fod import analyse, classify
 from phase2_i74_demote import collect_crossings, HALF
-from mass_conservation_validate import local_calibration, THRESH, EPS
+from mass_conservation_validate import local_calibration, local_ratio_threshold, THRESH, EPS
 
 N_CAL_TRIES = 40          # random nearby offsets to try per candidate
 CAL_RADIUS = (12, 30)     # shell (vox) to search for confidently-"single" neighbours
@@ -87,12 +87,14 @@ def run(crop=200, n_cross=60, save="real_i74_mass_conservation.png", seed=0):
         print("  no candidates yielded a valid calibration -- nothing to report.")
         return
 
-    fire_frac = float(np.mean(ratios > THRESH))
+    thr, thr_reason = local_ratio_threshold(ratios)   # data-driven cut from THIS volume
+    fire_frac = float(np.mean(ratios > thr))
     print(f"  scored {n}/{len(cx)} candidates (rest had no confidently-'single' "
           f"neighbour within radius {CAL_RADIUS})")
     print(f"  ratio: median={np.median(ratios):.2f}  mean={np.mean(ratios):.2f}  "
           f"IQR=[{np.percentile(ratios,25):.2f}, {np.percentile(ratios,75):.2f}]")
-    print(f"  FIRE FRACTION (ratio > {THRESH}, mass-conserved / crossing-consistent) "
+    print(f"  threshold = {thr:.2f}  [{thr_reason}]")
+    print(f"  FIRE FRACTION (ratio > {thr:.2f}, mass-conserved / crossing-consistent) "
           f"= {fire_frac:.0%}")
     print(f"  (Descriptive only: no i74 ground truth. Phantom sweep gave catch=100% on "
           f"true crossings, FP=0% on true kissing -- so this fraction is the real-tissue "
@@ -103,14 +105,14 @@ def run(crop=200, n_cross=60, save="real_i74_mass_conservation.png", seed=0):
     fig, ax = plt.subplots(1, 2, figsize=(12, 5))
     bins = np.linspace(0, max(3.0, ratios.max() * 1.05), 30)
     ax[0].hist(ratios, bins=bins, color="tab:purple", alpha=0.8)
-    ax[0].axvline(THRESH, color="k", ls="--", label=f"THRESH={THRESH}")
+    ax[0].axvline(thr, color="k", ls="--", label=f"threshold={thr:.2f}")
     ax[0].set_xlabel("mass-conservation ratio (intensity / local single-fibre calib)")
     ax[0].set_ylabel("HOST crossing voxels")
-    ax[0].set_title(f"{n} real i74 HOST crossings\nfire fraction (ratio>{THRESH}) = {fire_frac:.0%}")
+    ax[0].set_title(f"{n} real i74 HOST crossings\nfire fraction (ratio>{thr:.2f}) = {fire_frac:.0%}")
     ax[0].legend(fontsize=8)
 
-    ax[1].scatter(seps, ratios, s=28, c=(ratios > THRESH), cmap="RdYlGn", edgecolor="0.3", lw=0.4)
-    ax[1].axhline(THRESH, color="k", ls="--")
+    ax[1].scatter(seps, ratios, s=28, c=(ratios > thr), cmap="RdYlGn", edgecolor="0.3", lw=0.4)
+    ax[1].axhline(thr, color="k", ls="--")
     ax[1].set_xlabel("HOST crossing separation (deg)")
     ax[1].set_ylabel("mass-conservation ratio")
     ax[1].set_title("ratio vs crossing angle")

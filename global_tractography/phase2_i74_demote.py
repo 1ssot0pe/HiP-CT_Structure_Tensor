@@ -42,9 +42,14 @@ HALF = 8                 # local_fibreness patch half-width (matches phase 1)
 CONE_DEG = 35.0          # curvature cone for the continuity walk
 R_STOP = 0.55            # a step still 'on a fibre' if r=f_along/f_max >= R_STOP
 MAX_STEPS = 25           # cap each half-walk (25 vox ~ 500 um at 20 um/vox)
-REACH_MIN = 6            # a peak must persist at least this far to be certifiable
-STRAIGHT_MIN = 0.70      # provisional: a real through-fibre keeps straightness >=0.70
+REACH_MIN = 6            # PHYSICAL FALLBACK only (see calibrate_certifier): used when
+STRAIGHT_MIN = 0.70      # too few single-fibre voxels exist to build a within-volume null
 EPS = 1e-12
+
+# low percentile of the single-fibre NULL at which to set each gate: a real fibre
+# keeps straightness/reach above (almost) every confidently-single fibre, so the
+# 10th percentile is a permissive "still looks like a real fibre" floor.
+NULL_Q = 10.0
 
 
 def _walk_support(vol, pos0, dir_xyz, cone=CONE_DEG, max_steps=MAX_STEPS):
@@ -108,6 +113,39 @@ def collect_crossings(vol, n_target, stride=6, seed=0, max_attempts=1500):
     return out
 
 
+def calibrate_certifier(vol, n_single=60, q=NULL_Q, seed=1, max_attempts=3000):
+    """Data-driven (STRAIGHT_MIN, REACH_MIN) from a WITHIN-VOLUME NULL -- no
+    external constant, no ground truth.
+
+    Seed streamlines on voxels HOST confidently calls SINGLE (genuine one-fibre
+    tissue) and measure the straightness + reach of THOSE fibres. That is the
+    distribution of what a real fibre looks like in THIS volume, at THIS noise
+    and resolution. A crossing's second peak, if it is a real fibre, should land
+    inside that distribution; if spurious, it falls below. So the gate is the
+    low `q`-th percentile of the single-fibre null (a real fibre stays above it).
+
+    Returns (straight_min, reach_min, n_used). Falls back to the physical
+    STRAIGHT_MIN / REACH_MIN if fewer than 10 single voxels are found.
+    """
+    rng = np.random.default_rng(seed)
+    lo, hi = HALF + 3, np.array(vol.shape) - HALF - 3
+    straights, reaches = [], []
+    for _ in range(max_attempts):
+        pos = np.array([rng.integers(lo, hi[i]) for i in range(3)])
+        patch = vol[tuple(slice(pos[i] - HALF, pos[i] + HALF + 1) for i in range(3))]
+        m = analyse(patch)
+        if m is None or m["dirs"] is None or classify(m) != "single":
+            continue
+        rc, st = peak_reach(vol, pos.astype(float), np.asarray(m["dirs"][0]))
+        straights.append(st); reaches.append(rc)
+        if len(straights) >= n_single:
+            break
+    if len(straights) < 10:
+        return STRAIGHT_MIN, REACH_MIN, len(straights)
+    return (float(np.percentile(straights, q)),
+            float(np.percentile(reaches, q)), len(straights))
+
+
 def run(crop=160, n_cross=40, save="phase2_i74_demote.png"):
     print("=" * 74)
     print(f"PHASE 2 -- forward-support certifier on real i74 ({DEFAULT_VOLUME_DIR.name})")
@@ -115,6 +153,11 @@ def run(crop=160, n_cross=40, save="phase2_i74_demote.png"):
     vol = load_volume(crop=(c0, c0 + crop)).astype(np.float64)
     print(f"  volume {vol.shape}, mean={vol.mean():.1f}  (uint8 source; "
           f"{(vol == 0).mean():.0%} exactly 0 = clipped air)")
+    print(f"  calibrating the certifier from the volume's own single-fibre voxels ...")
+    straight_min, reach_min, n_null = calibrate_certifier(vol)
+    src = "single-fibre null" if n_null >= 10 else "PHYSICAL FALLBACK (too few single voxels)"
+    print(f"  gates (data-driven, {src}, n={n_null}): "
+          f"STRAIGHT_MIN={straight_min:.2f}, REACH_MIN={reach_min:.1f}")
     print(f"  seeking {n_cross} HOST-'crossing' voxels ...")
     cx = collect_crossings(vol, n_cross)
     print(f"  found {len(cx)} crossings; certifying each peak by STRAIGHTNESS of its "
@@ -130,8 +173,9 @@ def run(crop=160, n_cross=40, save="phase2_i74_demote.png"):
         weak.append(w); strong.append(s)
         reaches.append(min(rc0, rc1))
         seps.append(float(np.degrees(np.arccos(np.clip(abs(dirs[0] @ dirs[1]), 0, 1)))))
-        # demote if the weaker peer wanders (low straightness) or dies too early
-        if w < STRAIGHT_MIN or min(rc0, rc1) < REACH_MIN:
+        # demote if the weaker peer wanders (low straightness) or dies too early,
+        # relative to the volume's OWN single-fibre null (not a fixed constant)
+        if w < straight_min or min(rc0, rc1) < reach_min:
             demoted += 1
     weak, strong, seps = np.array(weak), np.array(strong), np.array(seps)
     n = len(weak)
@@ -142,7 +186,7 @@ def run(crop=160, n_cross=40, save="phase2_i74_demote.png"):
               f"IQR[{np.percentile(weak,25):.2f},{np.percentile(weak,75):.2f}]; "
               f"stronger median={np.median(strong):.2f}")
         print(f"  DEMOTED {demoted}/{n} = {frac:.0%}: weaker peak WANDERS "
-              f"(straightness<{STRAIGHT_MIN}) or dies <{REACH_MIN} vox "
+              f"(straightness<{straight_min:.2f}) or dies <{reach_min:.1f} vox "
               f"-> not a coherent 2nd fibre.")
         print(f"  CONFIRMED {n-demoted}/{n} = {1-frac:.0%}: both peaks trace straight, "
               f"persistent lines (real crossings).")

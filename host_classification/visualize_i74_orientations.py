@@ -71,6 +71,7 @@ if __name__ == "__main__":
 
     vol = load_interior()
     sl = vol[Z_SLICE]
+    # single/dispersed uses host_fod's parameter-free c_s<=FA rule (no calibration)
     centers = list(range(HALF + 10, vol.shape[1] - HALF - 5, STEP))
     grid = [(cy, cx) for cy in centers for cx in centers]
     print(f"i74 interior {vol.shape}, slice z={Z_SLICE}; {len(grid)} patches "
