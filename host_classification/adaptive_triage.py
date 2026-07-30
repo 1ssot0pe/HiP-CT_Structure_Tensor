@@ -56,7 +56,11 @@ from host_geometry_test import (
 
 SIGMAS_LINDEBERG = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
 RHO_LINDEBERG = 1.0
-CS_SINGLE_CUTOFF = 0.15    # from the model_ladder.py c_s ladder: single-fibre rung
+# cs_single_cutoff defaults to None below -> the fast-path and classify() both use
+# host_fod's PARAMETER-FREE rule (single iff c_s <= FA, both from the same voxel's
+# eigenvalues). Pass a number only to force the old hard c_s threshold instead.
+def _is_single(m, cs_single_cutoff):
+    return (m["c_s"] <= m["FA"]) if cs_single_cutoff is None else (m["c_s"] <= cs_single_cutoff)
 
 
 # ---------------------------------------------------------------------------
@@ -76,18 +80,18 @@ def pick_local_sigma_grad(patch, sigmas=SIGMAS_LINDEBERG, rho=RHO_LINDEBERG, ver
 # STEP 2 -- triage: cheap fast-path for clean single fibre, else defer to HOST
 # ---------------------------------------------------------------------------
 
-def triage_patch(patch, cs_single_cutoff=CS_SINGLE_CUTOFF):
+def triage_patch(patch, cs_single_cutoff=None):
     """Returns dict(sigma_grad, tier, label, m) where m is the HOST-FOD
     metrics dict (always computed once, at the locally-picked sigma_grad --
-    cheap, and needed anyway to read off c_s for the tier decision)."""
+    cheap, and needed anyway to read off c_s/FA for the tier decision)."""
     sigma_grad, sg_sigmas, sg_resp = pick_local_sigma_grad(patch)
     m = analyse(patch, sigma_grad=sigma_grad, order=6)
     if m is None:
         return dict(sigma_grad=sigma_grad, tier="no-data", label="n/a", m=None)
-    if m["c_s"] <= cs_single_cutoff:
+    if _is_single(m, cs_single_cutoff):
         tier, label = "fast-path", "single"
     else:
-        tier, label = "host-fod", classify(m)
+        tier, label = "host-fod", classify(m, cs_single=cs_single_cutoff)
     return dict(sigma_grad=sigma_grad, tier=tier, label=label, m=m)
 
 
@@ -102,12 +106,12 @@ SIGMA_SWEEP_HOST = np.array([0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])
 
 
 def triage_patch_v2(patch, sigmas_lindeberg=SIGMAS_LINDEBERG, rho_lindeberg=RHO_LINDEBERG,
-                    sigma_sweep=SIGMA_SWEEP_HOST, cs_single_cutoff=CS_SINGLE_CUTOFF,
+                    sigma_sweep=SIGMA_SWEEP_HOST, cs_single_cutoff=None,
                     amp2_min=0.4):
     sigma_lind, _sg_sigmas, _sg_resp = pick_local_sigma_grad(patch, sigmas_lindeberg, rho_lindeberg)
     m_lind = analyse(patch, sigma_grad=sigma_lind, order=6)
 
-    if m_lind is not None and m_lind["c_s"] <= cs_single_cutoff:
+    if m_lind is not None and _is_single(m_lind, cs_single_cutoff):
         return dict(sigma_grad=sigma_lind, tier="fast-path", label="single",
                     m=m_lind, sweep=None)
 
@@ -123,10 +127,12 @@ def triage_patch_v2(patch, sigmas_lindeberg=SIGMAS_LINDEBERG, rho_lindeberg=RHO_
     best_sg, best_m, best_q = max(sweep, key=lambda t: t[2])
 
     if best_q >= amp2_min:
-        return dict(sigma_grad=best_sg, tier="host-fod-multi", label=classify(best_m),
+        return dict(sigma_grad=best_sg, tier="host-fod-multi",
+                    label=classify(best_m, cs_single=cs_single_cutoff),
                     m=best_m, sweep=sweep)
-    return dict(sigma_grad=sigma_lind, tier="fallback-single-scale", label=classify(m_lind),
-               m=m_lind, sweep=sweep)
+    return dict(sigma_grad=sigma_lind, tier="fallback-single-scale",
+                label=classify(m_lind, cs_single=cs_single_cutoff),
+                m=m_lind, sweep=sweep)
 
 
 # ---------------------------------------------------------------------------

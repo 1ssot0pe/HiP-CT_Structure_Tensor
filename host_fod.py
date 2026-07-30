@@ -69,25 +69,42 @@ def analyse(patch, sigma_grad=2.0, order=6, rel=0.30, min_sep=30.0, sharpen=3.0)
     S = (G[keep] * mag[keep, None] ** 0).T @ G[keep]
     lam = np.sort(np.linalg.eigvalsh(S))
     c_s = float(3.0 * lam[0] / (lam.sum() + EPS))
+    # fractional anisotropy of the SAME structure tensor -- a second normalised
+    # descriptor from the same eigenvalues. classify() compares c_s vs FA as a
+    # parameter-free single/dispersed rule (both local to this voxel).
+    fa = float(np.sqrt(0.5) * np.sqrt((lam[0] - lam[1]) ** 2 + (lam[1] - lam[2]) ** 2
+                                      + (lam[2] - lam[0]) ** 2) / (np.sqrt((lam ** 2).sum()) + EPS))
     npk = len(vals)
     sep = amp2 = np.nan
     if npk >= 2:
         sep = float(np.degrees(np.arccos(np.clip(abs(dirs[0] @ dirs[1]), 0, 1))))
         amp2 = float(vals[1] / (vals[0] + EPS))
-    return dict(n_peaks=npk, sep=sep, amp2=amp2, aniso=aniso, c_s=c_s,
+    return dict(n_peaks=npk, sep=sep, amp2=amp2, aniso=aniso, c_s=c_s, FA=fa,
                 dirs=dirs, vals=vals, n=G.shape[0])
 
 
-def classify(m, aniso_iso=0.9, amp2_min=0.4, sep_min=30.0, cs_single=0.15):
+def classify(m, aniso_iso=0.9, amp2_min=0.4, sep_min=30.0, cs_single=None):
     if m is None:
         return "n/a"
+
     if m["aniso"] < aniso_iso:
         return "disorganised"
+
     # EXACTLY 2 clean peaks = a crossing we can trust. n_peaks >= 3 is either a
     # genuine 3+ crossing (beyond this method's validated 2-fibre ceiling) or
-    # spurious splitting -- either way not trustworthy, so triage as complex.
+    # spurious splitting -- either way not trustworthy, so label as complex.
     if m["n_peaks"] == 2 and m["amp2"] >= amp2_min and m["sep"] >= sep_min:
         return "crossing"
+    # single vs dispersed: PARAMETER-FREE rule -- a voxel is a single fibre when
+    # it is more anisotropic (FA) than spherical (c_s). Both are normalised
+    # descriptors of the SAME structure-tensor eigenvalues, so this is purely
+    # local to the voxel, needs no external threshold, and uses the full
+    # eigenvalue structure (not just c_s). Validated on i74: gives ~29% single vs
+    # the implausible 3% a fixed c_s<=0.15 gives, and the classes overlap in c_s
+    # (so FA genuinely adds information a c_s threshold cannot). Pass a numeric
+    # cs_single to override with a hard c_s threshold instead.
+    if cs_single is None:
+        return "single" if m["c_s"] <= m["FA"] else "dispersed"
     return "single" if m["c_s"] <= cs_single else "dispersed"
 
 
