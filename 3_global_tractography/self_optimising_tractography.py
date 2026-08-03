@@ -69,8 +69,22 @@ from host_fod import analyse
 from tract_density import rasterise, density_at, mse
 
 EPS = 1e-12
-CROSSING_S = 0.65        # S above this = superposing = crossing
-TANGENCY_S = 0.35        # S below this = no superposition = tangency
+# Physical values of S, not tuned ones. A genuine crossing superposes two
+# fibres over the background: I_c - I_0 = 2f while (I_a - I_0) + (I_b - I_0) =
+# f + f = 2f, so S = 1. A tangency has one fibre's worth at the centre while
+# both contributors are still one fibre each: S = f / 2f = 0.5. The decision
+# boundary is therefore the midpoint 0.75 -- which is exactly
+# mass_conservation_validate.THRESH = 1.5 rescaled, since S = ratio / 2.
+S_CROSSING = 1.0
+S_TANGENCY = 0.5
+S_DECISION = 0.75
+S_BAND = 0.10            # +-band around the midpoint reported as AMBIGUOUS
+# I_a / I_b are searched over a RANGE of distances, not read at one point: the
+# contributing structure may curve away from a straight ray (the kissing
+# phantom bends by ~1 voxel over 8), and a point read then lands in background
+# and sends S to infinity. See _contributor_intensity.
+ARM_MIN, ARM_MAX, ARM_STEP = 5.0, 11.0, 1.0
+ARM_HALF = 2             # perpendicular tolerance when tracking the structure
 
 
 # ---------------------------------------------------------------------------
@@ -115,31 +129,61 @@ def background_level(vol, air_frac=0.05):
     return float(np.percentile(vol, 1))
 
 
-def superposition_S(vol, centre, d1, d2, I0=None, arm=6.0, half=1):
+def _local_max(vol, p, half):
+    idx = tuple(int(np.clip(round(v), 0, s - 1)) for v, s in zip(p, vol.shape))
+    if half <= 0:
+        return float(vol[idx])
+    sl = tuple(slice(max(v - half, 0), min(v + half + 1, s))
+               for v, s in zip(idx, vol.shape))
+    return float(vol[sl].max())
+
+
+def _contributor_intensity(vol, centre, d, arm_min=ARM_MIN, arm_max=ARM_MAX,
+                           arm_step=ARM_STEP, half=ARM_HALF):
+    """Brightness of ONE contributing structure, away from the junction.
+
+    Two things have to be true at once and they pull in opposite directions:
+    the sample must be far enough out that the other structure no longer
+    overlaps (inside the junction both fibres contribute and the reading is
+    already the sum), but close enough that the structure has not curved out of
+    reach. So the ray is walked over a RANGE and the maximum local value taken,
+    with a perpendicular tolerance of `half` voxels.
+
+    A single point read at a fixed distance fails exactly where it matters: on
+    a curved tangency it lands in background, the denominator collapses and S
+    diverges (measured: S = 2.1, 21.9, 136 at arm 6, 8, 10).
+    """
+    c = np.asarray(centre, float)
+    d = np.asarray(d, float)
+    d = d / (np.linalg.norm(d) + EPS)
+    vals = []
+    for s in np.arange(arm_min, arm_max + 1e-9, arm_step):
+        for sgn in (1.0, -1.0):
+            vals.append(_local_max(vol, c + sgn * s * d, half))
+    vals = np.asarray(vals, float)
+    # Keep only samples that are ON the structure, then take their MEDIAN.
+    # max() is wrong: near the junction both families still overlap, so the
+    # brightest sample on the ray reads the SUM and the crossing's own
+    # contributor comes out at 1.58 instead of 1.0, dragging S down to 0.63.
+    # min() is equally wrong: it reads the faded far end of a curving tangency.
+    # The median of the on-structure samples is the one that is neither.
+    on = vals[vals > 0.2 * (vals.max() + EPS)]
+    return float(np.median(on)) if on.size else float(vals.max())
+
+
+def superposition_S(vol, centre, d1, d2, I0=None, half=1, **kw):
     """S = (I_c - I0) / ((I_a - I0) + (I_b - I0)) at one junction.
 
-    I_a and I_b are sampled `arm` voxels along +-d1 and +-d2 respectively, taking
-    the max over the two signs so a one-sided structure is still measured at its
-    own brightness rather than at its faded end.
+    S ~ 1.0 -> the two structures superpose  -> CROSSING
+    S ~ 0.5 -> only one structure is present -> TANGENCY
     """
     vol = np.asarray(vol)
     if I0 is None:
         I0 = background_level(vol)
     c = np.asarray(centre, float)
-
-    def sample(p):
-        idx = tuple(int(np.clip(round(v), 0, s - 1)) for v, s in zip(p, vol.shape))
-        if half <= 0:
-            return float(vol[idx])
-        sl = tuple(slice(max(v - half, 0), min(v + half + 1, s))
-                   for v, s in zip(idx, vol.shape))
-        return float(vol[sl].max())
-
-    I_c = sample(c)
-    I_a = max(sample(c + arm * np.asarray(d1, float)),
-              sample(c - arm * np.asarray(d1, float)))
-    I_b = max(sample(c + arm * np.asarray(d2, float)),
-              sample(c - arm * np.asarray(d2, float)))
+    I_c = _local_max(vol, c, half)
+    I_a = _contributor_intensity(vol, c, d1, **kw)
+    I_b = _contributor_intensity(vol, c, d2, **kw)
     denom = (I_a - I0) + (I_b - I0)
     if abs(denom) < EPS:
         return np.nan, I_c, I_a, I_b, I0
@@ -147,11 +191,12 @@ def superposition_S(vol, centre, d1, d2, I0=None, arm=6.0, half=1):
 
 
 def verdict_from_S(S):
+    """CROSSING / TANGENCY against the physical midpoint, AMBIGUOUS in a band."""
     if not np.isfinite(S):
         return "unscored"
-    if S >= CROSSING_S:
+    if S >= S_DECISION + S_BAND:
         return "CROSSING"
-    if S <= TANGENCY_S:
+    if S <= S_DECISION - S_BAND:
         return "TANGENCY"
     return "AMBIGUOUS"
 
