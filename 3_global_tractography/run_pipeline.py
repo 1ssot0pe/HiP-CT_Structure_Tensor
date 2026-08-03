@@ -122,8 +122,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
         vs = [j["verdict"] for j in r["junctions"]]
-        print(f"
-  {len(S)} scored junctions: S median {np.median(S):.3f}, "
+        print(f"\n  {len(S)} scored junctions: S median {np.median(S):.3f}, "
               f"IQR [{np.percentile(S,25):.3f}, {np.percentile(S,75):.3f}]")
         for v in ("CROSSING", "TANGENCY", "AMBIGUOUS", "unscored"):
             k = vs.count(v)
