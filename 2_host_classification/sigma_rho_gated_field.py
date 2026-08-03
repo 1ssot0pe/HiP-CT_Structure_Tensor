@@ -109,6 +109,40 @@ class GatedField:
     def multi(self):
         return [p for p in self.patches if p["n_dirs"] >= 2]
 
+    def save(self, path):
+        """Serialise the unified orientation field -- the Stage 2 deliverable.
+
+        Arrays rather than pickled objects so the artifact is readable without
+        importing this module:
+            centres  (N, 3) int      patch centres, (z, y, x)
+            dirs     (N, K, 3) float directions, NaN-padded to K = max peaks
+            n_dirs   (N,) int        how many are real for that patch
+            routed   (N,) bool       THE ROUTING MASK (c_s > FA)
+            c_s, FA  (N,) float      the two numbers the gate compared
+            sigma,rho(N,) float      the scale Stage 1 certified for that patch
+            labels   (N,) str        HOST's class where it ran
+        """
+        import numpy as _np
+        n = self.n
+        k = max([p["n_dirs"] for p in self.patches], default=1)
+        dirs = _np.full((n, k, 3), _np.nan)
+        for i, p in enumerate(self.patches):
+            for j, d in enumerate(p["dirs"][:k]):
+                dirs[i, j] = d
+        _np.savez_compressed(
+            path,
+            centres=_np.array([p["centre"] for p in self.patches], dtype=int),
+            dirs=dirs,
+            n_dirs=_np.array([p["n_dirs"] for p in self.patches], dtype=int),
+            routed=self.routing_mask(),
+            c_s=_np.array([p["c_s"] for p in self.patches]),
+            FA=_np.array([p["FA"] for p in self.patches]),
+            sigma=_np.array([p["sigma"] for p in self.patches]),
+            rho=_np.array([p["rho"] for p in self.patches]),
+            labels=_np.array([p["label"] for p in self.patches]),
+            shape=_np.array(self.shape, dtype=int))
+        return path
+
     def summary(self):
         if not self.patches:
             return "empty field"
