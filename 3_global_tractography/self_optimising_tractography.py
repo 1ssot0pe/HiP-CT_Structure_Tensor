@@ -491,6 +491,42 @@ def optimise(vol, field, junctions, D_obs, tissue, I0, n_iter=6, seed=0,
 # phantom validation
 # ---------------------------------------------------------------------------
 
+def field_from_gated(gated, vol, I0=None, e3=None):
+    """Consume Stage 2's GatedField -- the actual Stage 2 -> Stage 3 join.
+
+    Two frame conversions have to happen here and both are easy to get silently
+    wrong:
+
+    * `host_fod.analyse` returns directions as (x, y, z) = (axis2, axis1,
+      axis0), and Skielex's e3 uses the same order. Stage 3 indexes positions as
+      (z, y, x). So every direction is reversed on the way in. Skipping this
+      does not crash -- it just makes every streamline walk a mirrored path,
+      which reads as "the structure curves away" rather than as a bug.
+    * Stage 2 stores patch centres already in (z, y, x), so those pass through.
+
+    Junctions are the multi-orientation patches, each scored by superposition S
+    at the point Stage 2 routed to HOST.
+    """
+    if e3 is None:
+        e3 = orientation_field(vol)
+    if I0 is None:
+        I0 = background_level(vol)
+    field, junctions = [], []
+    for p in gated.patches:
+        dirs = [np.asarray(d, float)[::-1] for d in p["dirs"]]     # (x,y,z)->(z,y,x)
+        idx = len(field)
+        field.append(dict(centre=tuple(p["centre"]), dirs=dirs,
+                          n_dirs=len(dirs), c_s=p["c_s"], FA=p["FA"],
+                          gated=p["gated"], label=p["label"]))
+        if len(dirs) >= 2:
+            S, Ic, Ia, Ib, _ = superposition_S(vol, p["centre"], dirs[0], dirs[1],
+                                               I0=I0, e3=e3)
+            junctions.append(dict(field_index=idx, centre=tuple(p["centre"]),
+                                  dirs=dirs, S=S, verdict=verdict_from_S(S),
+                                  I_c=Ic, I_a=Ia, I_b=Ib, I_0=I0))
+    return field, junctions, I0
+
+
 def build_field_and_junctions(vol, half, centre, sigma_grad=2.5, search=6,
                               stride=6, air_frac=0.05):
     """Minimal Stage-1/2 field for the phantom: patches on a grid, HOST peaks
