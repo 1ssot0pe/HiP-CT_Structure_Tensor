@@ -1,0 +1,295 @@
+{
+  "name": "I74 REGION",
+  "truth": "UNKNOWN",
+  "skipped": false,
+  "n_patches": 125,
+  "n_routed": 44,
+  "junctions": [
+    {
+      "field_index": 18,
+      "centre": [
+        16,
+        40,
+        40
+      ],
+      "S": 0.4645550527903469,
+      "verdict": "TANGENCY",
+      "I_c": 222.0,
+      "I_a": 230.75,
+      "I_b": 225.0,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 24,
+      "centre": [
+        16,
+        48,
+        48
+      ],
+      "S": 0.42302543507362783,
+      "verdict": "TANGENCY",
+      "I_c": 224.0,
+      "I_a": 237.5,
+      "I_b": 239.25,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 30,
+      "centre": [
+        24,
+        24,
+        16
+      ],
+      "S": 0.5186500888099467,
+      "verdict": "TANGENCY",
+      "I_c": 218.0,
+      "I_a": 215.75,
+      "I_b": 215.0,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 31,
+      "centre": [
+        24,
+        24,
+        24
+      ],
+      "S": 0.4583333333333333,
+      "verdict": "TANGENCY",
+      "I_c": 211.0,
+      "I_a": 220.0,
+      "I_b": 214.0,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 36,
+      "centre": [
+        24,
+        32,
+        24
+      ],
+      "S": 0.38977635782747605,
+      "verdict": "TANGENCY",
+      "I_c": 206.0,
+      "I_a": 222.5,
+      "I_b": 224.0,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 56,
+      "centre": [
+        32,
+        24,
+        24
+      ],
+      "S": 0.45595854922279794,
+      "verdict": "TANGENCY",
+      "I_c": 211.0,
+      "I_a": 216.75,
+      "I_b": 218.0,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 61,
+      "centre": [
+        32,
+        32,
+        24
+      ],
+      "S": 0.4412811387900356,
+      "verdict": "TANGENCY",
+      "I_c": 207.0,
+      "I_a": 207.25,
+      "I_b": 223.25,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 105,
+      "centre": [
+        48,
+        24,
+        16
+      ],
+      "S": 0.3493761140819964,
+      "verdict": "TANGENCY",
+      "I_c": 194.0,
+      "I_a": 214.0,
+      "I_b": 216.25,
+      "I_0": 145.0
+    },
+    {
+      "field_index": 106,
+      "centre": [
+        48,
+        24,
+        24
+      ],
+      "S": 0.48148148148148145,
+      "verdict": "TANGENCY",
+      "I_c": 210.0,
+      "I_a": 211.0,
+      "I_b": 214.0,
+      "I_0": 145.0
+    }
+  ],
+  "verdict": "TANGENCY",
+  "correct": false,
+  "theta": {
+    "step": 0.5,
+    "angle_deg": 60.0,
+    "seed_density": 1.0,
+    "link_weight": 1.5,
+    "assoc_radius": 4.0,
+    "max_steps": 200
+  },
+  "L_initial": 1.345629604536118,
+  "L_final": 1.3425401381143178,
+  "trace": [
+    {
+      "iteration": -1,
+      "theta": {
+        "step": 0.75,
+        "angle_deg": 45.0,
+        "seed_density": 0.5,
+        "link_weight": 1.0,
+        "assoc_radius": 4.0,
+        "max_steps": 200
+      },
+      "mse": 1.345629604536118,
+      "penalty": 0.0,
+      "total": 1.345629604536118,
+      "n_streams": 130
+    },
+    {
+      "iteration": 0,
+      "theta": {
+        "step": 0.5,
+        "angle_deg": 60.0,
+        "seed_density": 1.0,
+        "link_weight": 1.5,
+        "assoc_radius": 4.0,
+        "max_steps": 200
+      },
+      "mse": 1.3425401381143178,
+      "penalty": 0.0,
+      "total": 1.3425401381143178,
+      "n_streams": 268
+    },
+    {
+      "iteration": 1,
+      "theta": {
+        "step": 0.5,
+        "angle_deg": 60.0,
+        "seed_density": 1.0,
+        "link_weight": 1.5,
+        "assoc_radius": 4.0,
+        "max_steps": 200
+      },
+      "mse": 1.3425401381143178,
+      "penalty": 0.0,
+      "total": 1.3425401381143178,
+      "n_streams": 268
+    }
+  ],
+  "junction_log": [
+    {
+      "centre": [
+        16,
+        40,
+        40
+      ],
+      "S": 0.4645550527903469,
+      "verdict": "TANGENCY",
+      "density": 0.4405408541656207,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        16,
+        48,
+        48
+      ],
+      "S": 0.42302543507362783,
+      "verdict": "TANGENCY",
+      "density": 0.45871680487071215,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        24,
+        24,
+        16
+      ],
+      "S": 0.5186500888099467,
+      "verdict": "TANGENCY",
+      "density": 0.4323773249502952,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        24,
+        24,
+        24
+      ],
+      "S": 0.4583333333333333,
+      "verdict": "TANGENCY",
+      "density": 0.4348940707942884,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        24,
+        32,
+        24
+      ],
+      "S": 0.38977635782747605,
+      "verdict": "TANGENCY",
+      "density": 0.49079991916882715,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        32,
+        24,
+        24
+      ],
+      "S": 0.45595854922279794,
+      "verdict": "TANGENCY",
+      "density": 0.45369344828826974,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        32,
+        32,
+        24
+      ],
+      "S": 0.4412811387900356,
+      "verdict": "TANGENCY",
+      "density": 0.49710263333657295,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        48,
+        24,
+        16
+      ],
+      "S": 0.3493761140819964,
+      "verdict": "TANGENCY",
+      "density": 0.5255776185714903,
+      "loss_contribution": 0.0
+    },
+    {
+      "centre": [
+        48,
+        24,
+        24
+      ],
+      "S": 0.48148148148148145,
+      "verdict": "TANGENCY",
+      "density": 0.4890702023809293,
+      "loss_contribution": 0.0
+    }
+  ]
+}
