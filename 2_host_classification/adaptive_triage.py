@@ -46,7 +46,7 @@ import numpy as np
 
 _ROOT = os.path.dirname(os.path.dirname(__file__))          # repo root (host_fod, host_geometry_test)
 sys.path.insert(0, _ROOT)
-sys.path.insert(0, os.path.join(_ROOT, "sigma_rho_selection"))   # pick_sigma_rho
+sys.path.insert(0, os.path.join(_ROOT, "1_sigma_rho_selection"))   # pick_sigma_rho
 from pick_sigma_rho import lindeberg_response_3d, first_local_max
 from host_fod import analyse, classify
 from host_geometry_test import (
@@ -60,6 +60,12 @@ RHO_LINDEBERG = 1.0
 # host_fod's PARAMETER-FREE rule (single iff c_s <= FA, both from the same voxel's
 # eigenvalues). Pass a number only to force the old hard c_s threshold instead.
 def _is_single(m, cs_single_cutoff):
+    # The n_peaks guard has to be HERE as well as in classify(): the fast path
+    # below returns "single" WITHOUT calling classify(), so a >=3-peak patch
+    # whose c_s <= FA would bypass classify's "complex" branch entirely and be
+    # reported as a clean single fibre.
+    if m["n_peaks"] >= 3:
+        return False
     return (m["c_s"] <= m["FA"]) if cs_single_cutoff is None else (m["c_s"] <= cs_single_cutoff)
 
 

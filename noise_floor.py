@@ -1,8 +1,8 @@
 """
 noise_floor.py -- noise-floor characterisation of the structure tensor.
 
-Tests the falsifiable claim that the structure tensor S on real i74 carries an
-additive, (near-)isotropic noise term N(sigma) that does NOT average away with
+Tests the falsifiable claim that the structure tensor on real i74 carries an
+additive, (near)isotropic noise term N(sigma) that does NOT average away with
 rho, and that a large N drives the Westin sphericity c_s -> 1 for every voxel --
 making "pervasively high c_s / 80% multi-orientation" a NOISE-FLOOR ARTIFACT
 rather than a tissue property.
@@ -233,3 +233,31 @@ def loglog_slope(sigma, trN):
     A = np.vstack([s, np.ones_like(s)]).T
     m, _c = np.linalg.lstsq(A, y, rcond=None)[0]
     return float(m)
+
+if __name__ == "__main__":
+    import sys
+    import argparse
+    from pathlib import Path
+    from .io import load_nifti, save_nifti
+
+    parser = argparse.ArgumentParser(description="Compute structure tensor noise floor N(sigma) from a noise region.")
+    parser.add_argument("input", type=Path, help="Input NIfTI file (noise region).")
+    parser.add_argument("--sigmas", type=float, nargs="+", default=[1, 2, 4, 8], help="List of sigma values to compute N(sigma).")
+    parser.add_argument("--truncate", type=float, default=_TRUNC, help="Truncate Gaussian kernel at this many sigmas.")
+    parser.add_argument("--crop", type=int, default=None, help="Crop this many voxels from each face before averaging.")
+    parser.add_argument("--output", type=Path, default=None, help="Output N(sigma) as a text file.")
+    
+    args = parser.parse_args()
+
+    # Load the noise region
+    I = load_nifti(args.input)
+
+    # Compute N(sigma) for each sigma
+    results = []
+    for sigma in args.sigmas:
+        N = N_matrix(I, sigma, truncate=args.truncate, crop=args.crop)
+        trN = np.trace(N)
+
+        results.append((sigma, trN))
+
+        
