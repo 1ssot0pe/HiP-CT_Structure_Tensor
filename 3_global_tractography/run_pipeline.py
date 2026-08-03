@@ -110,9 +110,10 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
     """
     from reconstruction import load_volume
     c = tuple(centre)
-    vol = load_volume(crop=(c[0] - radius, c[0] + radius), dtype=np.uint8)
-    vol = vol[:, c[1] - radius:c[1] + radius, c[2] - radius:c[2] + radius]
-    vol = vol.astype(np.float32)
+    # load_volume's `crop` applies to ALL THREE axes, not just z -- slicing the
+    # result again with absolute indices produces a zero-size array.
+    vol = load_volume(crop=(c[0] - radius, c[0] + radius),
+                      dtype=np.uint8).astype(np.float32)
     print("=" * 78)
     print(f"REAL i74 -- {vol.shape} at {c}, mean {vol.mean():.1f}")
     print("=" * 78)
