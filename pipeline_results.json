@@ -1,0 +1,104 @@
+[
+  {
+    "name": "TRUE CROSSING",
+    "truth": "CROSSING",
+    "skipped": false,
+    "n_patches": 27,
+    "n_routed": 1,
+    "junctions": [
+      {
+        "field_index": 13,
+        "centre": [
+          24,
+          24,
+          24
+        ],
+        "S": 1.000878021659729,
+        "verdict": "CROSSING",
+        "I_c": 2.0,
+        "I_a": 1.0025386959314346,
+        "I_b": 0.9995244145393372,
+        "I_0": 0.0038142672274261713
+      }
+    ],
+    "verdict": "CROSSING",
+    "correct": true,
+    "theta": {
+      "step": 1.5,
+      "angle_deg": 45.0,
+      "seed_density": 1.0,
+      "link_weight": 1.5,
+      "assoc_radius": 4.0,
+      "max_steps": 200
+    },
+    "L_initial": 4.003701726776603,
+    "L_final": 3.1438335965069006,
+    "trace": [
+      {
+        "iteration": -1,
+        "theta": {
+          "step": 0.75,
+          "angle_deg": 45.0,
+          "seed_density": 0.5,
+          "link_weight": 1.0,
+          "assoc_radius": 4.0,
+          "max_steps": 200
+        },
+        "mse": 1.1438818925242278,
+        "penalty": 2.8598198342523755,
+        "total": 4.003701726776603,
+        "n_streams": 28
+      },
+      {
+        "iteration": 0,
+        "theta": {
+          "step": 1.5,
+          "angle_deg": 45.0,
+          "seed_density": 1.0,
+          "link_weight": 1.5,
+          "assoc_radius": 4.0,
+          "max_steps": 200
+        },
+        "mse": 1.1427247623056975,
+        "penalty": 2.001108834201203,
+        "total": 3.1438335965069006,
+        "n_streams": 56
+      },
+      {
+        "iteration": 1,
+        "theta": {
+          "step": 1.5,
+          "angle_deg": 45.0,
+          "seed_density": 1.0,
+          "link_weight": 1.5,
+          "assoc_radius": 4.0,
+          "max_steps": 200
+        },
+        "mse": 1.1427247623056975,
+        "penalty": 2.001108834201203,
+        "total": 3.1438335965069006,
+        "n_streams": 56
+      }
+    ],
+    "junction_log": [
+      {
+        "centre": [
+          24,
+          24,
+          24
+        ],
+        "S": 1.000878021659729,
+        "verdict": "CROSSING",
+        "density": 0.5853944598577301,
+        "loss_contribution": 2.001108834201203
+      }
+    ]
+  },
+  {
+    "name": "TANGENCY (kissing)",
+    "truth": "TANGENCY",
+    "skipped": true,
+    "n_patches": 27,
+    "n_routed": 0
+  }
+]

@@ -326,7 +326,20 @@ def verdict_from_S(S):
 # streamline integration through the unified orientation field
 # ---------------------------------------------------------------------------
 
-def _nearest_patch(field_pts, p, max_d):
+def _nearest_patch(field_pts, p, max_d, tree=None):
+    """Index of the field patch nearest p, or None if none within max_d.
+
+    A KD-tree when scipy is available: the brute-force scan is O(N) per
+    integration step, and with a few hundred patches and thousands of steps per
+    loss evaluation that dominates everything else in the loop. The linear path
+    is kept as a fallback so the module does not hard-depend on scipy.
+    """
+    if tree is not None:
+        d, i = tree.query(np.asarray(p, float), k=1,
+                          distance_upper_bound=float(max_d))
+        if not np.isfinite(d):
+            return None, d
+        return int(i), float(d)
     d = np.linalg.norm(field_pts - np.asarray(p, float)[None, :], axis=1)
     i = int(np.argmin(d))
     return (i, d[i]) if d[i] <= max_d else (None, d[i])
@@ -345,6 +358,11 @@ def integrate(field, shape, theta, junction_verdicts=None, rng=None):
     """
     rng = rng or np.random.default_rng(0)
     pts = np.array([p["centre"] for p in field], float)
+    try:
+        from scipy.spatial import cKDTree
+        tree = cKDTree(pts)
+    except Exception:
+        tree = None
     dirs = [np.atleast_2d(np.asarray(p["dirs"], float)) for p in field]
     step = float(theta["step"])
     cosmax = np.cos(np.deg2rad(float(theta["angle_deg"])))
@@ -366,7 +384,7 @@ def integrate(field, shape, theta, junction_verdicts=None, rng=None):
                     p = p + step * u
                     if not all(0 <= p[k] < shape[k] for k in range(3)):
                         break
-                    j, dist = _nearest_patch(pts, p, max_d)
+                    j, dist = _nearest_patch(pts, p, max_d, tree)
                     if j is None:
                         break
                     cand = dirs[j]
