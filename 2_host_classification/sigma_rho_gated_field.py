@@ -1,0 +1,215 @@
+"""
+sigma_rho_gated_field.py -- the Stage 1 -> Stage 2 bridge.
+
+Until this file, the two stages were independent: `1_sigma_rho_selection`
+certified a (sigma, rho) per region and produced a dense e3 field, and
+`2_host_classification` ignored it -- `adaptive_triage` re-derived its own
+per-patch sigma_grad from the raw image and never saw Stage 1's output at all.
+This wires them: the orientation field comes from Stage 1's adaptive (sigma,
+rho) selection, and c_s > FA decides which of its patches go to HOST-FOD.
+
+Output: `GatedField`, holding per patch
+    centre, n_dirs, dirs, gated (the routing mask), label, c_s, FA, sigma, rho
+
+Single-fibre patches carry one e3 from Stage 1's tensor; gated patches carry
+HOST's multi-orientation answer INSTEAD, which is the point of gating.
+
+Three scales, all measured
+--------------------------
+The literal reading of "gate the patches from Stage 1" -- compute c_s and FA
+from the structure tensor at Stage 1's own certified (sigma, rho) -- gates
+NOTHING, including a true crossing:
+
+    patch half | sigma_grad | crossing c_s vs FA | fires | kissing | fires
+    -----------|------------|--------------------|-------|---------|------
+        14     |    1.0     |   0.216 vs 0.664   |  no   |  0.244  |  no
+         8     |    2.0     |   0.098 vs 0.719   |  no   |  0.070  |  no
+        10     |    4.0     |   0.342 vs 0.723   |  no   |  0.037  |  no
+        14     |    4.0     |   0.486 vs 0.454   | YES   |  0.148  |  no
+
+At Stage 1's sigma (~0.85-1.0 vox) the crossing/kissing c_s ratio is 0.9-1.2x:
+no separation at all. The reason is geometric -- a single fibre's gradients
+already lie in a plane, so lambda3 is small; a crossing only raises lambda3
+once the integration window is wide enough to hold BOTH fibre families, and
+Stage 1's rho ~ 1 voxel is far too narrow to mix them.
+
+A second measurement splits the scales again. HOST's second peak only exists in
+a window that does NOT include the gate scale:
+
+    sigma_grad :  1.0   1.5   2.0   2.5   3.0   4.0
+    n_peaks    :   1     1     2     2     2     1     (true crossing)
+
+So three different scales are in play, each doing its own job:
+
+    Stage 1 sigma ~0.85-1.0  ->  the single-fibre direction e3
+    GATE_SIGMA_GRAD = 4.0    ->  c_s vs FA, the routing decision
+    DIR_SIGMA_GRAD  = 2.5    ->  extracting the peak directions
+
+Using one scale for all three does not merely degrade the losers: at 1.0 the
+gate never fires, and at 4.0 the peaks that justified gating are already
+smoothed away.
+"""
+
+import argparse
+import os
+import sys
+
+import numpy as np
+from structure_tensor import structure_tensor_3d, eig_special_3d
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_ROOT = os.path.dirname(_HERE)
+for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
+    sys.path.insert(0, _p)
+
+from host_fod import analyse, classify
+from sigma_rho_adaptive import compute_adaptive_map, SIGMA_FLOOR
+
+EPS = 1e-12
+GATE_HALF = 14           # = mass_conservation_validate.CROSS_HALF
+GATE_SIGMA_GRAD = 4.0    # the only swept scale where c_s overtakes FA
+DIR_SIGMA_GRAD = 2.5     # where HOST's second peak actually exists
+DEFAULT_STRIDE = 6
+
+
+def tensor_fields(vol, sigma, rho, truncate=4.0):
+    """Structure tensor eigenvalues (descending) and e3 at one (sigma, rho)."""
+    with np.errstate(divide="ignore", invalid="ignore"):
+        S = structure_tensor_3d(vol.astype(np.float32), float(sigma), float(rho),
+                                truncate=truncate)
+        val, vec = eig_special_3d(S)
+    del S
+    return val, vec
+
+
+class GatedField:
+    """Per-patch orientation field plus the boolean routing mask."""
+
+    def __init__(self, shape):
+        self.shape = tuple(shape)
+        self.patches = []
+
+    def add(self, **kw):
+        self.patches.append(kw)
+
+    @property
+    def n(self):
+        return len(self.patches)
+
+    def routing_mask(self):
+        """The Stage-1 deliverable: True where the patch was routed to HOST."""
+        return np.array([p["gated"] for p in self.patches], dtype=bool)
+
+    def multi(self):
+        return [p for p in self.patches if p["n_dirs"] >= 2]
+
+    def summary(self):
+        if not self.patches:
+            return "empty field"
+        g = int(self.routing_mask().sum())
+        x = len(self.multi())
+        labs = {}
+        for p in self.patches:
+            labs[p["label"]] = labs.get(p["label"], 0) + 1
+        parts = ", ".join(f"{k} {v}" for k, v in sorted(labs.items()))
+        return (f"{self.n} patches | routed to HOST (c_s>FA): {g} ({g/self.n:.0%}) "
+                f"| multi-orientation: {x} | {parts}")
+
+
+def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
+                      gate_sigma_grad=GATE_SIGMA_GRAD,
+                      dir_sigma_grad=DIR_SIGMA_GRAD, order=4,
+                      sigma_fallback=SIGMA_FLOOR, verbose=True):
+    """Stage 1's adaptive (sigma, rho), then the c_s > FA routing gate."""
+    vol = np.asarray(vol, dtype=np.float32)
+    field = GatedField(vol.shape)
+
+    if verbose:
+        print(f"  [stage 1] adaptive sigma/rho on {block}^3 blocks ...")
+    m = compute_adaptive_map(vol, block=block, verbose=False)
+    sig_map, rho_map = m["sigma_map"], m["rho_map"]
+    zs, ys, xs = m["zs"], m["ys"], m["xs"]
+    if verbose:
+        fin = sig_map[np.isfinite(sig_map)]
+        print(f"           {fin.size}/{sig_map.size} blocks certified"
+              + (f", sigma {fin.min():.2f}-{fin.max():.2f}" if fin.size else ""))
+
+    def block_scale(c):
+        bi = int(np.clip(np.searchsorted(zs, c[0], "right") - 1, 0, len(zs) - 1))
+        bj = int(np.clip(np.searchsorted(ys, c[1], "right") - 1, 0, len(ys) - 1))
+        bk = int(np.clip(np.searchsorted(xs, c[2], "right") - 1, 0, len(xs) - 1))
+        s, r = sig_map[bi, bj, bk], rho_map[bi, bj, bk]
+        if not np.isfinite(s) or s < sigma_fallback:
+            return float(sigma_fallback), float(sigma_fallback)
+        return float(s), float(r if np.isfinite(r) else s)
+
+    centres = [(z, y, x)
+               for z in range(half, vol.shape[0] - half, stride)
+               for y in range(half, vol.shape[1] - half, stride)
+               for x in range(half, vol.shape[2] - half, stride)]
+    scales = {}
+    for c in centres:
+        scales.setdefault(block_scale(c), []).append(c)
+    if verbose:
+        print(f"  [stage 1] {len(centres)} patch centres over "
+              f"{len(scales)} distinct (sigma, rho)")
+
+    air = 0.05 * float(vol.max())
+    for (sigma, rho), cs in scales.items():
+        val, vec = tensor_fields(vol, sigma, rho)
+        for c in cs:
+            patch = vol[c[0] - half:c[0] + half + 1,
+                        c[1] - half:c[1] + half + 1,
+                        c[2] - half:c[2] + half + 1]
+            if patch.mean() < air:
+                continue
+            # --- the routing gate, at ITS OWN scale --------------------------
+            gm = analyse(patch, sigma_grad=gate_sigma_grad, order=order)
+            if gm is None:
+                continue
+            c_s, fa = float(gm["c_s"]), float(gm["FA"])
+            if c_s <= fa:
+                e3 = vec[:, c[0], c[1], c[2]]
+                if not np.all(np.isfinite(e3)):
+                    continue
+                field.add(centre=c, n_dirs=1, dirs=[np.asarray(e3, float)],
+                          gated=False, label="single", c_s=c_s, FA=fa,
+                          sigma=sigma, rho=rho)
+                continue
+            # --- routed to HOST: directions at the PEAK-RESOLVING scale ------
+            dm = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
+            if dm is None or not len(dm["dirs"]):
+                continue
+            lab = classify(dm)
+            dirs = [np.asarray(d, float) for d in dm["dirs"][:2]]
+            field.add(centre=c, n_dirs=len(dirs), dirs=dirs, gated=True,
+                      label=lab, c_s=c_s, FA=fa, sigma=sigma, rho=rho)
+        del val, vec
+
+    if verbose:
+        print(f"  [stage 2] {field.summary()}")
+    return field
+
+
+def run(block=32, stride=8):
+    sys.path.insert(0, os.path.join(_ROOT, "mass_conservation"))
+    from mass_conservation_validate import (raw_localized_crossing, CROSS_SHAPE,
+                                            CROSS_R1, CROSS_TAPER)
+    print("=" * 78)
+    print("GATED ORIENTATION FIELD -- Stage 1 adaptive sigma/rho, gated by c_s > FA")
+    print("=" * 78)
+    vol = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5, CROSS_R1, CROSS_TAPER)
+    print(f"  localized-crossing phantom {vol.shape}")
+    f = build_gated_field(vol, block=block, stride=stride)
+    print("-" * 78)
+    print(f"  routing mask: {int(f.routing_mask().sum())}/{f.n} patches to HOST")
+    print("=" * 78)
+    return f
+
+
+if __name__ == "__main__":
+    p = argparse.ArgumentParser(description="Stage 1 -> Stage 2 gated field")
+    p.add_argument("--block", type=int, default=32)
+    p.add_argument("--stride", type=int, default=8)
+    a = p.parse_args()
+    run(block=a.block, stride=a.stride)
