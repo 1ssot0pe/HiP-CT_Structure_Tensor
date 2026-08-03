@@ -59,6 +59,8 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
     # ---- Stage 1 + 2 --------------------------------------------------------
     gated = build_gated_field(vol, block=block, stride=stride, verbose=verbose)
     mask = gated.routing_mask()
+    tag = name.split()[0].lower()
+    gated.save(f"unified_field_{tag}.npz")
     print(f"  [stage 2] routing mask: {int(mask.sum())}/{gated.n} patches to HOST")
 
     # ---- Stage 3 ------------------------------------------------------------
@@ -94,6 +96,43 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
                 L_initial=float(trace[0]["total"]),
                 L_final=float(trace[-1]["total"]),
                 trace=trace, junction_log=info["junctions"])
+
+
+def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
+    """Real i74. No ground truth -- this is the case S exists for.
+
+    On phantoms the gate already rejects a tangency upstream, so S never fires.
+    On i74 the recorded Phase-2/3 result is that HOST-flagged crossings behave
+    like the non-crossing phantom (24% confirm, at the 21% false-confirm floor),
+    i.e. HOST over-calls. Those over-called crossings ARE routed by the gate, so
+    this is where the superposition metric gets its first real test: it should
+    demote a substantial fraction of them (S well below 0.75).
+    """
+    from reconstruction import load_volume
+    c = tuple(centre)
+    vol = load_volume(crop=(c[0] - radius, c[0] + radius), dtype=np.uint8)
+    vol = vol[:, c[1] - radius:c[1] + radius, c[2] - radius:c[2] + radius]
+    vol = vol.astype(np.float32)
+    print("=" * 78)
+    print(f"REAL i74 -- {vol.shape} at {c}, mean {vol.mean():.1f}")
+    print("=" * 78)
+    r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
+                 block=block, stride=stride, iters=iters)
+    if not r["skipped"]:
+        S = np.array([j["S"] for j in r["junctions"]], float)
+        S = S[np.isfinite(S)]
+        vs = [j["verdict"] for j in r["junctions"]]
+        print(f"
+  {len(S)} scored junctions: S median {np.median(S):.3f}, "
+              f"IQR [{np.percentile(S,25):.3f}, {np.percentile(S,75):.3f}]")
+        for v in ("CROSSING", "TANGENCY", "AMBIGUOUS", "unscored"):
+            k = vs.count(v)
+            if k:
+                print(f"    {v:10}: {k:4d}  ({k/len(vs):.0%})")
+    with open("pipeline_i74_results.json", "w") as f:
+        json.dump(r, f, indent=2, default=float)
+    print("wrote pipeline_i74_results.json")
+    return r
 
 
 def main(iters=3, radius=24, stride=8, block=32):
@@ -139,5 +178,11 @@ if __name__ == "__main__":
     ap.add_argument("--radius", type=int, default=24)
     ap.add_argument("--stride", type=int, default=8)
     ap.add_argument("--block", type=int, default=32)
+    ap.add_argument("--i74", action="store_true", help="run on real i74 instead")
+    ap.add_argument("--centre", nargs=3, type=int, default=[384, 384, 384])
     a = ap.parse_args()
-    main(iters=a.iters, radius=a.radius, stride=a.stride, block=a.block)
+    if a.i74:
+        run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
+                stride=a.stride, iters=a.iters)
+    else:
+        main(iters=a.iters, radius=a.radius, stride=a.stride, block=a.block)
