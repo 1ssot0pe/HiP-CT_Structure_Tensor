@@ -143,10 +143,17 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
             return float(sigma_fallback), float(sigma_fallback)
         return float(s), float(r if np.isfinite(r) else s)
 
-    centres = [(z, y, x)
-               for z in range(half, vol.shape[0] - half, stride)
-               for y in range(half, vol.shape[1] - half, stride)
-               for x in range(half, vol.shape[2] - half, stride)]
+    # Grid ANCHORED ON THE VOLUME CENTRE, not on `half`. A grid that starts at
+    # `half` and steps by `stride` silently misses the middle of the volume
+    # unless (centre - half) happens to be divisible by stride -- which is
+    # exactly where a phantom puts its junction, so the run reports "no
+    # junction" while the gate is working perfectly.
+    def _axis(n):
+        c0 = n // 2
+        ks = range(-((c0 - half) // stride), ((n - half - 1 - c0) // stride) + 1)
+        return [c0 + k * stride for k in ks if half <= c0 + k * stride < n - half]
+    centres = [(z, y, x) for z in _axis(vol.shape[0])
+               for y in _axis(vol.shape[1]) for x in _axis(vol.shape[2])]
     scales = {}
     for c in centres:
         scales.setdefault(block_scale(c), []).append(c)
@@ -161,7 +168,10 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
             patch = vol[c[0] - half:c[0] + half + 1,
                         c[1] - half:c[1] + half + 1,
                         c[2] - half:c[2] + half + 1]
-            if patch.mean() < air:
+            # MAX, not mean: a patch holding one thin bundle in an otherwise
+            # empty crop has a low mean and was being discarded as air, which
+            # emptied the field entirely on the kissing phantom.
+            if patch.max() < air:
                 continue
             # --- the routing gate, at ITS OWN scale --------------------------
             gm = analyse(patch, sigma_grad=gate_sigma_grad, order=order)
