@@ -11,3 +11,7 @@ lung_B.npy
 *.tiff
 *.nii
 *.nii.gz
+
+.venv/
+__pycache__/
+*.pyc
