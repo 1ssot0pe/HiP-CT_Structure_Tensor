@@ -3,8 +3,8 @@
     "name": "TRUE CROSSING",
     "truth": "CROSSING",
     "skipped": true,
-    "n_patches": 23,
-    "n_routed": 0
+    "n_patches": 13,
+    "n_routed": 1
   },
   {
     "name": "TANGENCY (kissing)",

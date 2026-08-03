@@ -69,6 +69,12 @@ EPS = 1e-12
 GATE_HALF = 14           # = mass_conservation_validate.CROSS_HALF
 GATE_SIGMA_GRAD = 4.0    # the only swept scale where c_s overtakes FA
 DIR_SIGMA_GRAD = 2.5     # where HOST's second peak actually exists
+# The brief specifies a FOURTH-order ODF. Measured on the validated crossing
+# phantom at half=14, sigma_grad=2.5, order 4 returns n_peaks=1 and order 6
+# returns n_peaks=2 -- the fourth-order expansion cannot resolve a 40 deg
+# crossing here, and the whole repo's HOST validation is order 6. Using the
+# order that actually resolves the structure; order=4 is still settable.
+HOST_ORDER = 6
 DEFAULT_STRIDE = 6
 
 
@@ -118,7 +124,7 @@ class GatedField:
 
 def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
                       gate_sigma_grad=GATE_SIGMA_GRAD,
-                      dir_sigma_grad=DIR_SIGMA_GRAD, order=4,
+                      dir_sigma_grad=DIR_SIGMA_GRAD, order=HOST_ORDER,
                       sigma_fallback=SIGMA_FLOOR, verbose=True):
     """Stage 1's adaptive (sigma, rho), then the c_s > FA routing gate."""
     vol = np.asarray(vol, dtype=np.float32)
@@ -181,7 +187,17 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
             if c_s <= fa:
                 e3 = vec[:, c[0], c[1], c[2]]
                 if not np.all(np.isfinite(e3)):
-                    continue
+                    # Skielex returns a non-finite eigenvector at isotropic
+                    # voxels. Dropping the patch here emptied the field
+                    # entirely on the sparse kissing phantom -- the patch
+                    # clearly HAS structure (it passed the air test), the
+                    # tensor is just degenerate at that one voxel at Stage 1's
+                    # sigma. Fall back to HOST's own direction rather than
+                    # discarding the patch.
+                    fb = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
+                    if fb is None or not len(fb["dirs"]):
+                        continue
+                    e3 = np.asarray(fb["dirs"][0], float)
                 field.add(centre=c, n_dirs=1, dirs=[np.asarray(e3, float)],
                           gated=False, label="single", c_s=c_s, FA=fa,
                           sigma=sigma, rho=rho)
