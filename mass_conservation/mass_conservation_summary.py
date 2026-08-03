@@ -8,7 +8,7 @@ in mc_validate.log, grouped exactly as that log reports them.
 import os as _sr_os, sys as _sr_sys
 _SR_ROOT = _sr_os.path.dirname(_sr_os.path.dirname(__file__))
 _sr_sys.path.insert(0, _SR_ROOT)  # repo root (host_fod, crossing_shape_3d, kissing_phantom, ...)
-_sr_sys.path.insert(0, _sr_os.path.join(_SR_ROOT, "global_tractography"))  # phase1/phase2 certifiers
+_sr_sys.path.insert(0, _sr_os.path.join(_SR_ROOT, "3_global_tractography"))  # phase1/phase2 certifiers
 
 import numpy as np
 import matplotlib

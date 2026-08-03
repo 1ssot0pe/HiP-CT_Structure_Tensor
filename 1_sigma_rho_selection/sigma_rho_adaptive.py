@@ -1,31 +1,25 @@
 """
-sigma_rho_adaptive.py -- whole-volume ADAPTIVE (sigma, rho), replacing the
-single global pick sigma_rho_global.py certifies from one box.
-
 Why: sigma_rho_robustness.py's multi-box consistency check found the pick
-drifts badly across real i74 tissue -- box A (mean intensity 200) picked
-sigma_L=0.90, box C (mean 160) picked sigma_L=0.88, but box B (mean 105,
-sparser tissue) picked sigma_L=6.00, over 6x the others. A single global
-(sigma, rho) for the whole volume is not defensible. adaptive_triage.py
-already exists for exactly this reason at the HOST-FOD stage (per-patch
-sigma_grad); this module does the equivalent for the upstream
-structure-tensor stage sigma_rho_global.py is about, using the SAME certified
-recipe (pick_sigma_rho: Lindeberg response peak for sigma, rho-stability
-plateau for rho) run per-block instead of once globally.
+drifts badly across real i74 tissue
+    - box A (mean intensity 200) picked sigma_L=0.90
+    - box C (mean 160) picked sigma_L=0.88
+    - box B (mean 105, sparser tissue) picked sigma_L=6.00
+Verdict: A single global (sigma, rho) for whole volume not defensible
+    - Similiar to per patch sigma_grad for HOST selection!
 
-Two pieces:
-
-  compute_adaptive_map(region, block, ...) -- tile a (loaded) 3D region into
+Process:
+  (1) compute_adaptive_map(region, block, ...): tile a (loaded) 3D region into
       non-overlapping blocks, run pick_sigma_rho independently on each
       (skipping background/air blocks by a mean-intensity check), and return
       per-block (sigma, rho) plus validity/ramp/floor flags -- the map.
 
-  fibre_direction_adaptive(region, block, sigma_map, rho_map, valid, ...) --
+  (2) fibre_direction_adaptive(region, block, sigma_map, rho_map, valid, ...):
       consume that map to build the actual whole-region e3 (fibre direction)
       field: each block is recomputed with an EXTRA context margin pulled
       from its neighbours in `region` (so the structure-tensor kernel has
       real support near block edges, not a hard zero-padded boundary), then
       cropped back to the block's own interior and stitched into the output.
+      
       Blocks use their OWN locally-certified (sigma, rho), not one global
       value -- piecewise-constant across blocks (not smoothly blended; see
       module docstring note below on why that's an intentional, simpler
@@ -154,9 +148,12 @@ def summarize_map(m):
 # NOTE (scope): this stitches PIECEWISE-CONSTANT per-block results (each
 # block computed at its own certified sigma,rho, then cropped to its own
 # interior and placed edge-to-edge) rather than smoothly blending scales
-# across block boundaries. A voxel-continuous blend would need structure
+# across block boundaries. 
+# 
+# A voxel-continuous blend would need structure
 # tensors at MULTIPLE candidate scales per voxel and a soft combination rule
-# -- real future work, not implemented here. Piecewise-constant is simple,
+# 
+# Piecewise-constant is simple,
 # correct within each block's interior (real context margin, not zero-padded
 # edges), and already directly answers the finding that drove this: different
 # regions genuinely need different scales.
@@ -203,9 +200,9 @@ def fibre_direction_single_global(region, sigma, rho, truncate=TRUNCATE):
 
 def run(region_slices=REGION, block=BLOCK, global_sigma=0.90, global_rho=3.46,
         save="sigma_rho_adaptive_map.png"):
-    print("=" * 88)
-    print("ADAPTIVE (sigma, rho) FIELD -- whole-region demonstration on real i74")
-    print("=" * 88)
+    
+    print("Whole-region demonstration on real i74")
+
     full = load_volume(crop=None, dtype=np.uint8)
     region = full[region_slices].astype(np.float32)
     del full

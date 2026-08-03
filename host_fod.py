@@ -95,6 +95,16 @@ def classify(m, aniso_iso=0.9, amp2_min=0.4, sep_min=30.0, cs_single=None):
     # spurious splitting -- either way not trustworthy, so label as complex.
     if m["n_peaks"] == 2 and m["amp2"] >= amp2_min and m["sep"] >= sep_min:
         return "crossing"
+    # The comment above was the intent from the start, but the branch was never
+    # written: a >=3-peak patch fell through to the c_s vs FA rule below and came
+    # back "single" whenever c_s <= FA. That is the most confident label in the
+    # set, handed to a patch the method has explicitly given up on -- and
+    # downstream it is a FILTER, not a display string (mass_conservation builds
+    # its calibration pool from classify(m) == "single"), so such patches were
+    # entering a clean-single-fibre pool. Measured on real i74: rare, 1 of 196
+    # sampled patches, but that one did land in the pool.
+    if m["n_peaks"] >= 3:
+        return "complex"
     # single vs dispersed: PARAMETER-FREE rule -- a voxel is a single fibre when
     # it is more anisotropic (FA) than spherical (c_s). Both are normalised
     # descriptors of the SAME structure-tensor eigenvalues, so this is purely

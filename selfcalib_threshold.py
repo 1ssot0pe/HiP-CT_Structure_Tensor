@@ -31,9 +31,20 @@ EPS = 1e-12
 INTERIOR = (slice(60, 260), slice(240, 440), slice(240, 440))
 
 
-def sphericity_field(vol, sigma, rho, truncate=4.0):
+def sphericity_field(vol, sigma, rho, truncate=4.0, subtract_N=None):
     """Per-voxel sphericity c_s = 3*l3/(l1+l2+l3), cropped to the valid border.
-    Same formula as crossing_shape_3d.shape_measures, but the field not the mean."""
+    Same formula as crossing_shape_3d.shape_measures, but the field not the mean.
+
+    subtract_N (3x3 axis-basis noise structure tensor from noise_model.debias):
+    if given, c_s is computed from the NOISE-CORRECTED tensor E[S]-N. OFF by
+    default -- on i74 the noise level can't be soundly measured (no half-maps),
+    so this is only sound for data with half-maps; see noise_model/debias.py."""
+    if subtract_N is not None:
+        import noise_floor as _nf
+        S = _nf.structure_tensor_field(vol, sigma, rho, subtract_N=subtract_N, truncate=truncate)
+        l1, l2, l3, _e3, _clip = _nf.eig_fields(S, psd_clip=True, want_vec=False)
+        cs = 3.0 * l3 / (l1 + l2 + l3 + EPS)
+        return _crop3(cs, crop_margin(sigma, rho, truncate))
     with np.errstate(divide="ignore", invalid="ignore"):
         S = structure_tensor_3d(vol.astype(np.float32), sigma, rho, truncate=truncate)
         val, _vec = eig_special_3d(S)
