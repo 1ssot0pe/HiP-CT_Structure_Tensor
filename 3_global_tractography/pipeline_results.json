@@ -1,0 +1,16 @@
+[
+  {
+    "name": "TRUE CROSSING",
+    "truth": "CROSSING",
+    "skipped": true,
+    "n_patches": 23,
+    "n_routed": 0
+  },
+  {
+    "name": "TANGENCY (kissing)",
+    "truth": "TANGENCY",
+    "skipped": true,
+    "n_patches": 0,
+    "n_routed": 0
+  }
+]
