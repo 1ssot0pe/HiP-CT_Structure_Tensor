@@ -29,7 +29,10 @@ from scipy import ndimage
 
 from crossing_shape_3d import (make_crossing_phantom_3d, make_single_fibre_3d,
                                _noise_volume)
-from selfcalib_threshold import load_interior, sphericity_field
+# NOTE: `from selfcalib_threshold import load_interior, sphericity_field` used to
+# sit here. Neither name was referenced anywhere in this file. Because host_fod
+# imports this module, that one dead line pulled selfcalib_threshold -- and
+# through it noise_floor and reconstruction -- into every pipeline run.
 
 EPS = 1e-12
 

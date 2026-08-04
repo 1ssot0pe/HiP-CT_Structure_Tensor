@@ -76,6 +76,9 @@ DIR_SIGMA_GRAD = 2.5     # where HOST's second peak actually exists
 # order that actually resolves the structure; order=4 is still settable.
 HOST_ORDER = 6
 DEFAULT_STRIDE = 6
+# Warn when fewer than this fraction of Stage-1 blocks certify a (sigma, rho):
+# below it, the run is effectively on one hardcoded fallback scale.
+FALLBACK_WARN_FRAC = 0.5
 
 
 def tensor_fields(vol, sigma, rho, truncate=4.0):
@@ -169,10 +172,25 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
     m = compute_adaptive_map(vol, block=block, verbose=False)
     sig_map, rho_map = m["sigma_map"], m["rho_map"]
     zs, ys, xs = m["zs"], m["ys"], m["xs"]
+    # Stage 1 not certifying a block is not an error -- block_scale() falls back
+    # to sigma_fallback and the run continues. But when MOST blocks fail, the
+    # "adaptive" scale selection is not happening at all: every patch is being
+    # measured at one hardcoded fallback sigma, and nothing downstream says so.
+    # That is how the kissing phantom runs (0/8 certified, everything at
+    # SIGMA_FLOOR) -- fine there, but on a real volume it would silently mean
+    # Stage 1 contributed nothing. Warn loudly rather than print a count that
+    # is easy to read past.
+    fin = sig_map[np.isfinite(sig_map)]
+    frac = fin.size / sig_map.size if sig_map.size else 0.0
     if verbose:
-        fin = sig_map[np.isfinite(sig_map)]
         print(f"           {fin.size}/{sig_map.size} blocks certified"
               + (f", sigma {fin.min():.2f}-{fin.max():.2f}" if fin.size else ""))
+    if frac < FALLBACK_WARN_FRAC:
+        who = "every patch" if fin.size == 0 else "most patches"
+        print(f"  [stage 1] WARNING: only {frac:.0%} of blocks certified a "
+              f"(sigma, rho) -- {who} will fall back to sigma="
+              f"{sigma_fallback:g}, so the adaptive scale selection is "
+              f"effectively OFF for this volume.")
 
     def block_scale(c):
         bi = int(np.clip(np.searchsorted(zs, c[0], "right") - 1, 0, len(zs) - 1))
@@ -263,9 +281,8 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
 
 
 def run(block=32, stride=8):
-    sys.path.insert(0, os.path.join(_ROOT, "mass_conservation"))
-    from mass_conservation_validate import (raw_localized_crossing, CROSS_SHAPE,
-                                            CROSS_R1, CROSS_TAPER)
+    from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+                                    CROSS_R1, CROSS_TAPER)
     print("=" * 78)
     print("GATED ORIENTATION FIELD -- Stage 1 adaptive sigma/rho, gated by c_s > FA")
     print("=" * 78)

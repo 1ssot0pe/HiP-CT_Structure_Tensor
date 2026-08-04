@@ -581,21 +581,15 @@ def build_field_and_junctions(vol, half, centre, sigma_grad=2.5, search=6,
 
 
 def validate(n_iter=4, verbose=True):
-    # mass_conservation_validate may be a module or be inside the mass_conservation
-    # package depending on installation layout; try both import styles.
-    try:
-        from mass_conservation_validate import (raw_localized_crossing, raw_kissing,
-                                                CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
-                                                CROSS_HALF, KISS_HALF)
-    except Exception:
-        try:
-            from mass_conservation.mass_conservation_validate import (
-                    raw_localized_crossing, raw_kissing,
-                    CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
-                    CROSS_HALF, KISS_HALF)
-        except Exception:
-            print("mass_conservation_validate import failed; validation skipped")
-            return {}
+    # The phantoms are at the repo root, which the preamble above guarantees is
+    # on sys.path. This used to be a two-deep try/except that reached into
+    # `mass_conservation/` and silently returned {} -- printing "validation
+    # skipped" and exiting 0 -- whenever neither import shape worked. A
+    # validation that quietly does nothing is worse than one that crashes, and
+    # the fallback only existed because the builders lived in a sibling folder.
+    from localized_phantoms import (raw_localized_crossing, raw_kissing,
+                                    CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
+                                    CROSS_HALF, KISS_HALF)
     print("=" * 84)
     print("STAGE 3 -- self-optimising tractography, phantom validation")
     print("=" * 84)

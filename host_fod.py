@@ -31,7 +31,15 @@ warnings.filterwarnings("ignore")
 
 from dipy.direction import peak_directions
 
-from fod_dipy import SPHERE                       # repulsion724 sphere (has edges)
+from dipy.data import get_sphere
+
+# The repulsion724 sphere (it has edges, which peak_directions needs). Built
+# here rather than imported from fod_dipy: that one constant was the only
+# reason the live pipeline loaded fod_dipy, a dipy cross-check experiment.
+try:
+    SPHERE = get_sphere(name="repulsion724")
+except TypeError:                                 # older dipy: positional only
+    SPHERE = get_sphere("repulsion724")
 from two_orientation_test import patch_gradients, _central_patch
 
 EPS = 1e-12

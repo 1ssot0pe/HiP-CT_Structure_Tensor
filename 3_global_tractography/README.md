@@ -40,6 +40,11 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
 1. **The two phantoms** — `crossing_shape_3d.py` + `kissing_phantom.py` *(root)*
    build a true crossing and a kissing pair with **known** geometry, so every
    method below can be checked against truth before touching real data.
+   `localized_phantoms.py` *(root)* builds the two the **live pipeline**
+   validates against: a *localized* crossing (second family bounded to a zone,
+   so single-family tissue exists in the same volume) and a curved kissing
+   pair. These used to sit in `mass_conservation/`, which made this stage
+   depend on a downstream folder.
 
 2. **Phase 1 — can a tracker tell them apart?** — `phase1_kissing_crossing.py`.
    A continuity tracker traverses a real crossing but terminates at a kissing

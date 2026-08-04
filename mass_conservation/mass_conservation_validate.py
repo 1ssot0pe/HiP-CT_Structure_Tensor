@@ -113,41 +113,17 @@ def local_ratio_threshold(ratios, physical=THRESH, min_gap=0.5):
 
 # ---------------------------------------------------------------------------
 # raw (un-normalised) phantom builders
+#
+# These MOVED to the repo root (`localized_phantoms.py`). They are the live
+# pipeline's validation fixtures -- run_pipeline, self_optimising_tractography
+# and sigma_rho_gated_field all build them -- so having them here made three
+# upstream stages depend on this mass-conservation experiment. Re-exported so
+# this module's public surface is unchanged.
 # ---------------------------------------------------------------------------
 
-def raw_kissing(gap, curv, radius_a, radius_b):
-    C = _coords_cross(KSHAPE)
-    ptsA, ptsB = _curve_pts(-1, gap, curv), _curve_pts(+1, gap, curv)
-    A = curved_bundle(C, ptsA, radius_a)
-    B = curved_bundle(C, ptsB, radius_b)
-    return (A + B).astype(np.float32)
-
-
-def raw_localized_crossing(shape, sep_deg, spacing, width, R1=20.0, taper=8.0):
-    """A crossing that only exists within a BOUNDED zone around the volume
-    centre -- family 1 fills the whole volume, family 2 is smoothly windowed
-    to r<R1 (flat, no gradient in the window itself) then tapers to exactly 0
-    by r=R1+taper. This models real tissue: one dominant background
-    population, locally crossed by a second bundle over a finite overlap zone
-    -- so genuine single-family-only tissue exists elsewhere in the SAME
-    volume, and the calibration can come from there instead of a synthetic
-    companion. (A raw radial mask with no flat core was tried first and broke
-    HOST's 2-peak detection at the intersection -- the mask's own smooth
-    gradient, even a small one, was enough to corrupt the higher-order
-    energy balance; a flat core avoids that entirely.)"""
-    half = np.deg2rad(sep_deg / 2.0)
-    d1 = np.array([np.cos(half), np.sin(half), 0.0])
-    d2 = np.array([np.cos(half), -np.sin(half), 0.0])
-    C = _coords_cross(shape)
-    t1 = _tube_family(C, d1, spacing, width)
-    t2 = _tube_family(C, d2, spacing, width)
-    X, Y, Z = C
-    r = np.sqrt(X ** 2 + Y ** 2 + Z ** 2)
-    mask = np.ones_like(r)
-    band = (r > R1) & (r < R1 + taper)
-    mask[band] = 0.5 * (1 + np.cos(np.pi * (r[band] - R1) / taper))
-    mask[r >= R1 + taper] = 0.0
-    return (t1 + t2 * mask).astype(np.float32)
+from localized_phantoms import (raw_kissing, raw_localized_crossing,  # noqa: E402,F401
+                                CROSS_HALF, KISS_HALF, CROSS_SHAPE,
+                                CROSS_R1, CROSS_TAPER, CROSS_CAL_OFFSETS)
 
 
 def anoise(shape, amp, seed, smooth=(2.5, 0.8, 0.8)):
@@ -232,14 +208,9 @@ def _patch_at(vol, center_zyx, half):
 # that actually reproduces the rare spurious "crossing" near the pinch point).
 # ---------------------------------------------------------------------------
 
-CROSS_HALF = 14
-KISS_HALF = 8
-# z kept small (real lung half-map noise only has 81 z-slices available); y is
-# generous so the far calibration offsets (+/-45, +/-50) have room either side
-# of the crossing zone without needing a huge, expensive volume.
-CROSS_SHAPE = (56, 200, 60)
-CROSS_R1, CROSS_TAPER = 20.0, 8.0
-CROSS_CAL_OFFSETS = (45, 50, -45, -50)
+# CROSS_HALF / KISS_HALF / CROSS_SHAPE / CROSS_R1 / CROSS_TAPER /
+# CROSS_CAL_OFFSETS now live beside the builders they parameterise, in
+# `localized_phantoms.py` at the repo root, and are imported above.
 
 
 def _noise(shape, amp, seed, kind):
