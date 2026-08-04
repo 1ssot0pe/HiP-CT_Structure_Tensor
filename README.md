@@ -23,6 +23,110 @@ Setup and the full step-by-step are in [PIPELINE.md](PIPELINE.md).
 | **2** Gate | Can one direction be trusted here? | orientation field + routing mask |
 | **3** Resolve | Real crossing, or fibres just touching? | S + verdict per junction |
 
+## Logic flow
+
+Each step asks one question. The **decisions** are what the pipeline is; the
+boxes are just where they happen.
+
+```
+                    reconstruction.load_volume()      real scan, no truth
+                    localized_phantoms.raw_*()        phantom, known truth
+                                   │
+                                   ▼   vol (z, y, x) float32
+
+┌─ STEP 1 · At what scale do we measure? ─────────────  1_sigma_rho_selection
+│
+│    A structure tensor has two knobs, and the tissue sets both:
+│
+│      first peak of the Lindeberg response  →  σ    how wide a gradient
+│      where angular drift flattens          →  ρ    how far to average
+│
+│    σ too small measures noise; too large blurs neighbouring fibres.
+│    ρ too small leaves direction jittery; too large averages across fibres.
+│    Picked per 32³ block, because the best σ varies ~1–6 across a volume.
+│
+│    ? is the block certified
+│      ├─ yes → use this block's (σ, ρ)
+│      └─ no  → σ = ρ = 0.85  ⚠ WARNS: this step is contributing nothing
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼   sigma_map, rho_map
+
+┌─ STEP 2 · Can ONE direction be trusted here? ───────  2_host_classification
+│
+│    A tensor gives one direction per voxel. Where two fibres cross, that
+│    answer is not imprecise — it is meaningless. Find those places, and
+│    spend the expensive method only there.
+│
+│    per patch (half = 14):   host_fod.analyse(σ_grad = 4.0)
+│                               → c_s   how much it has NO dominant direction
+│                               → FA    how strongly directional it is
+│
+│    ? c_s ≤ FA  AND  fewer than 3 peaks        ← both from the same
+│      │                                          eigenvalues, so no
+│      │                                          threshold to tune
+│      ├─ yes → SINGLE.  keep Step 1's e3, one direction, done
+│      │
+│      └─ no  → ROUTE TO HOST-FOD, at a different scale:
+│               analyse(σ_grad = 2.5) → up to 2 directions
+│               classify() → single, crossing, dispersed,
+│                            disorganised, complex
+│
+│    Three scales, not interchangeable:  σ≈1.0 for direction,
+│    4.0 for the gate, 2.5 for peaks. At 1.0 the gate never fires;
+│    at 4.0 the second peak is already smoothed away.
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼   GatedField → results/unified_field_*.npz
+
+┌─ STEP 3 · Real crossing, or fibres just touching? ── 3_global_tractography
+│
+│  (a) MEASURE — from the image, once per junction. Brightness adds:
+│
+│        S = (I_c − I₀) ⁄ ((I_a − I₀) + (I_b − I₀))
+│
+│        S ≈ 1.0   both fibres deposit here      →  CROSSING
+│        S ≈ 0.5   only one is really here       →  TANGENCY
+│        decision at 0.75, ±0.10 reported as AMBIGUOUS
+│
+│  (b) FIT — θ = (step, angle, seed density, link weight)
+│
+│        ┌───────────────────────────────────────────────────────┐
+│        │                                                       │
+│        ▼                                                       │
+│      integrate streamlines through the field                   │
+│        └─ S is a WALL here: a path may run ALONG a tangency,   │
+│           never THROUGH it                                     │
+│        │                                                       │
+│        ▼                                                       │
+│      rasterise → D_rec    arc-length weighted, so density 2    │
+│        │                  literally means two fibres           │
+│        ▼                                                       │
+│      L = MSE(D_rec, D_obs)        does it explain the image?   │
+│          + verdict penalty        does it obey S?              │
+│        │                            CROSSING wants density 2   │
+│        │                            TANGENCY wants density ≤ 1 │
+│        ▼                                                       │
+│      coordinate descent — one knob at a time, keep what helps ─┘
+│        (no gradient: streamlines terminate discretely, so L is
+│         flat, then jumps. There is no slope to follow.)
+│
+│      stop when a full sweep improves nothing
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼
+
+     results/pipeline_results.json    S + verdict per junction, fitted θ
+     results/unified_field_*.npz      the orientation field
+     results/field_*.png              greyscale + orientations, to check by eye
+     stdout                           PASS / FAIL, or a verdict with no
+                                      correctness claim on real data
+```
+
+**Where the loop closes.** S is measured once from the image and never revised.
+θ adapts to S; S never adapts to θ. So a wrong verdict is optimised *toward*,
+not away from — the honest limit of the current design.
+
 ## What actually runs
 
 Traced from a real run — 13 modules, not the 56 in the repo:
