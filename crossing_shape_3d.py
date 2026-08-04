@@ -23,24 +23,51 @@ Westin shape measures (val descending, l1>=l2>=l3):
     sphericity c_s = 3*l3 / (l1 + l2 + l3)           -- isotropic / multi-orient
 
 Reuses: structure_tensor_3d + eig_special_3d (3 eigenvalues); fibre_direction,
-crop_margin, _crop3 (orthogonality_residual); the coherence-onset knee detector
-(toy2d/coherence_sigma.knee_sigma) unchanged. The only NEW thing is a 3D
+crop_margin, _crop3 (orthogonality_residual). The only NEW thing is a 3D
 crossing phantom with a tunable separation angle -- no existing phantom has that.
-"""
 
-import os
-import sys
+`knee_sigma` below was previously imported from `1_sigma_rho_selection/toy2d/
+coherence_sigma.py` via a sys.path insert. It is a pure function of a curve
+(numpy only, ~15 lines), and that one import pulled the whole five-file toy2d
+package into every run of the live pipeline -- `import host_fod` reaches here.
+Inlined so the 2D toy stays a standalone experiment.
+"""
 
 import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
 from orthogonality_residual import fibre_direction, crop_margin, _crop3
 
-# Reuse the exact knee detector from the 2D selector (pure function of a curve).
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "1_sigma_rho_selection", "toy2d"))
-from coherence_sigma import knee_sigma  # noqa: E402
-
 EPS = 1e-12
+
+
+def knee_sigma(sigmas, C, tau=0.2):
+    """Coherence-ONSET sigma via an explicit slope-threshold knee.
+
+    Method (printed so it can be checked):
+      1. slope[i] = (C[i+1]-C[i]) / (sigma[i+1]-sigma[i]).
+      2. i_rise = argmax(slope) -- the steepest part of the coherence rise.
+      3. onset = first i >= i_rise where slope[i] < tau * slope[i_rise]
+         -- i.e. the sigma at which the rise first FLATTENS (the plateau starts).
+    Taking the FIRST flattening (not the global max of C) is what avoids the
+    over-smoothing trap: if C rises again later (crossing fusion), that second
+    rise is ignored because we stop at the first knee.
+    """
+    sigmas = np.asarray(sigmas, float)
+    C = np.asarray(C, float)
+    slope = np.diff(C) / np.diff(sigmas)
+    i_rise = int(np.argmax(slope))
+    thresh = tau * slope[i_rise]
+    onset = None
+    for i in range(i_rise, slope.size):
+        if slope[i] < thresh:
+            onset = i
+            break
+    if onset is None:                       # never flattened in range
+        onset = sigmas.size - 1
+    info = dict(slope=slope, i_rise=i_rise, thresh=float(thresh),
+                onset_idx=int(onset), max_slope=float(slope[i_rise]))
+    return float(sigmas[onset]), info
 
 
 # ---------------------------------------------------------------------------
@@ -539,6 +566,7 @@ def stress_skew(noise=0.3, train_seeds=(0, 1, 2), test_seeds=(0, 1, 2),
 
 
 if __name__ == "__main__":
+    import sys
     stage = sys.argv[1] if len(sys.argv) > 1 else "1"
     if stage == "1":
         layer1()

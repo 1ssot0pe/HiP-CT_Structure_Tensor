@@ -67,7 +67,7 @@ it. Each reaches the root libs via a `sys.path.insert` at the top.
 
 # How to run
 
-From the repo root, e.g. `.venv\Scripts\python -u noise_model\run_lung_multiblock.py`.
+From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u noise_model\run_lung_multiblock.py`.
 
 | Script | Needs | Note |
 |---|---|---|
@@ -84,5 +84,9 @@ From the repo root, e.g. `.venv\Scripts\python -u noise_model\run_lung_multibloc
 # Shared at repo root
 
 `noise_floor.py` (the N-matrix / power-spectrum library, used here and by the
-tractography stage), plus `reconstruction.py`, `resolution_sweep.py`,
-`orthogonality_residual.py`. Files here import them via `sys.path.insert` to root.
+tractography stage), plus `reconstruction.py` and `orthogonality_residual.py`.
+Files here import them via `sys.path.insert` to root.
+
+`debias.py` (the analysis-time de-biasing layer) was deleted in the `simple`
+pass — it was never imported by anything. `noise_floor.structure_tensor_field`
+still takes `subtract_N=`, which is the mechanism it wrapped.

@@ -41,46 +41,47 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    build a true crossing and a kissing pair with **known** geometry, so every
    method below can be checked against truth before touching real data.
 
-2. **Phase 1 — can a tracker tell them apart?** — `phase1_kissing_crossing.py`
-   (+ `phase1b_global` / `phase1c_directional` / `phase1d_generalize`
-   extensions). A continuity tracker traverses a real crossing but terminates at
-   a kissing boundary. **Closed for wide angles**; narrow crossings stay
-   unresolvable (a stated limit).
+2. **Phase 1 — can a tracker tell them apart?** — `phase1_kissing_crossing.py`.
+   A continuity tracker traverses a real crossing but terminates at a kissing
+   boundary. **Closed for wide angles**; narrow crossings stay unresolvable (a
+   stated limit). Also the `local_fibreness` / `V` primitives Phase 2 builds on.
 
 3. **Phase 2 — demote spurious crossings on real i74** — `phase2_i74_demote.py`
-   (forward-support straightness certifier) + `phase2b_validate.py`. Walk both
-   peaks of each HOST crossing; a real one traces a straight persistent line, a
-   spurious one wanders. It demotes ~76% of HOST crossings — but a *local*
-   per-peak certifier proved insufficient, which motivated Phase 3.
+   (forward-support straightness certifier). Walk both peaks of each HOST
+   crossing; a real one traces a straight persistent line, a spurious one
+   wanders. It demotes ~76% of HOST crossings — but a *local* per-peak certifier
+   proved insufficient, which motivated Phase 3. Exports `collect_crossings`,
+   which all five `mass_conservation/` i74 scripts import.
 
 4. **Phase 3 — the joint global model** — `phase3_global.py` (the model),
    `phase3_i74.py` (on real i74), `phase3_validate3d.py` (3D phantom, kissing=0
    at every angle), `phase3_realnoise.py` (**real noise degrades true-crossing
-   confirm 89%→57%**), `phase3_calibrated.py` (honest negative — a scalar gate
-   can't pin the over-calling magnitude), `phase3_generative.py` (the
-   noise-calibrated generative likelihood — selects the true geometry 100%,
-   beats a white-noise model at high noise).
+   confirm 89%→57%**), `phase3_generative.py` (the noise-calibrated generative
+   likelihood — selects the true geometry 100%, beats a white-noise model at
+   high noise).
 
-5. **Kissing gap — the resolution limit** — `kissing_gap_sweep.py` +
+5. **Stage 3, the live path** — `tract_density.py` (trilinear-splat rasteriser,
+   arc-length normalised) → `self_optimising_tractography.py` (the optimisation
+   loop, `field_from_gated`, `superposition_S`) → `run_pipeline.py`, the only
+   end-to-end driver (Stage 1 → 2 → 3).
+
+6. **Kissing gap — the resolution limit** — `kissing_gap_sweep.py` +
    `test_kissing_phantom.py`. Global tractography stays clean down to a gap of
    **~5× the fibre radius**; below that the phantom itself fuses — a resolution
    limit, not a bug.
 
-6. **Whole-pipeline capstone** — `brain_phantom_pipeline.py`. Runs every stage
+7. **Whole-pipeline capstone** — `brain_phantom_pipeline.py`. Runs every stage
    at once on a 3D all-features phantom (single / crossing / kissing / complex)
    at realistic SNR, against known labels.
 
-7. **Figures** — `*_arrows.py` (recovered-orientation arrow overlays for the
-   kissing/gap-sweep/capstone phantoms) and `phantom_overview.py` (phantom
-   gallery).
-
 # How to run
 
-From the repo root, e.g. `.venv\Scripts\python -u global_tractography\phase3_i74.py`.
+From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u 3_global_tractography\run_pipeline.py`.
 Phantom-based scripts need no real data; the i74 ones need the volume.
 
 | Script | Needs | What it shows |
 |---|---|---|
+| **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run** |
 | `phase1_kissing_crossing.py` | phantom | tracker separates kissing from crossing |
 | `phase2_i74_demote.py` | i74 volume | straightness demotes ~76% of HOST crossings |
 | `phase3_i74.py` | i74 volume | joint global tractography on real tissue |
@@ -88,6 +89,12 @@ Phantom-based scripts need no real data; the i74 ones need the volume.
 | `phase3_generative.py` | phantom | noise-calibrated model selection |
 | `kissing_gap_sweep.py` | phantom | the ~5× fibre-radius resolution limit |
 | `brain_phantom_pipeline.py` | phantom | whole-pipeline capstone (5/5 at realistic SNR) |
+
+Deleted in the `simple` pass (findings recorded above and in
+`BAYES_TRACTOGRAPHY.md`): `phase1b_global`, `phase1c_directional`,
+`phase1d_generalize` (superseded Phase-1 extensions), `phase2b_validate`,
+`phase3_calibrated` (the scalar-gate negative), and the figure-only scripts
+`*_arrows.py` / `phantom_overview.py`.
 
 # Shared at repo root, and the one downstream reach-in
 

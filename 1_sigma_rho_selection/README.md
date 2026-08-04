@@ -46,8 +46,10 @@ of each file. Run any script from anywhere.
 
 1. **Prove it in 2D** — `toy2d/`. Test the two rules (Lindeberg response → σ,
    angular drift → ρ) on a 2D phantom with known directions. They track the
-   truth; a naive alternative didn't. (`coherence_sigma.py` also exports
-   `knee_sigma`, used by root `crossing_shape_3d.py` — so it stays.)
+   truth; a naive alternative didn't. Now a **standalone experiment**: it used
+   to be dragged into every pipeline run because root `crossing_shape_3d.py`
+   imported `coherence_sigma.knee_sigma`. That function is copied into
+   `crossing_shape_3d.py`, so nothing outside this folder imports `toy2d/`.
 
 2. **The 3D core** — `pick_sigma_rho.py`. What every later step calls.
    **σ** = the *first* peak of the Lindeberg response (first, not highest, so a
@@ -78,7 +80,7 @@ of each file. Run any script from anywhere.
 
 # How to run
 
-From the repo root, e.g. `.venv\Scripts\python -u sigma_rho_selection\sigma_rho_global.py`.
+From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u sigma_rho_selection\sigma_rho_global.py`.
 
 | Script | Needs | Output |
 |---|---|---|
@@ -89,7 +91,10 @@ From the repo root, e.g. `.venv\Scripts\python -u sigma_rho_selection\sigma_rho_
 
 # Downstream consumers outside this folder
 
-`host_classification/adaptive_triage.py` uses `pick_sigma_rho` for a *different*
-job — a per-patch scale for HOST-FOD, not the volume-wide pick here.
-`crossing_shape_3d.py` (root) uses `toy2d/coherence_sigma.knee_sigma`. Both
-reach in the same `sys.path.insert` way.
+`2_host_classification/adaptive_triage.py` uses `pick_sigma_rho` for a
+*different* job — a per-patch scale for HOST-FOD, not the volume-wide pick here.
+`2_host_classification/sigma_rho_gated_field.py` uses
+`sigma_rho_adaptive.compute_adaptive_map` — that is the live Stage 1 → Stage 2
+link. Both reach in via `sys.path.insert`.
+
+Nothing outside this folder imports `toy2d/` any more.

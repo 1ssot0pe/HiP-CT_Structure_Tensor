@@ -35,10 +35,11 @@ def sphericity_field(vol, sigma, rho, truncate=4.0, subtract_N=None):
     """Per-voxel sphericity c_s = 3*l3/(l1+l2+l3), cropped to the valid border.
     Same formula as crossing_shape_3d.shape_measures, but the field not the mean.
 
-    subtract_N (3x3 axis-basis noise structure tensor from noise_model.debias):
-    if given, c_s is computed from the NOISE-CORRECTED tensor E[S]-N. OFF by
-    default -- on i74 the noise level can't be soundly measured (no half-maps),
-    so this is only sound for data with half-maps; see noise_model/debias.py."""
+    subtract_N (3x3 axis-basis noise structure tensor, e.g. from
+    noise_floor.N_matrix): if given, c_s is computed from the NOISE-CORRECTED
+    tensor E[S]-N. OFF by default -- on i74 the noise level can't be soundly
+    measured (no half-maps), so this is only sound for data with half-maps;
+    see noise_model/README.md."""
     if subtract_N is not None:
         import noise_floor as _nf
         S = _nf.structure_tensor_field(vol, sigma, rho, subtract_N=subtract_N, truncate=truncate)

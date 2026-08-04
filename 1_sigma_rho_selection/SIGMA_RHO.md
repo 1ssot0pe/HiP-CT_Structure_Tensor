@@ -61,12 +61,13 @@ floor. That is a defensible pick, not a two-method certification.
 
 ## Reproduce
 
-- `python sigma_rho_selection/sigma_rho_global.py` — single global Lindeberg
+- `python 1_sigma_rho_selection/sigma_rho_global.py` — single global Lindeberg
   (σ, ρ) pick on real i74 + discretisation-floor check (`sigma_rho_global.png`).
   (FSC corroboration was removed after it failed its trust gate — see
-  `sigma_rho_selection/README.md`.)
-- `python sigma_rho_selection/sigma_rho_adaptive.py` — per-region adaptive pick
-  (current best; the single global pick drifts across tissue).
-- `python quality_metric.py` — the cross-scale residual trust-gate
-  (`quality_metric_validate.png`); `tensor_reproducibility` / `sweep_reproducibility`
-  for the reproducibility metric.
+  `1_sigma_rho_selection/README.md`.)
+- `python 1_sigma_rho_selection/sigma_rho_adaptive.py` — per-region adaptive
+  pick (current best; the single global pick drifts across tissue). This is
+  what the live pipeline calls.
+- `quality_metric.py` (the cross-scale residual trust-gate) was archived and
+  then deleted in the `simple` pass; the final certification is Lindeberg +
+  discretisation floor. Recover it from git history if needed.

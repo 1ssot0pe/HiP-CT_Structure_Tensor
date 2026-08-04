@@ -1,6 +1,9 @@
+# environments
 .venv/
+.venv-*/
 .ipynb_checkpoints/
 __pycache__/
+*.pyc
 
 # large half-map noise data (regenerate with noise_model/build_lung_slab.py)
 lung_A.npy
@@ -12,6 +15,13 @@ lung_B.npy
 *.nii
 *.nii.gz
 
-.venv/
-__pycache__/
-*.pyc
+# Pipeline run outputs — regenerate with run_pipeline.py. These were committed
+# once by accident; they are results, not source.
+pipeline_results.json
+pipeline_i74_results.json
+stage3_validation.json
+unified_field_*.npz
+results/N_of_sigma.npz
+
+# Figures
+*.png

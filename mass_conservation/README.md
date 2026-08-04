@@ -34,12 +34,20 @@ the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
    `crossing_vs_kissing_metrics.py`. A cheap first test of candidate metrics on
    phantoms; the mass-conservation ratio wins.
 
-2. **Prove it on phantoms** — `mass_conservation_validate.py` (+
-   `mass_conservation_summary.py` for the plot). A proper train/test sweep across
+2. **Prove it on phantoms** — `mass_conservation_validate.py`. A proper
+   train/test sweep across
    crossing angles, tube widths, kissing gaps, and both synthetic *and* real
    measured noise. **Result: catch = 100% (real crossings flagged), false-positive
    = 0% (kissing never flagged)** at the fixed 1.5 threshold — the metric
    generalises.
+
+   > **This file has a second job.** Its phantom builders
+   > (`raw_localized_crossing`, `raw_kissing`, and the `CROSS_*` constants) are
+   > imported by `3_global_tractography/run_pipeline.py`,
+   > `self_optimising_tractography.py` and
+   > `2_host_classification/sigma_rho_gated_field.py`. It is a **library the live
+   > pipeline depends on**, not only an experiment — do not delete it as
+   > evidence.
 
 3. **Apply it to real i74** — `real_i74_mass_conservation.py`. Run the
    phantom-validated ratio on actual HOST 2-peak crossing voxels. (First checked
@@ -66,7 +74,7 @@ the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
 
 # How to run
 
-From the repo root, e.g. `.venv\Scripts\python -u mass_conservation\mass_conservation_validate.py`.
+From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u mass_conservation\mass_conservation_validate.py`.
 
 | Script | Needs | What it shows |
 |---|---|---|
@@ -80,7 +88,9 @@ From the repo root, e.g. `.venv\Scripts\python -u mass_conservation\mass_conserv
 # Dependencies
 
 Reaches *up* to the repo root (`crossing_shape_3d`, `kissing_phantom`, `host_fod`,
-`reconstruction`) and *into* `global_tractography/` (`phase2_i74_demote`,
+`reconstruction`) and *into* `3_global_tractography/` (`phase2_i74_demote`,
 `phase1_kissing_crossing`) — a one-way downstream→upstream reach via
-`sys.path.insert`. `lung_A/B.npy` is gitignored; rebuild it with
+`sys.path.insert`. All five i74 scripts here import
+`phase2_i74_demote.collect_crossings`, so those two files cannot be treated as
+tractography-only evidence. `lung_A/B.npy` is gitignored; rebuild it with
 `noise_model/build_lung_slab.py`.

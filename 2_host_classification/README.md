@@ -193,7 +193,7 @@ These do not run in the pipeline. They are why it looks the way it does.
 # How to run
 
 From the repo root, e.g.
-`.venv\Scripts\python -u 2_host_classification\gate_protocol.py`.
+`$PY -u 2_host_classification\gate_protocol.py`.
 
 | Script | Needs | What it does |
 |---|---|---|
