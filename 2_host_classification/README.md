@@ -54,10 +54,28 @@ isolated direction with no neighbour support is dropped.
 
 # Part A — what runs, per patch, in order
 
-The live path is `adaptive_triage.triage_patch` (and `triage_patch_v2`). Each step
-below states exactly what it receives and what it hands on.
+**Which of these is actually live.** There are two per-patch routes in this
+folder and they pick their scale differently:
 
-## Step 1 — pick the scale for this patch
+| | `sigma_rho_gated_field.build_gated_field` | `adaptive_triage.triage_patch_v2` |
+|---|---|---|
+| Called by | **`3_global_tractography/run_pipeline.py`** — the pipeline | `visualize_i74_orientations.py` only |
+| σ for the gate | fixed `GATE_SIGMA_GRAD = 4.0` | per-patch Lindeberg sweep |
+| σ for directions | fixed `DIR_SIGMA_GRAD = 2.5` | the same per-patch pick |
+| Direction for a single patch | Stage 1's e3 at the block's certified (σ, ρ) | HOST's own peak |
+
+So the **live** path is `sigma_rho_gated_field`, on fixed scales. Step 1 below
+describes `adaptive_triage`'s per-patch Lindeberg pick, which is *not* in the
+pipeline — it is the more principled version, kept for the overlay figure and
+as the obvious upgrade path. Steps 2–4 are shared: both call the same
+`host_fod.analyse` / `classify` and apply the same c_s ≤ FA rule.
+
+`sigma_rho_gated_field.py`'s own docstring records why the fixed scales are
+what they are: at Stage 1's σ (~0.85–1.0) the gate never fires at all, and at
+4.0 the second peak that justified gating is already smoothed away — so the
+gate scale and the direction scale genuinely cannot be the same number.
+
+## Step 1 — pick the scale for this patch *(adaptive_triage only, not live)*
 
 - In: the raw patch, a cube of image voxels.
 - Does: a Lindeberg sweep over σ on this patch alone; take the first interior peak.
@@ -65,7 +83,8 @@ below states exactly what it receives and what it hands on.
 - Code: `pick_local_sigma_grad`, reusing `pick_sigma_rho` from `1_sigma_rho_selection`.
 
 HOST-FOD only works when σ_grad matches the local fibre width, so this is picked
-per patch, not once for the volume.
+per patch, not once for the volume. The live path uses fixed scales instead —
+see the table above.
 
 ## Step 2 — measure the patch, once
 
@@ -96,10 +115,27 @@ only ~3% of real i74 tissue single, implausibly few; c_s ≤ FA gives ~29%. The 
 classes overlap in c_s, so a c_s threshold alone cannot reproduce this split — FA
 is adding information.
 
-Written twice, because there are two ways in: `_is_single` in `adaptive_triage.py`
-(the fast path) and the single-vs-dispersed branch of `host_fod.classify`. Passing
-a number as `cs_single_cutoff` / `cs_single` restores the old fixed threshold; that
-is an override for comparison, not the default.
+Written in **three** places, because there are three ways in:
+
+1. `host_fod.classify` — the single-vs-dispersed branch (the reference).
+2. `_is_single` in `adaptive_triage.py` — the fast path.
+3. `sigma_rho_gated_field.build_gated_field` — **the live gate**.
+
+All three must carry the same `n_peaks >= 3` guard, because 2 and 3 both return
+"single" *without* calling `classify()` and would otherwise hand a 3+-peak patch
+back as a clean single fibre. Copy 3 was missing that guard: the live Stage 2
+tested only `c_s <= fa`, so a patch the method has given up on could contribute
+one confident direction to the tractography field. Now fixed — such patches go
+down the HOST branch and get labelled by `classify()` like everything else.
+
+Measured on real i74 before the fix (48³ at the volume centre, half=14,
+stride=6): **0 of 34** gate-passing patches had `n_peaks >= 3`, so this was a
+latent inconsistency rather than an active fault — in line with the ~0.5% rate
+recorded at the bottom of this file. Three copies of one rule is the underlying
+smell; a shared helper would be the real fix.
+
+Passing a number as `cs_single_cutoff` / `cs_single` restores the old fixed
+threshold; that is an override for comparison, not the default.
 
 ## Step 4 — HOST-FOD's class, for patches that reached it
 
