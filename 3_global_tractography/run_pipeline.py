@@ -2,7 +2,9 @@
 run_pipeline.py -- Stage 1 -> Stage 2 -> Stage 3, end to end.
 
 This is the join. Before it, the three folders never exchanged data: each read
-the raw volume and called the root engine independently. Here the flow is
+the raw volume and called the root engine independently. 
+
+Here the flow is: 
 
     Stage 1  adaptive (sigma, rho) per block          [1_sigma_rho_selection]
        |     -> dense e3 field
@@ -16,11 +18,29 @@ the raw volume and called the root engine independently. Here the flow is
 
 Validation is on phantoms with known truth before any real data, per the brief:
 a localized crossing (truth CROSSING) and a kissing pair (truth TANGENCY).
+Both count towards the tally and the process exits non-zero on any FAIL, so
+this doubles as a regression check.
+
+What the kissing phantom does and does NOT test
+-----------------------------------------------
+It passes by producing NO junction: the routing gate never fires on it, so the
+pipeline never invents a crossing. That is the right answer, and it is a real
+pass -- but it means the superposition score S is exercised here only on the
+CROSSING side. The gate's refusal was checked to be genuine, not an artifact of
+Stage 1 failing to certify a scale on this sparse phantom: sweeping the
+sigma fallback over 0.85-3.0 routes zero patches at every value.
+
+S on a true tangency is covered elsewhere -- `phase3_validate3d.py` (kissing
+scores 0 at every crossing angle) and `mass_conservation/
+mass_conservation_validate.py` (catch 100%, false-positive 0%). Real i74 also
+produces TANGENCY verdicts through this driver. So the coverage exists; it just
+is not in this file.
 
 Run
 ---
     python run_pipeline.py                # both phantoms
     python run_pipeline.py --iters 3
+    python run_pipeline.py --i74          # real data, truth UNKNOWN
 """
 
 import argparse
@@ -42,6 +62,9 @@ from mass_conservation_validate import (raw_localized_crossing, raw_kissing,
                                         CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 
+UNKNOWN = "UNKNOWN"          # truth label for real data, where there is none
+
+
 def _crop(vol, centre, r):
     """Cube of half-width r about `centre`, with the centre's new index."""
     sl, new = [], []
@@ -51,6 +74,32 @@ def _crop(vol, centre, r):
         sl.append(slice(lo, hi))
         new.append(v - lo)
     return vol[tuple(sl)], tuple(new)
+
+
+def _status(truth, verdict):
+    """(status, reason) for one case. `verdict` is None if nothing was scored.
+
+    A case with no junction is NOT a skip, and treating it as one hid two
+    things. For a kissing pair, finding no junction is the CORRECT answer --
+    the pipeline declined to invent a crossing -- so it was a pass being
+    reported as a non-result. For a true crossing it is a MISS. Both used to
+    drop out of the tally entirely, which meant a total failure of Stage 2
+    would print "0/0 phantoms classified correctly (2 skipped)" instead of
+    failing: the validation went quiet exactly when it should have shouted.
+
+    Real data carries truth=UNKNOWN, so no correctness claim is made at all --
+    previously `majority == truth` compared against the string "UNKNOWN" and
+    printed WRONG for every i74 run.
+    """
+    if truth == UNKNOWN:
+        return "UNSCORED", "no ground truth"
+    if verdict is None:
+        if truth == "TANGENCY":
+            return "PASS", "no junction -- no false crossing invented"
+        return "FAIL", f"no junction -- a real {truth} was missed"
+    if verdict == truth:
+        return "PASS", f"verdict {verdict}"
+    return "FAIL", f"verdict {verdict}, expected {truth}"
 
 
 def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True):
@@ -69,8 +118,13 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
     print(f"  [stage 3] field {len(field)} patches, {len(junctions)} junction(s), "
           f"I_0={I0:.3f}")
     if not junctions:
+        status, reason = _status(truth, None)
         print("  [stage 3] no multi-orientation junction -- nothing to score")
-        return dict(name=name, truth=truth, skipped=True,
+        if status != "UNSCORED":
+            print(f"  RESULT: {status} -- {reason}")
+        return dict(name=name, truth=truth, skipped=True, status=status,
+                    reason=reason, verdict=None,
+                    correct=None if status == "UNSCORED" else status == "PASS",
                     n_patches=gated.n, n_routed=int(mask.sum()))
 
     for j in junctions:
@@ -83,16 +137,20 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
 
     verdicts = [j["verdict"] for j in junctions]
     majority = max(set(verdicts), key=verdicts.count)
-    ok = majority == truth
-    print(f"  RESULT: verdict {majority} vs truth {truth}  "
-          f"{'CORRECT' if ok else 'WRONG'};  L {trace[0]['total']:.4f} -> "
+    status, reason = _status(truth, majority)
+    lead = (f"verdict {majority} (no ground truth)" if status == "UNSCORED"
+            else f"{status} -- {reason}")
+    print(f"  RESULT: {lead};  L {trace[0]['total']:.4f} -> "
           f"{trace[-1]['total']:.4f}")
-    return dict(name=name, truth=truth, skipped=False,
+    return dict(name=name, truth=truth, skipped=False, status=status,
+                reason=reason,
                 n_patches=gated.n, n_routed=int(mask.sum()),
                 junctions=[{k: (v if not isinstance(v, tuple) else list(v))
                             for k, v in j.items() if k != "dirs"}
                            for j in junctions],
-                verdict=majority, correct=bool(ok), theta=theta,
+                verdict=majority,
+                correct=None if status == "UNSCORED" else status == "PASS",
+                theta=theta,
                 L_initial=float(trace[0]["total"]),
                 L_final=float(trace[-1]["total"]),
                 trace=trace, junction_log=info["junctions"])
@@ -102,6 +160,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
+
     On i74 the recorded Phase-2/3 result is that HOST-flagged crossings behave
     like the non-crossing phantom (24% confirm, at the 21% false-confirm floor),
     i.e. HOST over-calls. Those over-called crossings ARE routed by the gate, so
@@ -117,6 +176,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
     print("=" * 78)
     print(f"REAL i74 -- {vol.shape} at {c}, mean {vol.mean():.1f}")
     print("=" * 78)
+
     r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
                  block=block, stride=stride, iters=iters)
     if not r["skipped"]:
@@ -136,9 +196,9 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
 
 
 def main(iters=3, radius=24, stride=8, block=32):
-    print("=" * 78)
+
     print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
-    print("=" * 78)
+
 
     X = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5, CROSS_R1, CROSS_TAPER)
     Xc, xc = _crop(X, tuple(s // 2 for s in CROSS_SHAPE), radius)
@@ -151,20 +211,23 @@ def main(iters=3, radius=24, stride=8, block=32):
     out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY",
                         block=block, stride=stride, iters=iters))
 
-    scored = [r for r in out if not r["skipped"]]
-    n_ok = sum(r["correct"] for r in scored)
+    # Every phantom counts. A case with no junction is a pass or a fail
+    # depending on its truth (see _status) -- never dropped from the tally.
+    n_pass = sum(r["status"] == "PASS" for r in out)
     print("\n" + "=" * 78)
-    print(f"END-TO-END: {n_ok}/{len(scored)} phantoms classified correctly "
-          f"({len(out) - len(scored)} skipped)")
+    print(f"END-TO-END: {n_pass}/{len(out)} phantoms correct")
     for r in out:
         if r["skipped"]:
-            print(f"  {r['name']:22} SKIPPED (no junction)")
+            print(f"  {r['name']:22} {r['status']:4}  (truth {r['truth']})   "
+                  f"{r['reason']}")
         else:
             s = r["junctions"][0]["S"]
-            print(f"  {r['name']:22} S={s:.3f} -> {r['verdict']:9} "
-                  f"(truth {r['truth']})   L {r['L_initial']:.4f} -> "
-                  f"{r['L_final']:.4f}")
+            print(f"  {r['name']:22} {r['status']:4}  S={s:.3f} -> "
+                  f"{r['verdict']:9} (truth {r['truth']})   "
+                  f"L {r['L_initial']:.4f} -> {r['L_final']:.4f}")
     print("=" * 78)
+    if n_pass < len(out):
+        print("VALIDATION FAILED -- see the FAIL rows above")
 
     with open("pipeline_results.json", "w") as f:
         json.dump(out, f, indent=2, default=float)
@@ -185,4 +248,8 @@ if __name__ == "__main__":
         run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
                 stride=a.stride, iters=a.iters)
     else:
-        main(iters=a.iters, radius=a.radius, stride=a.stride, block=a.block)
+        res = main(iters=a.iters, radius=a.radius, stride=a.stride,
+                   block=a.block)
+        # Non-zero exit on any FAIL, so the phantom validation is usable as a
+        # regression check rather than something you have to read carefully.
+        sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)
