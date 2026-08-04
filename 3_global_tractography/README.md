@@ -65,6 +65,14 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    loop, `field_from_gated`, `superposition_S`) → `run_pipeline.py`, the only
    end-to-end driver (Stage 1 → 2 → 3).
 
+   > **Reading its phantom result.** The kissing phantom passes by producing
+   > **no junction** — the gate never routes it, so no crossing is invented.
+   > Verified genuine, not a Stage-1 scale failure: sweeping the σ fallback
+   > 0.85–3.0 routes zero patches at every value. The consequence is that
+   > `run_pipeline.py` exercises the superposition score S only on the crossing
+   > side; S-on-tangency is covered by `phase3_validate3d.py` and
+   > `mass_conservation_validate.py` instead.
+
 6. **Kissing gap — the resolution limit** — `kissing_gap_sweep.py` +
    `test_kissing_phantom.py`. Global tractography stays clean down to a gap of
    **~5× the fibre radius**; below that the phantom itself fuses — a resolution
@@ -81,7 +89,7 @@ Phantom-based scripts need no real data; the i74 ones need the volume.
 
 | Script | Needs | What it shows |
 |---|---|---|
-| **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run** |
+| **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run**; exits non-zero on any FAIL |
 | `phase1_kissing_crossing.py` | phantom | tracker separates kissing from crossing |
 | `phase2_i74_demote.py` | i74 volume | straightness demotes ~76% of HOST crossings |
 | `phase3_i74.py` | i74 volume | joint global tractography on real tissue |
