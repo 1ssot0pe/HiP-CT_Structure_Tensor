@@ -1,20 +1,61 @@
 # Running the pipeline on a new volume
 
-A practical runbook. This is a **research pipeline** — a sequence of scripts, not one
-CLI. Stages A–C run on any volume after one config edit; the noise stages (D–F) need
-**two half-reconstructions** (even/odd projection subsets) of the same scan.
+A practical runbook. Stages A–C are wired together into one driver; the noise
+stages (D–F) need **two half-reconstructions** (even/odd projection subsets) of
+the same scan.
 
-All commands use the project venv:
-
-```
-.venv/Scripts/python.exe <script> …      # Windows
-```
+All commands below are written as `$PY <script>`, where `$PY` is the Python
+inside the project venv. Set it once per shell — see § 0.
 
 ---
 
 ## 0. Requirements
 
-- The `.venv` in this repo (numpy, scipy, tifffile, matplotlib, dipy, nibabel).
+### The venv lives OUTSIDE this repo
+
+This folder is inside OneDrive. A venv is ~400 MB of many small files, and
+leaving it here means OneDrive re-syncs it constantly — which is what corrupted
+the previous in-repo `.venv` (a `pip install` was interrupted partway through
+the large binary wheels, leaving a half-populated environment that imported
+`numpy` but not `scipy`, `dipy` or `matplotlib`).
+
+Create it somewhere unsynced. The current one is at
+`%USERPROFILE%\venvs\hipct-structure-tensor`:
+
+```powershell
+# PowerShell — one-time setup
+python -m venv $env:USERPROFILE\venvs\hipct-structure-tensor
+$PY = "$env:USERPROFILE\venvs\hipct-structure-tensor\Scripts\python.exe"
+& $PY -m pip install -r requirements.txt
+```
+
+```bash
+# Git Bash — one-time setup
+python -m venv "$USERPROFILE/venvs/hipct-structure-tensor"
+PY="$USERPROFILE/venvs/hipct-structure-tensor/Scripts/python.exe"
+$PY -m pip install -r requirements.txt
+```
+
+Then in each new shell, just re-set `$PY` to that path.
+
+### Dependencies
+
+`requirements.txt` is the **9 packages the pipeline actually imports** (numpy,
+scipy, matplotlib, tifffile, structure-tensor, dipy, nibabel, tqdm,
+scikit-image), derived from the import statements — not a `pip freeze` dump.
+It installs in one step and pulls ~35 packages with transitive deps.
+
+`requirements-dev.txt` holds the other 176 from the original environment, needed
+only for the Jupyter notebook, the Human Organ Atlas download tooling
+(`hoa-tools`, `gcsfs`, `zarr`, `dask`), and lint/type tools. Install it only if
+you want those:
+
+```
+$PY -m pip install -r requirements-dev.txt
+```
+
+### Data
+
 - Your volume as a **folder of single-slice TIFFs** (sorted by filename), or a
   multipage `.tif` / `.npy` / NIfTI.
 - Voxel size in µm.
@@ -23,116 +64,111 @@ All commands use the project venv:
 
 ## 1. Point the code at your volume (the one required edit)
 
-Almost every stage loads the volume through `reconstruction.load_volume()`, which
-defaults to a hardcoded path. Edit **`reconstruction.py`** (top of file):
+Almost every stage loads the volume through `reconstruction.load_volume()`,
+which defaults to a hardcoded path. Edit **`reconstruction.py`** (top of file):
 
 ```python
 DEFAULT_VOLUME_DIR = Path(r"C:\path\to\your\volume_folder")   # folder of *.tif slices
 VOXEL_SIZE_UM      = 16.5                                      # your voxel size (µm)
 ```
 
-`load_volume(folder, crop=(a, b))` carves a central cube `[a:b]` on all three axes
-(RAM-bound — the full stack can be very large). Use a crop for a first pass, `crop=None`
-for the whole stack.
+`load_volume(folder, crop=(a, b))` carves a central cube `[a:b]` **on all three
+axes** (RAM-bound — the full stack can be very large). Use a crop for a first
+pass, `crop=None` for the whole stack.
 
-That single edit propagates to stages A, B, C. Stages D–F take their inputs explicitly
-(see below).
+That single edit propagates to stages A–C. Stages D–F take their inputs
+explicitly.
 
 ---
 
 ## 2. Stages
 
-### A. Pick the structure-tensor scales (σ, ρ)
+### A–C. The end-to-end run
+
+Stages 1, 2 and 3 now share data — one command runs all three:
 
 ```
-.venv/Scripts/python.exe sigma_rho_final.py
+$PY 3_global_tractography/run_pipeline.py            # phantoms first
+$PY 3_global_tractography/run_pipeline.py --i74 --radius 48
 ```
 
-Prints a recommended **σ** (gradient scale) and **ρ** (integration scale) in voxels and
-µm, from the Lindeberg criterion cross-checked by FSC sharpness and gradient
-orthogonality. **Note the recommended σ, ρ** — later stages have them as constants you
-may want to match (e.g. `SIGMA, RHO` in the analysis scripts).
+The phantom form validates against known truth (a localised crossing → truth
+CROSSING, a kissing pair → truth TANGENCY) and should be run before trusting the
+real form. Flags: `--radius` (half-width of the cube), `--stride` (patch grid
+spacing), `--block` (Stage-1 block size), `--iters` (Stage-3 iterations),
+`--centre z y x`.
 
-### B. Per-voxel orientation + HOST gate (single / crossing / complex)
+Outputs `unified_field_*.npz` (the orientation-field artifact),
+`pipeline_results.json` / `pipeline_i74_results.json`, and per-junction
+S / verdict lines. Smaller `--radius`, larger `--stride` = faster, coarser.
 
-The cheap structure tensor gives one direction per voxel; HOST-FOD is run only where
-that model fails. The per-patch classifier is `adaptive_triage.triage_patch_v2(patch)`
-(local Lindeberg → HOST-FOD → label), gated by the self-calibrating `c_s` threshold
-(`selfcalib_threshold.py`). To render the labelled orientation overlay on a slice:
+### Running a stage on its own
 
-```
-.venv/Scripts/python.exe visualize_i74_orientations.py
-```
-
-API for your own driver: `host_fod.analyse(patch)` → dict with peaks; `host_fod.classify(m)`
-→ `"single" | "crossing" | "complex" | "disorganised"`.
+| | |
+|---|---|
+| **A** σ, ρ only | `1_sigma_rho_selection/sigma_rho_global.py` (one box → ACCEPTED / FLAGGED / REJECTED) or `sigma_rho_adaptive.py` (per-block map, current best) |
+| **B** per-patch labels | `2_host_classification/visualize_i74_orientations.py` for the glyph overlay. API: `host_fod.analyse(patch)` → peaks; `host_fod.classify(m)` → label |
+| **C** tractography alone | `3_global_tractography/phase3_i74.py --crop 96 --stride 4` |
 
 > **i74-specific assumption:** `visualize_i74_orientations.py` loads via
-> `selfcalib_threshold.load_interior()`, which reads the volume as **uint8** and carves a
-> fixed interior box. For a **float32** reconstruction (e.g. the lung), casting to uint8
-> would destroy it — load your volume as float and run `triage_patch_v2(patch)` directly
-> over your own patch grid instead. `host_fod.analyse/classify` are dtype-agnostic.
-
-### C. Global tractography (resolve real crossings vs touching fibres)
-
-Seeds segments from the HOST orientations, links collinear neighbours, assembles tracts:
-
-```
-.venv/Scripts/python.exe phase3_i74.py --crop 96 --stride 4
-```
-
-Outputs `phase3_i74.png` (z-projection + tracts) and a printed confirmed/demoted count
-for the HOST-flagged crossings. Smaller `--crop` / larger `--stride` = faster, coarser.
+> `selfcalib_threshold.load_interior()`, which reads the volume as **uint8** and
+> carves a fixed interior box. For a **float32** reconstruction (e.g. the lung),
+> casting to uint8 would destroy it — load your volume as float and run
+> `adaptive_triage.triage_patch_v2(patch)` directly over your own patch grid
+> instead. `host_fod.analyse/classify` are dtype-agnostic.
 
 ---
 
 ### Noise stages (need even/odd half-reconstructions)
 
-You need **two folders**: the volume reconstructed from even-angle projections (A) and
-from odd-angle projections (B). The signal is shared; `n = (A − B)/√2` is pure noise.
+You need **two folders**: the volume reconstructed from even-angle projections
+(A) and from odd-angle projections (B). The signal is shared; `n = (A − B)/√2`
+is pure noise.
 
-### D. Measure the noise floor (T1–T4)
+### D. Measure the noise floor
 
 General entry — works directly on two folders:
 
 ```
-.venv/Scripts/python.exe half_map_analysis.py --a PATH_EVEN --b PATH_ODD --vox 16.5 --crop 256
+$PY noise_model/half_map_analysis.py --a PATH_EVEN --b PATH_ODD --vox 16.5 --crop 256
 ```
 
-Outputs `halfmap_T1..T4_*.png` + `HALFMAP_RESULTS.md`: T1 = noise character (white vs
-correlated, anisotropy), T2 = does `c_s` complexity survive the measured noise, T4 =
-resolution. `--synthetic` runs a self-test with known answers.
+Outputs `halfmap_T1..T4_*.png` + `HALFMAP_RESULTS.md`: T1 = noise character
+(white vs correlated, anisotropy), T2 = does `c_s` complexity survive the
+measured noise, T4 = resolution. `--synthetic` runs a self-test with known
+answers.
 
-> **Large, untiled TIFFs** (e.g. 8000² float32): reading full slices is costly. Use the
-> caching path instead — set the two folder paths at the top of **`build_lung_slab.py`**
-> and pick an output dir, then:
+> **Large, untiled TIFFs** (e.g. 8000² float32): reading full slices is costly.
+> Use the caching path instead — set the two folder paths at the top of
+> **`noise_model/build_lung_slab.py`** and pick an output dir, then:
 > ```
-> LUNG_SLAB_DIR=/scratch .venv/Scripts/python.exe build_lung_slab.py     # caches lung_A/B.npy
-> LUNG_SLAB_DIR=/scratch .venv/Scripts/python.exe run_lung_halfmap.py    # T1–T4 on a tissue block
-> LUNG_SLAB_DIR=/scratch .venv/Scripts/python.exe run_lung_multiblock.py # robustness over blocks
+> LUNG_SLAB_DIR=/scratch $PY noise_model/build_lung_slab.py     # caches lung_A/B.npy
+> LUNG_SLAB_DIR=/scratch $PY noise_model/run_lung_halfmap.py    # T1–T4 on a tissue block
+> LUNG_SLAB_DIR=/scratch $PY noise_model/run_lung_multiblock.py # robustness over blocks
 > ```
-> It prints `corr(A,B)` — this must be high (well-registered) before trusting anything.
+> It prints `corr(A,B)` — this must be high (well-registered) before trusting
+> anything downstream.
 
 ### E. Noise correction (subtract the measured N)
 
 ```
-LUNG_SLAB_DIR=/scratch .venv/Scripts/python.exe run_lung_subtractN.py
+LUNG_SLAB_DIR=/scratch $PY noise_model/run_lung_subtractN.py
 ```
 
-Subtracts the measured **anisotropic** N from the structure tensor before re-reading
-shape, and reports the crossing/complexity fractions uncorrected vs corrected (and vs a
-plain white floor, to show the anisotropy matters).
+Subtracts the measured **anisotropic** N from the structure tensor before
+re-reading shape, and reports the crossing/complexity fractions uncorrected vs
+corrected (and vs a plain white floor, to show the anisotropy matters).
 
 ### F. Calibrated decision (noise-whitened likelihood)
 
 ```
-LUNG_SLAB_DIR=/scratch .venv/Scripts/python.exe phase3_generative.py
+LUNG_SLAB_DIR=/scratch $PY 3_global_tractography/phase3_generative.py
 ```
 
-Scores each geometry by a generative likelihood whitened by the measured noise spectrum:
-selects the true fibre configuration and reports a confidence that shrinks as noise
-rises. **Status:** validated as a model-*selector*; not yet wired inside the
-tractography link-scoring (the one open build).
+Scores each geometry by a generative likelihood whitened by the measured noise
+spectrum: selects the true fibre configuration and reports a confidence that
+shrinks as noise rises. **Status:** validated as a model-*selector*; not yet
+wired inside the tractography link-scoring (the one open build).
 
 ---
 
@@ -140,12 +176,11 @@ tractography link-scoring (the one open build).
 
 ```
 # once: edit reconstruction.py -> your folder + voxel size
-.venv/Scripts/python.exe sigma_rho_final.py                 # A: (σ, ρ)
-.venv/Scripts/python.exe visualize_i74_orientations.py      # B: per-voxel labels
-.venv/Scripts/python.exe phase3_i74.py --crop 96 --stride 4 # C: tracts
+$PY 3_global_tractography/run_pipeline.py           # validate on phantoms
+$PY 3_global_tractography/run_pipeline.py --i74     # then the real volume
 
 # if you have even/odd half-maps:
-.venv/Scripts/python.exe half_map_analysis.py --a EVEN --b ODD --vox 16.5 --crop 256   # D
+$PY noise_model/half_map_analysis.py --a EVEN --b ODD --vox 16.5 --crop 256
 # (large untiled TIFFs -> use build_lung_slab.py + run_lung_halfmap.py instead)
 ```
 
