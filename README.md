@@ -7,9 +7,9 @@ tensor returns **one** direction per voxel, but where two fibres cross there is
 no single correct direction. This pipeline finds those places, and decides which
 of them are real crossings rather than fibres that merely touch.
 
-```
-$PY 3_global_tractography/run_pipeline.py            # phantoms, known truth
-$PY 3_global_tractography/run_pipeline.py --i74      # real volume
+```powershell
+.\run_all.ps1                  # regression check -> phantoms -> real volume
+.\run_all.ps1 -Quick -SkipI74  # ~1 min smoke test, no data needed
 ```
 
 Setup and the full step-by-step are in [PIPELINE.md](PIPELINE.md).
@@ -36,9 +36,13 @@ run_pipeline.py                                  the only entry point
  │   ├─ sigma_rho_adaptive.py → pick_sigma_rho.py → orthogonality_residual.py
  │   └─ host_fod.py → two_orientation_test.py → crossing_shape_3d.py
  │                                                 → kissing_phantom.py
- └─ self_optimising_tractography.py                STEP 3
-     └─ tract_density.py
+ ├─ self_optimising_tractography.py                STEP 3
+ │   └─ tract_density.py
+ └─ render_field.py                                figures
 ```
+
+Each run writes `results/field_*.png` — the greyscale image with the recovered
+orientations drawn on top, so a run can be checked by eye, not just read.
 
 Everything else in the repo is either a library for one of these, or a
 standalone experiment recording a finding. Nothing is orphaned.
