@@ -218,7 +218,18 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
             if gm is None:
                 continue
             c_s, fa = float(gm["c_s"]), float(gm["FA"])
-            if c_s <= fa:
+            # The n_peaks guard has to be HERE too, for the same reason it is in
+            # host_fod.classify and adaptive_triage._is_single: this fast path
+            # returns "single" WITHOUT calling classify(), so a >=3-peak patch
+            # whose c_s <= FA would bypass classify's "complex" branch and hand
+            # Stage 3 one confident direction for a patch the method has
+            # actually given up on. Sending it down the HOST branch instead
+            # lets classify() label it, which is what every other path does.
+            # Measured on i74 (48^3 at the volume centre, half=14, stride=6):
+            # 0 of 34 gate-passing patches had n_peaks >= 3, so this is a
+            # latent inconsistency rather than an active fault -- consistent
+            # with the ~0.5% rate recorded in this folder's README.
+            if c_s <= fa and int(gm["n_peaks"]) < 3:
                 e3 = vec[:, c[0], c[1], c[2]]
                 if not np.all(np.isfinite(e3)):
                     # Skielex returns a non-finite eigenvector at isotropic
