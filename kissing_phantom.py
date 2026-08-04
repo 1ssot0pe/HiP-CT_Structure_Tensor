@@ -19,7 +19,18 @@ across the gap (no merge) -- even though the curves are tangent and close there.
 import numpy as np
 
 from crossing_shape_3d import _coords
-from host_geometry_test import _finalise
+
+EPS = 1e-12
+
+
+def _finalise(vol):
+    """Shift to zero and scale to [0, 1].
+
+    Copied from host_geometry_test rather than imported: this three-line helper
+    was the only reason the live pipeline loaded that 298-line phantom suite.
+    """
+    vol = vol - vol.min()
+    return (vol / (vol.max() + EPS)).astype(np.float32)
 
 SHAPE = (80, 80, 80)
 

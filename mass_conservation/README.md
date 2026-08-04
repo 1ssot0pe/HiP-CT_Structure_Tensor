@@ -41,13 +41,14 @@ the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
    = 0% (kissing never flagged)** at the fixed 1.5 threshold — the metric
    generalises.
 
-   > **This file has a second job.** Its phantom builders
-   > (`raw_localized_crossing`, `raw_kissing`, and the `CROSS_*` constants) are
-   > imported by `3_global_tractography/run_pipeline.py`,
-   > `self_optimising_tractography.py` and
-   > `2_host_classification/sigma_rho_gated_field.py`. It is a **library the live
-   > pipeline depends on**, not only an experiment — do not delete it as
-   > evidence.
+   > **The phantom builders have moved out.** `raw_localized_crossing`,
+   > `raw_kissing` and the `CROSS_*` / `KISS_HALF` constants now live at the
+   > repo root in `localized_phantoms.py`, beside the other shared phantom
+   > code. They are the *live pipeline's* validation fixtures — imported by
+   > `run_pipeline.py`, `self_optimising_tractography.py` and
+   > `sigma_rho_gated_field.py` — so keeping them here made three upstream
+   > stages depend on this mass-conservation experiment. This module re-exports
+   > them, so everything that imported them from here still works.
 
 3. **Apply it to real i74** — `real_i74_mass_conservation.py`. Run the
    phantom-validated ratio on actual HOST 2-peak crossing voxels. (First checked

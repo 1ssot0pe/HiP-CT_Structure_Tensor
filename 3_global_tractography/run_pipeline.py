@@ -58,11 +58,24 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
 
 import self_optimising_tractography as S3
 from sigma_rho_gated_field import build_gated_field
-from mass_conservation_validate import (raw_localized_crossing, raw_kissing,
-                                        CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
+from localized_phantoms import (raw_localized_crossing, raw_kissing,
+                                CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 
 UNKNOWN = "UNKNOWN"          # truth label for real data, where there is none
+
+# Outputs used to be written CWD-relative, so `python run_pipeline.py` and
+# `python 3_global_tractography/run_pipeline.py` dropped their artifacts in
+# different places and a re-run from a different directory silently produced a
+# second copy instead of updating the first. Everything now goes to one
+# directory, `results/` at the repo root, overridable with --outdir.
+DEFAULT_OUTDIR = os.path.join(_ROOT, "results")
+
+
+def _out(outdir, name):
+    """Absolute path for an output file, creating the directory on demand."""
+    os.makedirs(outdir, exist_ok=True)
+    return os.path.join(outdir, name)
 
 
 def _crop(vol, centre, r):
@@ -102,14 +115,15 @@ def _status(truth, verdict):
     return "FAIL", f"verdict {verdict}, expected {truth}"
 
 
-def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True):
+def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True,
+             outdir=DEFAULT_OUTDIR):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
 
     # ---- Stage 1 + 2 --------------------------------------------------------
     gated = build_gated_field(vol, block=block, stride=stride, verbose=verbose)
     mask = gated.routing_mask()
     tag = name.split()[0].lower()
-    gated.save(f"unified_field_{tag}.npz")
+    gated.save(_out(outdir, f"unified_field_{tag}.npz"))
     print(f"  [stage 2] routing mask: {int(mask.sum())}/{gated.n} patches to HOST")
 
     # ---- Stage 3 ------------------------------------------------------------
@@ -156,7 +170,8 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
                 trace=trace, junction_log=info["junctions"])
 
 
-def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
+def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
+            outdir=DEFAULT_OUTDIR):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -178,7 +193,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
     print("=" * 78)
 
     r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
-                 block=block, stride=stride, iters=iters)
+                 block=block, stride=stride, iters=iters, outdir=outdir)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -189,13 +204,14 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3):
             k = vs.count(v)
             if k:
                 print(f"    {v:10}: {k:4d}  ({k/len(vs):.0%})")
-    with open("pipeline_i74_results.json", "w") as f:
+    path = _out(outdir, "pipeline_i74_results.json")
+    with open(path, "w") as f:
         json.dump(r, f, indent=2, default=float)
-    print("wrote pipeline_i74_results.json")
+    print(f"wrote {path}")
     return r
 
 
-def main(iters=3, radius=24, stride=8, block=32):
+def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR):
 
     print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
 
@@ -207,9 +223,9 @@ def main(iters=3, radius=24, stride=8, block=32):
 
     out = []
     out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING",
-                        block=block, stride=stride, iters=iters))
+                        block=block, stride=stride, iters=iters, outdir=outdir))
     out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY",
-                        block=block, stride=stride, iters=iters))
+                        block=block, stride=stride, iters=iters, outdir=outdir))
 
     # Every phantom counts. A case with no junction is a pass or a fail
     # depending on its truth (see _status) -- never dropped from the tally.
@@ -229,9 +245,10 @@ def main(iters=3, radius=24, stride=8, block=32):
     if n_pass < len(out):
         print("VALIDATION FAILED -- see the FAIL rows above")
 
-    with open("pipeline_results.json", "w") as f:
+    path = _out(outdir, "pipeline_results.json")
+    with open(path, "w") as f:
         json.dump(out, f, indent=2, default=float)
-    print("wrote pipeline_results.json")
+    print(f"wrote {path}")
     return out
 
 
@@ -243,13 +260,15 @@ if __name__ == "__main__":
     ap.add_argument("--block", type=int, default=32)
     ap.add_argument("--i74", action="store_true", help="run on real i74 instead")
     ap.add_argument("--centre", nargs=3, type=int, default=[384, 384, 384])
+    ap.add_argument("--outdir", default=DEFAULT_OUTDIR,
+                    help="where to write results (default: <repo>/results)")
     a = ap.parse_args()
     if a.i74:
         run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
-                stride=a.stride, iters=a.iters)
+                stride=a.stride, iters=a.iters, outdir=a.outdir)
     else:
         res = main(iters=a.iters, radius=a.radius, stride=a.stride,
-                   block=a.block)
+                   block=a.block, outdir=a.outdir)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)
