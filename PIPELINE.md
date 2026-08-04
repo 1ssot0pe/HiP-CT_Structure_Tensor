@@ -4,13 +4,23 @@ What runs, in order, with the file, input and output of each step. The file
 lists below are **measured**, not assumed: they are the modules Python actually
 loads during a run.
 
+```powershell
+.\run_all.ps1                  # all three steps, stops at the first failure
+.\run_all.ps1 -Quick -SkipI74  # ~1 min smoke test, no real data needed
 ```
-$PY 3_global_tractography/run_pipeline.py            # phantoms, known truth
-$PY 3_global_tractography/run_pipeline.py --i74      # real volume
+
+Or run the steps yourself, in this order — each is more trustworthy than the
+next, so a failure early makes the later ones meaningless:
+
+```
+$PY 3_global_tractography/test_frame_convention.py   # known answer
+$PY 3_global_tractography/run_pipeline.py            # known truth
+$PY 3_global_tractography/run_pipeline.py --i74      # no ground truth
 ```
 
 `$PY` is the venv interpreter — see § 0. Results go to `results/` at the repo
-root. The phantom form exits non-zero if any case fails.
+root. The first two exit non-zero on failure, so they work as checks, not just
+as output to read.
 
 ---
 
@@ -173,9 +183,22 @@ descent over θ = (step, angle threshold, seed density, link weight) minimises
 
 | Output | Meaning |
 |---|---|
+| `results/field_*.png` | greyscale slab with the recovered orientations drawn on it |
 | `results/unified_field_*.npz` | the orientation field: per patch, its directions, label, c_s, FA, σ, ρ |
 | `results/pipeline_results.json` | per-junction S and verdict, fitted θ, loss trace |
 | stdout | `PASS` / `FAIL` per phantom; on real data, verdict with no correctness claim |
+
+The figures (`render_field.py`, `--no-figures` to skip) are how you check a run
+rather than only read it — a field that has stopped following the fibres is
+obvious in a picture and invisible in a summary line. Blue = the gate trusted
+one direction; orange/aqua = a junction scored CROSSING/TANGENCY, with a ring
+marker so the verdict is not carried by colour alone; grey = routed but never
+scored.
+
+Glyphs are **line segments, not arrows**: a fibre orientation is a director, so
+e3 and −e3 mean the same thing and an arrowhead would assert a direction the
+measurement does not contain. A glyph drawn short means the fibre is leaving the
+viewing plane, not that the measurement is weak.
 
 On phantoms the crossing scores S ≈ 1.0 → CROSSING, and the kissing pair
 produces no junction at all — the gate never routes it, so no crossing is

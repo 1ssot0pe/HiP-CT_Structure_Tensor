@@ -57,6 +57,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
     sys.path.insert(0, _p)
 
 import self_optimising_tractography as S3
+from render_field import render_field
 from sigma_rho_gated_field import build_gated_field
 from localized_phantoms import (raw_localized_crossing, raw_kissing,
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
@@ -116,7 +117,7 @@ def _status(truth, verdict):
 
 
 def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True,
-             outdir=DEFAULT_OUTDIR):
+             outdir=DEFAULT_OUTDIR, figures=True):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
 
     # ---- Stage 1 + 2 --------------------------------------------------------
@@ -131,13 +132,29 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
     field, junctions, I0 = S3.field_from_gated(gated, vol, e3=e3)
     print(f"  [stage 3] field {len(field)} patches, {len(junctions)} junction(s), "
           f"I_0={I0:.3f}")
+
+    # Drawn here, before the no-junction early return, because that case is the
+    # one most worth looking at: it is a claim that nothing crosses, and the
+    # figure is how you check the field still followed the fibres.
+    def _figure(status_note=""):
+        if not figures:
+            return None
+        p = render_field(
+            vol, field, junctions, _out(outdir, f"field_{tag}.png"),
+            title=f"{name}   (truth: {truth})",
+            subtitle=(f"{gated.n} patches, {int(mask.sum())} routed to HOST, "
+                      f"{len(junctions)} junction(s){status_note}"))
+        print(f"  [figure] {p}")
+        return p
+
     if not junctions:
         status, reason = _status(truth, None)
         print("  [stage 3] no multi-orientation junction -- nothing to score")
         if status != "UNSCORED":
             print(f"  RESULT: {status} -- {reason}")
+        fig_path = _figure(" -- no crossing claimed")
         return dict(name=name, truth=truth, skipped=True, status=status,
-                    reason=reason, verdict=None,
+                    reason=reason, verdict=None, figure=fig_path,
                     correct=None if status == "UNSCORED" else status == "PASS",
                     n_patches=gated.n, n_routed=int(mask.sum()))
 
@@ -156,8 +173,9 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
             else f"{status} -- {reason}")
     print(f"  RESULT: {lead};  L {trace[0]['total']:.4f} -> "
           f"{trace[-1]['total']:.4f}")
+    fig_path = _figure()
     return dict(name=name, truth=truth, skipped=False, status=status,
-                reason=reason,
+                reason=reason, figure=fig_path,
                 n_patches=gated.n, n_routed=int(mask.sum()),
                 junctions=[{k: (v if not isinstance(v, tuple) else list(v))
                             for k, v in j.items() if k != "dirs"}
@@ -171,7 +189,7 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
 
 
 def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
-            outdir=DEFAULT_OUTDIR):
+            outdir=DEFAULT_OUTDIR, figures=True):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -193,7 +211,8 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
     print("=" * 78)
 
     r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
-                 block=block, stride=stride, iters=iters, outdir=outdir)
+                 block=block, stride=stride, iters=iters, outdir=outdir,
+                 figures=figures)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -211,7 +230,8 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
     return r
 
 
-def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR):
+def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
+         figures=True):
 
     print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
 
@@ -223,9 +243,11 @@ def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR):
 
     out = []
     out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING",
-                        block=block, stride=stride, iters=iters, outdir=outdir))
+                        block=block, stride=stride, iters=iters, outdir=outdir,
+                        figures=figures))
     out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY",
-                        block=block, stride=stride, iters=iters, outdir=outdir))
+                        block=block, stride=stride, iters=iters, outdir=outdir,
+                        figures=figures))
 
     # Every phantom counts. A case with no junction is a pass or a fail
     # depending on its truth (see _status) -- never dropped from the tally.
@@ -262,13 +284,17 @@ if __name__ == "__main__":
     ap.add_argument("--centre", nargs=3, type=int, default=[384, 384, 384])
     ap.add_argument("--outdir", default=DEFAULT_OUTDIR,
                     help="where to write results (default: <repo>/results)")
+    ap.add_argument("--no-figures", action="store_true",
+                    help="skip the orientation overlay PNGs")
     a = ap.parse_args()
     if a.i74:
         run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
-                stride=a.stride, iters=a.iters, outdir=a.outdir)
+                stride=a.stride, iters=a.iters, outdir=a.outdir,
+                figures=not a.no_figures)
     else:
         res = main(iters=a.iters, radius=a.radius, stride=a.stride,
-                   block=a.block, outdir=a.outdir)
+                   block=a.block, outdir=a.outdir,
+                   figures=not a.no_figures)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)
