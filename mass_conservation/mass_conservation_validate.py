@@ -137,7 +137,7 @@ def anoise(shape, amp, seed, smooth=(2.5, 0.8, 0.8)):
 # ---------------------------------------------------------------------------
 # REAL measured lung half-map noise n=(A-B)/sqrt(2) -- correlated + anisotropic
 # (slope ~-3.5, aniso ratio ~1.5-1.9, see noise-floor-result memory), cropped
-# from a random tissue location per seed (unlike phase3_realnoise.real_noise,
+# from a random tissue location per seed (unlike phase3.real_noise,
 # which always crops the SAME fixed offset regardless of its seed argument).
 # ---------------------------------------------------------------------------
 

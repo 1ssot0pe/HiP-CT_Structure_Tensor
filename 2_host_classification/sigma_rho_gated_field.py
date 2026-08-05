@@ -181,16 +181,35 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
     # Stage 1 contributed nothing. Warn loudly rather than print a count that
     # is easy to read past.
     fin = sig_map[np.isfinite(sig_map)]
-    frac = fin.size / sig_map.size if sig_map.size else 0.0
+    n_blocks = int(sig_map.size)
+    frac = fin.size / n_blocks if n_blocks else 0.0
+    # Two different reasons a block has no (sigma, rho), and they need different
+    # responses, so report them separately rather than as one "certified" count:
+    #   background -- block mean < 5% of the volume max, so compute_adaptive_map
+    #                 skipped it before attempting a scale pick at all. Common on
+    #                 sparse phantoms; means "nothing here", not "the method
+    #                 failed".
+    #   below floor -- a sigma WAS picked but sits under the discretisation
+    #                 floor, i.e. the pick itself is not trustworthy.
+    n_background = n_blocks - int(fin.size)
+    n_below_floor = int((np.isfinite(sig_map) & ~m["valid"]).sum())
     if verbose:
-        print(f"           {fin.size}/{sig_map.size} blocks certified"
+        print(f"           {fin.size}/{n_blocks} blocks produced a (sigma, rho)"
               + (f", sigma {fin.min():.2f}-{fin.max():.2f}" if fin.size else ""))
     if frac < FALLBACK_WARN_FRAC:
-        who = "every patch" if fin.size == 0 else "most patches"
-        print(f"  [stage 1] WARNING: only {frac:.0%} of blocks certified a "
-              f"(sigma, rho) -- {who} will fall back to sigma="
-              f"{sigma_fallback:g}, so the adaptive scale selection is "
-              f"effectively OFF for this volume.")
+        who = "Every patch" if fin.size == 0 else "Most patches"
+        why = []
+        if n_background:
+            why.append(f"{n_background} rejected as background "
+                       f"(block mean < 5% of volume max)")
+        if n_below_floor:
+            why.append(f"{n_below_floor} picked a sigma below the "
+                       f"discretisation floor")
+        print(f"  [stage 1] WARNING: only {fin.size}/{n_blocks} blocks produced "
+              f"a (sigma, rho)"
+              + (" -- " + ", ".join(why) if why else "") + ".")
+        print(f"            {who} falls back to sigma={sigma_fallback:g}; "
+              f"adaptive scale selection did not run for this volume.")
 
     def block_scale(c):
         bi = int(np.clip(np.searchsorted(zs, c[0], "right") - 1, 0, len(zs) - 1))

@@ -4,7 +4,7 @@ transfer that every "real noise" validation in this project relies on.
 
 Context. i74 (brain) has NO half-maps, so its own noise cannot be measured by
 the clean n=(A-B)/sqrt(2) route. Yet the pipeline's real-noise validations
-(mass_conservation_validate.py, sigma_rho_robustness.py, phase3_realnoise.py,
+(mass_conservation_validate.py, sigma_rho_robustness.py, phase3.py,
 the 89%->57% tractography degradation) all inject LUNG half-map noise
 (lung_A.npy/lung_B.npy) as a stand-in. That is a cross-ORGAN proxy. This
 script cannot prove the transfer is valid -- with a single averaged volume

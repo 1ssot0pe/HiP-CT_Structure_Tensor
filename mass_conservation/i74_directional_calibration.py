@@ -8,7 +8,7 @@ it throws away exactly the candidates most likely to BE real crossings.
 
 Fix: instead of random offsets, WALK outward along each of HOST's own two
 recovered peak directions (both signs -- 4 walks per candidate), the same
-continuity-following mechanism phase2_i74_demote.py already uses to trace
+continuity-following mechanism peak_straightness.py already uses to trace
 fibres. A real fibre continues past the local ambiguity onto a single-family
 segment; walking the actual fibre axis is far more likely to reach genuine
 single-fibre tissue in dense regions than a random nearby voxel. At each step,
@@ -36,8 +36,8 @@ import matplotlib.pyplot as plt
 
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR
 from host_fod import analyse, classify
-from phase1_kissing_crossing import local_fibreness, V
-from phase2_i74_demote import collect_crossings, HALF
+from fibre_continuity import local_fibreness, V
+from peak_straightness import collect_crossings, HALF
 from mass_conservation_validate import local_calibration, THRESH, EPS, _patch_at
 from real_i74_mass_conservation import _random_shell_positions
 

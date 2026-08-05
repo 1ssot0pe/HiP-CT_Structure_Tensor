@@ -2,7 +2,7 @@
 i74_metric_agreement.py -- do the two independent i74 crossing-demotion metrics
 agree on the SAME voxels, not just on similar aggregate rates?
 
-phase2_i74_demote.py (forward-support straightness) and
+peak_straightness.py (forward-support straightness) and
 real_i74_mass_conservation.py (intensity mass-conservation ratio) each report
 that most/all real HOST 2-peak calls are demoted -- but from separate random
 samples. Similar aggregate numbers could still arise from two metrics that
@@ -31,7 +31,7 @@ import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR
-from phase2_i74_demote import collect_crossings, peak_reach, HALF, STRAIGHT_MIN, REACH_MIN
+from peak_straightness import collect_crossings, peak_reach, HALF, STRAIGHT_MIN, REACH_MIN
 from mass_conservation_validate import local_calibration, THRESH, EPS
 from real_i74_mass_conservation import _random_shell_positions, N_CAL_TRIES
 

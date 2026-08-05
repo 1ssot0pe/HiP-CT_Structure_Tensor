@@ -1,5 +1,5 @@
 """
-phase1_kissing_crossing.py -- Phase 1 of the global-tractography scoping: does a
+fibre_continuity.py -- Phase 1 of the global-tractography scoping: does a
 continuity tracker correctly DISTINGUISH a kissing junction from a true crossing
 in 3D, on the host_geometry_test phantoms with known truth?
 
@@ -84,7 +84,7 @@ def track3d(vol, seed, dir0, mode, steps=80, step=1.0, cone_deg=30, term_ratio=0
     return np.array(path)
 
 
-def run(save="phase1_kissing_crossing.png"):
+def run(save="fibre_continuity.png"):
     kiss, _ = make_kissing_phantom()
     cross, _ = make_true_crossing_same_angles()
     seed = (48.0, 48.0, 18.0)               # x = 18-48 = -30 (left/x<0 region)

@@ -30,7 +30,7 @@ CROSSING side. The gate's refusal was checked to be genuine, not an artifact of
 Stage 1 failing to certify a scale on this sparse phantom: sweeping the
 sigma fallback over 0.85-3.0 routes zero patches at every value.
 
-S on a true tangency is covered elsewhere -- `phase3_validate3d.py` (kissing
+S on a true tangency is covered elsewhere -- `phase3.py` (kissing
 scores 0 at every crossing angle) and `mass_conservation/
 mass_conservation_validate.py` (catch 100%, false-positive 0%). Real i74 also
 produces TANGENCY verdicts through this driver. So the coverage exists; it just
@@ -57,6 +57,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
     sys.path.insert(0, _p)
 
 import self_optimising_tractography as S3
+from field_refine import refine as refine_field
 from render_field import render_field
 from sigma_rho_gated_field import build_gated_field
 from localized_phantoms import (raw_localized_crossing, raw_kissing,
@@ -117,7 +118,7 @@ def _status(truth, verdict):
 
 
 def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True,
-             outdir=DEFAULT_OUTDIR, figures=True):
+             outdir=DEFAULT_OUTDIR, figures=True, refine=False):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
 
     # ---- Stage 1 + 2 --------------------------------------------------------
@@ -127,8 +128,14 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
     gated.save(_out(outdir, f"unified_field_{tag}.npz"))
     print(f"  [stage 2] routing mask: {int(mask.sum())}/{gated.n} patches to HOST")
 
-    # ---- Stage 3 ------------------------------------------------------------
+    # ---- Stage 3a: refine the field ----------------------------------------
     e3 = S3.orientation_field(vol)
+    if refine:
+        e3, rinfo = refine_field(e3)
+        print(f"  [stage 3a] Frank-Oseen refine: {rinfo['iterations']} iters, "
+              f"E {rinfo['E_initial']:.1f} -> {rinfo['E_final']:.1f}")
+
+    # ---- Stage 3b: crossing vs kissing, then tracts -------------------------
     field, junctions, I0 = S3.field_from_gated(gated, vol, e3=e3)
     print(f"  [stage 3] field {len(field)} patches, {len(junctions)} junction(s), "
           f"I_0={I0:.3f}")
@@ -189,7 +196,7 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
 
 
 def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
-            outdir=DEFAULT_OUTDIR, figures=True):
+            outdir=DEFAULT_OUTDIR, figures=True, refine=False):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -212,7 +219,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
 
     r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
                  block=block, stride=stride, iters=iters, outdir=outdir,
-                 figures=figures)
+                 figures=figures, refine=refine)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -231,7 +238,7 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
 
 
 def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
-         figures=True):
+         figures=True, refine=False):
 
     print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
 
@@ -244,10 +251,10 @@ def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
     out = []
     out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING",
                         block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures))
+                        figures=figures, refine=refine))
     out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY",
                         block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures))
+                        figures=figures, refine=refine))
 
     # Every phantom counts. A case with no junction is a pass or a fail
     # depending on its truth (see _status) -- never dropped from the tally.
@@ -284,17 +291,19 @@ if __name__ == "__main__":
     ap.add_argument("--centre", nargs=3, type=int, default=[384, 384, 384])
     ap.add_argument("--outdir", default=DEFAULT_OUTDIR,
                     help="where to write results (default: <repo>/results)")
+    ap.add_argument("--refine", action="store_true",
+                    help="step 3a: Frank-Oseen smooth the director field first")
     ap.add_argument("--no-figures", action="store_true",
                     help="skip the orientation overlay PNGs")
     a = ap.parse_args()
     if a.i74:
         run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
                 stride=a.stride, iters=a.iters, outdir=a.outdir,
-                figures=not a.no_figures)
+                figures=not a.no_figures, refine=a.refine)
     else:
         res = main(iters=a.iters, radius=a.radius, stride=a.stride,
                    block=a.block, outdir=a.outdir,
-                   figures=not a.no_figures)
+                   figures=not a.no_figures, refine=a.refine)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)
