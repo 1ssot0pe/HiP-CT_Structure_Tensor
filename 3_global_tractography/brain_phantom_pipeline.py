@@ -32,8 +32,8 @@ from crossing_shape_3d import _tube_family, _coords
 from host_geometry_test import _dir_inplane, _finalise, _random_dirs
 from host_fod import analyse, classify
 import noise_floor as nf
-import phase3_i74 as Q
-import phase3_global as P
+import phase3 as Q
+import phase3 as P
 
 SHAPE = (64, 64, 64)
 NOISE_AMP = 0.07             # noise std ~ 0.07 vs signal std ~0.16 -> SNR ~2-3 (realistic;

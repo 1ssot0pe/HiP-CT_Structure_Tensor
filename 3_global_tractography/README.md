@@ -65,18 +65,49 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    likelihood — selects the true geometry 100%, beats a white-noise model at
    high noise).
 
-5. **Stage 3, the live path** — `tract_density.py` (trilinear-splat rasteriser,
-   arc-length normalised) → `self_optimising_tractography.py` (the optimisation
-   loop, `field_from_gated`, `superposition_S`) → `run_pipeline.py`, the only
-   end-to-end driver (Stage 1 → 2 → 3).
+5. **Stage 3 — two steps, and nothing more.**
 
-   > **Reading its phantom result.** The kissing phantom passes by producing
-   > **no junction** — the gate never routes it, so no crossing is invented.
-   > Verified genuine, not a Stage-1 scale failure: sweeping the σ fallback
-   > 0.85–3.0 routes zero patches at every value. The consequence is that
-   > `run_pipeline.py` exercises the superposition score S only on the crossing
-   > side; S-on-tangency is covered by `phase3_validate3d.py` and
-   > `mass_conservation_validate.py` instead.
+   | | | |
+   |---|---|---|
+   | **3a** field | `field_refine.py` | Frank-Oseen smooth the director field |
+   | **3b** topology + tracts | `self_optimising_tractography.py` → `tract_density.py` | superposition S decides crossing vs kissing, then the tracts are fitted |
+
+   Driven by `run_pipeline.py`; 3a is opt-in with `--refine`.
+
+   **3a — the whole field.** An orientation field has no head or tail, so its
+   correct smoothing energy is Frank-Oseen, not a Gaussian blur. Measured:
+   angular error 9.10 → 8.21° at noise 0.3, tractography loss −1.3% (crossing)
+   and −3.0% (kissing). Gaussian blurring of the same field makes it *worse*
+   (15.99°), because componentwise blurring averages across the sign ambiguity;
+   the unit-norm projection here does not. One constant, not three — equal
+   K matched or beat the unequal white-matter prior at every noise level, so
+   that prior is unsupported by this data. Off by default: the gain is real but
+   small, and it costs 35–80 iterations of dense 3D vector calculus.
+
+   > **Sign alignment must never leave the function that needs it.** Aligning
+   > director signs is required only so finite differences see a consistent
+   > field. Returning the aligned field cost the tractography **+62%**
+   > (crossing) and **+161%** (kissing): BFS forces one global sign convention
+   > on a field that admits none, manufacturing sign *seams*, and consumers
+   > that sample by trilinear interpolation average across a seam and get ≈0.
+   > `refine()` restores the input's signs on the way out. The energy is even
+   > in **n**, so this is free.
+
+   **3b — crossing vs kissing.** Superposition S only:
+   `S = (I_c−I₀)/((I_a−I₀)+(I_b−I₀))`, decided at 0.75. Brightness *adds* where
+   two fibres genuinely pass through; at a tangential kiss neither centreline
+   does, so it can never exceed one fibre's worth.
+
+   > **A geometric alternative was built and falsified.** Pairing the four
+   > half-branches at a junction by minimum bending energy — "a crossing is the
+   > pairing that stays straight, a kiss is the pairing that turns" — scored
+   > **0/20 on kisses** at every arm radius and noise level, and grew *more*
+   > confident as it got more room. The premise is false for a *tangential*
+   > kiss: the two curves are locally parallel there, so bridging the gap is
+   > perfectly straight while the true continuation must curve around its own
+   > bulge. Minimum bending energy is therefore guaranteed to pick the false
+   > merge. This is why brightness beats geometry here, and it is the same
+   > mechanism behind Phase 2's local certifier failing on real i74.
 
 6. **Kissing gap — the resolution limit** — `kissing_gap_sweep.py` +
    `test_kissing_phantom.py`. Global tractography stays clean down to a gap of

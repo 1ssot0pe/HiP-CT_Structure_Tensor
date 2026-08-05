@@ -45,9 +45,14 @@ boxes are just where they happen.
 │    ρ too small leaves direction jittery; too large averages across fibres.
 │    Picked per 32³ block, because the best σ varies ~1–6 across a volume.
 │
-│    ? is the block certified
-│      ├─ yes → use this block's (σ, ρ)
-│      └─ no  → σ = ρ = 0.85  ⚠ WARNS: this step is contributing nothing
+│    ? does the block hold tissue    block mean ≥ 5% of the volume max
+│      ├─ yes → pick (σ, ρ) for it, and use that
+│      └─ no  → BACKGROUND. skipped before any scale pick is attempted;
+│               those patches fall back to σ = ρ = 0.85  ⚠ WARNS
+│
+│    A sparse volume can fail this on every block — then Step 1 never ran,
+│    and the whole run is on one fixed scale. Cost, measured: ~20° of
+│    angular error on the kissing phantom.
 └──────────────────────────────────────────────────────────────────────────
                                    │
                                    ▼   sigma_map, rho_map

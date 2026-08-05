@@ -34,7 +34,7 @@ from scipy.stats import mannwhitneyu
 
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR
 from host_fod import analyse, classify
-from phase2_i74_demote import collect_crossings, HALF
+from peak_straightness import collect_crossings, HALF
 from mass_conservation_validate import local_calibration, EPS
 from real_i74_mass_conservation import _random_shell_positions
 

@@ -6,7 +6,7 @@ REAL HOST 2-peak crossing candidates in the i74 volume itself.
 Phantom validation only ever asked "does the ratio separate a phantom crossing
 from a phantom kissing pair". It never touched a real HOST-flagged ambiguous
 voxel. This script closes that gap: find real voxels where HOST's per-voxel
-classifier calls a 2-way crossing (phase2_i74_demote.collect_crossings), then
+classifier calls a 2-way crossing (peak_straightness.collect_crossings), then
 compute ratio = intensity-at-the-point / local "single"-fibre calibration
 (mass_conservation_validate.local_calibration, same recipe used in the
 phantom proof) and report the DISTRIBUTION of ratios and the fire-fraction
@@ -34,7 +34,7 @@ import matplotlib.pyplot as plt
 
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR
 from host_fod import analyse, classify
-from phase2_i74_demote import collect_crossings, HALF
+from peak_straightness import collect_crossings, HALF
 from mass_conservation_validate import local_calibration, local_ratio_threshold, THRESH, EPS
 
 N_CAL_TRIES = 40          # random nearby offsets to try per candidate

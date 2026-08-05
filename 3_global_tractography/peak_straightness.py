@@ -1,5 +1,5 @@
 """
-phase2_i74_demote.py -- Phase 2 of the global-tractography scoping, on REAL i74.
+peak_straightness.py -- Phase 2 of the global-tractography scoping, on REAL i74.
 
 Phase 1 (phantoms) established a generalising signal: FORWARD SUPPORT -- walk a
 streamline along a candidate direction and ask whether it stays a genuine fibre
@@ -22,7 +22,7 @@ not a fabricated accuracy; (ii) Phase-1's wide-angle limit carries over -- a gen
 narrow crossing is unresolvable and may itself look 'demoted'. Both are stated, not
 hidden.
 
-Run:  .venv/Scripts/python -u phase2_i74_demote.py [--crop N] [--n-cross N]
+Run:  .venv/Scripts/python -u peak_straightness.py [--crop N] [--n-cross N]
 """
 
 import os as _sr_os, sys as _sr_sys
@@ -36,7 +36,7 @@ import matplotlib.pyplot as plt
 
 from reconstruction import load_volume, DEFAULT_VOLUME_DIR, VOXEL_SIZE_UM
 from host_fod import analyse, classify
-from phase1_kissing_crossing import local_fibreness, V
+from fibre_continuity import local_fibreness, V
 
 HALF = 8                 # local_fibreness patch half-width (matches phase 1)
 CONE_DEG = 35.0          # curvature cone for the continuity walk
@@ -146,7 +146,7 @@ def calibrate_certifier(vol, n_single=60, q=NULL_Q, seed=1, max_attempts=3000):
             float(np.percentile(reaches, q)), len(straights))
 
 
-def run(crop=160, n_cross=40, save="phase2_i74_demote.png"):
+def run(crop=160, n_cross=40, save="peak_straightness.png"):
     print("=" * 74)
     print(f"PHASE 2 -- forward-support certifier on real i74 ({DEFAULT_VOLUME_DIR.name})")
     c0 = (768 - crop) // 2

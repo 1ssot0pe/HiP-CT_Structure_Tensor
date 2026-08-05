@@ -24,8 +24,8 @@ import numpy as np
 
 from kissing_phantom import build_kissing, SHAPE
 from host_fod import analyse, classify
-import phase3_i74 as Q
-import phase3_global as P
+import phase3 as Q
+import phase3 as P
 
 HALF = 8
 STRIDE = 4
