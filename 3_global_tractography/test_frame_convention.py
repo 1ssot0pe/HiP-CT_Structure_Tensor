@@ -19,6 +19,11 @@ push them through the real Stage 1 + 2 + join, and assert the recovered
 direction's dominant component is the axis the fibre was drawn along. An
 inverted or dropped reversal maps z <-> x and the z and x cases fail.
 
+`export_nifti` reverses in a SECOND place -- it writes a dense (z, y, x) peaks
+image straight from the tensor, never passing through `field_from_gated` -- so
+the same three fibres are run through that path too. The two can drift apart
+independently; each needs its own known answer.
+
 Run
 ---
     python test_frame_convention.py        # exits non-zero on failure
@@ -38,10 +43,12 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
 
 import self_optimising_tractography as S3          # noqa: E402
 from sigma_rho_gated_field import build_gated_field  # noqa: E402
+from export_nifti import dense_e3                    # noqa: E402
 
 N = 48
 AXES = ((0, "z"), (1, "y"), (2, "x"))
 DOMINANCE_MIN = 0.90     # |component| along the true axis, after normalising
+TISSUE_FRAC = 0.10       # dense case: score on voxels above this fraction of max
 
 
 def single_fibre(axis, n=N, width=1.2, amplitude=50.0):
@@ -66,38 +73,62 @@ def recovered_direction(vol, block=32, stride=8):
     return d / n if n > 0 else None
 
 
+def dense_direction(vol, block=32):
+    """Mean |direction| over the DENSE export path, in (z, y, x).
+
+    Scored on tissue voxels only. The surrounding halo also points along the
+    fibre, so including it would not change the answer, but it would let a
+    vacuum voxel's zero vector dilute the mean.
+    """
+    e3 = dense_e3(vol, block=block, verbose=False)          # (3, ...) in (x,y,z)
+    tissue = vol > TISSUE_FRAC * float(vol.max())
+    v = e3[:, tissue]
+    v = v[:, np.linalg.norm(v, axis=0) > 0]
+    if not v.size:
+        return None
+    d = np.abs(np.mean(v, axis=1))[::-1]                    # -> (z, y, x)
+    n = np.linalg.norm(d)
+    return d / n if n > 0 else None
+
+
+def _check(label, d, axis, name, failures, verbose):
+    if d is None:
+        failures.append(f"{label} / fibre along {name}: no directions")
+        if verbose:
+            print(f"  {label:6s} fibre along {name} (axis {axis}): NONE  -> FAIL")
+        return
+    got = int(np.argmax(d))
+    ok = got == axis and d[axis] >= DOMINANCE_MIN
+    if verbose:
+        print(f"  {label:6s} fibre along {name} (axis {axis}) -> (z,y,x) = "
+              f"[{d[0]:.3f} {d[1]:.3f} {d[2]:.3f}]  dominant={'zyx'[got]}  "
+              f"{'OK' if ok else '*** FAIL ***'}")
+    if not ok:
+        failures.append(f"{label} / fibre along {name}: dominant axis "
+                        f"{'zyx'[got]}, component {d[axis]:.3f} < {DOMINANCE_MIN}")
+
+
 def run(verbose=True):
     if verbose:
         print("=" * 78)
-        print("FRAME CONVENTION -- Stage 2 (x,y,z) -> Stage 3 (z,y,x)")
+        print("FRAME CONVENTION -- Stage 2 (x,y,z) -> Stage 3 / NIfTI (z,y,x)")
         print("=" * 78)
     failures = []
     for axis, name in AXES:
-        d = recovered_direction(single_fibre(axis))
-        if d is None:
-            failures.append(f"fibre along {name}: no patches in field")
-            if verbose:
-                print(f"  fibre along {name} (axis {axis}): NO PATCHES  -> FAIL")
-            continue
-        got = int(np.argmax(d))
-        ok = got == axis and d[axis] >= DOMINANCE_MIN
-        if verbose:
-            print(f"  fibre along {name} (axis {axis}) -> (z,y,x) = "
-                  f"[{d[0]:.3f} {d[1]:.3f} {d[2]:.3f}]  dominant={'zyx'[got]}  "
-                  f"{'OK' if ok else '*** FAIL ***'}")
-        if not ok:
-            failures.append(f"fibre along {name}: dominant axis {'zyx'[got]}, "
-                            f"component {d[axis]:.3f} < {DOMINANCE_MIN}")
+        vol = single_fibre(axis)
+        _check("patch", recovered_direction(vol), axis, name, failures, verbose)
+        _check("dense", dense_direction(vol), axis, name, failures, verbose)
     if verbose:
         print("-" * 78)
         if failures:
-            print(f"FAIL -- {len(failures)}/{len(AXES)} axes wrong:")
+            print(f"FAIL -- {len(failures)}/{2 * len(AXES)} cases wrong:")
             for f in failures:
                 print(f"    {f}")
-            print("The (x,y,z) -> (z,y,x) reversal in field_from_gated is "
-                  "inverted, dropped, or applied twice.")
+            print("The (x,y,z) -> (z,y,x) reversal in field_from_gated or "
+                  "export_nifti is inverted, dropped, or applied twice.")
         else:
-            print(f"PASS -- all {len(AXES)} axes recovered in the correct frame")
+            print(f"PASS -- all {2 * len(AXES)} cases recovered in the correct "
+                  f"frame (patch join + dense export)")
         print("=" * 78)
     return failures
 
