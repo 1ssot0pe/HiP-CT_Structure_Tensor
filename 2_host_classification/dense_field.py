@@ -67,6 +67,7 @@ REL = 0.30            # host_fod.analyse relative_peak_threshold
 MIN_SEP = 30.0        # host_fod.analyse min_separation_angle (degrees)
 SHARPEN = 3.0         # host_fod.analyse sharpen
 MIN_GRADS = 40        # analyse returns None below this many kept gradients
+AIR_FRAC = 0.05       # build_gated_field's air test: patch.max() < 0.05 * peak
 LEVELS = 24           # threshold quantisation bins
 SLAB = 16             # z-slab for the eigh pass
 CHUNK = 20000         # voxels per ODF evaluation chunk
@@ -85,6 +86,19 @@ def gradients(vol, sigma_grad):
     gy = ndimage.gaussian_filter(v, sigma_grad, order=(0, 1, 0), mode="nearest")
     gx = ndimage.gaussian_filter(v, sigma_grad, order=(0, 0, 1), mode="nearest")
     return gx, gy, gz
+
+
+def tissue_windows(vol, half=GATE_HALF, air_frac=AIR_FRAC):
+    """Voxels with tissue anywhere within `half` -- dense form of
+    `build_gated_field`'s `if patch.max() < air: continue`.
+
+    Once the background carries noise this is not optional. c_s and FA are
+    scale-free SHAPE descriptors, so isotropic shot noise reads as maximally
+    spherical (c_s -> 1, FA -> 0) and clears c_s > FA everywhere in empty space
+    no matter how faint the noise is.
+    """
+    return (ndimage.maximum_filter(vol, size=2 * half + 1, mode="constant")
+            >= air_frac * float(vol.max()))
 
 
 def _box(a, half):
@@ -146,12 +160,19 @@ def _eig_ascending(comp, shape, slab=SLAB):
 # ---------------------------------------------------------------------------
 
 def dense_gate(vol, sigma_grad=GATE_SIGMA_GRAD, half=GATE_HALF, levels=LEVELS,
-               verbose=True):
+               air_frac=AIR_FRAC, verbose=True):
     """c_s and FA per voxel, from the same gradient scatter matrix `analyse` uses.
 
     S = sum of g g^T over the box, gradients below 0.1 * box-max dropped --
     UNWEIGHTED, matching `analyse`'s `G[keep].T @ G[keep]` (its `mag**0` factor
     is the identity). Returns (c_s, FA, n_kept), all (nz, ny, nx).
+
+    Windows holding no tissue are left at c_s = FA = 0, so the gate cannot fire
+    there. `build_gated_field` does the same thing patchwise -- `if patch.max()
+    < air: continue`, air = 0.05 * vol.max() -- and it is not optional once the
+    background carries noise: c_s and FA are scale-free SHAPE descriptors, so
+    isotropic shot noise reads as maximally spherical (c_s -> 1, FA -> 0) and
+    passes c_s > FA everywhere in empty space no matter how faint it is.
     """
     gx, gy, gz = gradients(vol, sigma_grad)
     mag = np.sqrt(gx * gx + gy * gy + gz * gz)
@@ -184,7 +205,11 @@ def dense_gate(vol, sigma_grad=GATE_SIGMA_GRAD, half=GATE_HALF, levels=LEVELS,
     # Defined only where `analyse` would have returned something at all. Below
     # MIN_GRADS kept gradients it returns None, so there is no gate decision to
     # make and no HOST answer to be had; 0 keeps those voxels out of the gate.
-    ok = (tot > 0) & (n_kept >= MIN_GRADS)
+    has_signal = tissue_windows(vol, half=half, air_frac=air_frac)
+    ok = (tot > 0) & (n_kept >= MIN_GRADS) & has_signal
+    if verbose:
+        print(f"  [gate] {int(has_signal.sum())}/{vol.size} windows hold tissue "
+              f"(max >= {air_frac:g} * peak)")
     c_s = np.zeros(shape, np.float32)
     fa = np.zeros(shape, np.float32)
     c_s[ok] = 3.0 * lam[0][ok] / tot[ok]

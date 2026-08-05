@@ -80,7 +80,7 @@ def dense_direction(vol, block=32):
     fibre, so including it would not change the answer, but it would let a
     vacuum voxel's zero vector dilute the mean.
     """
-    e3 = dense_e3(vol, block=block, verbose=False)          # (3, ...) in (x,y,z)
+    e3, _measured, _trace = dense_e3(vol, block=block, verbose=False)   # (x,y,z)
     tissue = vol > TISSUE_FRAC * float(vol.max())
     v = e3[:, tissue]
     v = v[:, np.linalg.norm(v, axis=0) > 0]
