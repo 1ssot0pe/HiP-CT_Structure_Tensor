@@ -46,6 +46,24 @@ EPS = 1e-12
 _V = SPHERE.vertices
 
 
+def _ipow(a, n):
+    """a ** n for a small positive integer n, by repeated multiplication.
+
+    numpy's `**` calls pow() elementwise. On the (M, 724) array below that is
+    ~600 ms versus ~216 ms for three multiplies -- 2.8x, and this term is 99%
+    of analyse()'s cost. Exact for integer exponents: max observed difference
+    against `**` is 8e-17, i.e. float rounding.
+    """
+    r, b = None, a
+    while n:
+        if n & 1:
+            r = b if r is None else r * b
+        n >>= 1
+        if n:
+            b = b * b
+    return r
+
+
 def directional_energy(G, order=4, mag_frac=0.1):
     """E_2n(u) over the sphere: |grad|^2-weighted mean of (grad_hat . u)^order."""
     mag = np.linalg.norm(G, axis=1)
@@ -54,13 +72,46 @@ def directional_energy(G, order=4, mag_frac=0.1):
     w = mag[keep] ** 2
     w = w / (w.sum() + EPS)
     dot = Gn @ _V.T                               # (M, Nv)
-    return (w[:, None] * dot ** order).sum(0)     # (Nv,)
+    return (w[:, None] * _ipow(dot, int(order))).sum(0)   # (Nv,)
 
 
-def analyse(patch, sigma_grad=2.0, order=6, rel=0.30, min_sep=30.0, sharpen=3.0):
+def _scatter_eigvals(G, mag_frac=0.1):
+    """Ascending eigenvalues of the gradient scatter matrix -- no sphere needed."""
+    mag = np.linalg.norm(G, axis=1)
+    keep = mag > mag_frac * (mag.max() + EPS)
+    return np.sort(np.linalg.eigvalsh(G[keep].T @ G[keep]))
+
+
+def _c_s(lam):
+    """Sphericity 3*l3/(l1+l2+l3): how much the patch has NO dominant direction."""
+    return float(3.0 * lam[0] / (lam.sum() + EPS))
+
+
+def _fa(lam):
+    """Fractional anisotropy from the same three eigenvalues."""
+    return float(np.sqrt(0.5) * np.sqrt((lam[0] - lam[1]) ** 2
+                                        + (lam[1] - lam[2]) ** 2
+                                        + (lam[2] - lam[0]) ** 2)
+                 / (np.sqrt((lam ** 2).sum()) + EPS))
+
+
+def analyse(patch, sigma_grad=2.0, order=6, rel=0.30, min_sep=30.0, sharpen=3.0,
+            peaks=True):
+    """Metrics for one patch. `peaks=False` skips the sphere entirely.
+
+    c_s and FA come from a 3x3 eigendecomposition of the gradient scatter and
+    need no sphere at all; only n_peaks/sep/amp2/aniso/dirs do. Measured split
+    per call: patch_gradients 5.9 ms, 3x3 eigvalsh 1.6 ms, sphere work 600 ms.
+    So a caller that only wants the c_s vs FA routing decision should pass
+    peaks=False and skip 99% of the work.
+    """
     G = patch_gradients(patch, sigma_grad)
     if G.shape[0] < 40:
         return None
+    if not peaks:
+        lam = _scatter_eigvals(G)
+        return dict(n_peaks=None, sep=np.nan, amp2=np.nan, aniso=np.nan,
+                    c_s=_c_s(lam), FA=_fa(lam), dirs=[], vals=[], n=G.shape[0])
     E = directional_energy(G, order)
     f = E.max() - E                               # fibre-ness ODF (>=0)
     fn = (f / (f.max() + EPS)) ** sharpen         # sharpen minima into distinct peaks
@@ -73,15 +124,12 @@ def analyse(patch, sigma_grad=2.0, order=6, rel=0.30, min_sep=30.0, sharpen=3.0)
     # 2nd-order sphericity c_s from the same gradients: single fibre is planar
     # (c_s ~ 0), a dispersed population smears the plane (c_s higher). Splits the
     # two 1-peak cases the HOST peak-count alone cannot.
-    mag = np.linalg.norm(G, axis=1); keep = mag > 0.1 * (mag.max() + EPS)
-    S = (G[keep] * mag[keep, None] ** 0).T @ G[keep]
-    lam = np.sort(np.linalg.eigvalsh(S))
-    c_s = float(3.0 * lam[0] / (lam.sum() + EPS))
+    lam = _scatter_eigvals(G)
+    c_s = _c_s(lam)
     # fractional anisotropy of the SAME structure tensor -- a second normalised
     # descriptor from the same eigenvalues. classify() compares c_s vs FA as a
     # parameter-free single/dispersed rule (both local to this voxel).
-    fa = float(np.sqrt(0.5) * np.sqrt((lam[0] - lam[1]) ** 2 + (lam[1] - lam[2]) ** 2
-                                      + (lam[2] - lam[0]) ** 2) / (np.sqrt((lam ** 2).sum()) + EPS))
+    fa = _fa(lam)
     npk = len(vals)
     sep = amp2 = np.nan
     if npk >= 2:

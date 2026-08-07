@@ -58,10 +58,17 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
 
 import self_optimising_tractography as S3
 from field_refine import refine as refine_field
+from field_export import export_field, export_difference
 from render_field import render_field
-from sigma_rho_gated_field import build_gated_field
+from sigma_rho_gated_field import build_gated_field, DEFAULT_STRIDE
+from reconstruction import VOXEL_SIZE_UM, tissue_mask
+from nifti_io import nifti_affine, save_nifti, save_vector_field
+from tensor import tensor_field, field_for
 from localized_phantoms import (raw_localized_crossing, raw_kissing,
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
+
+sys.path.insert(0, os.path.join(_ROOT, "1_sigma_rho_selection"))
+from select_scales import select_scales, save_scales, paint_maps, summary as scale_summary
 
 
 UNKNOWN = "UNKNOWN"          # truth label for real data, where there is none
@@ -78,6 +85,59 @@ def _out(outdir, name):
     """Absolute path for an output file, creating the directory on demand."""
     os.makedirs(outdir, exist_ok=True)
     return os.path.join(outdir, name)
+
+
+def steps_0_to_2(vol, tag, outdir, crop_origin=(0, 0, 0), voxel_um=VOXEL_SIZE_UM,
+                 mode="adaptive", block=32, export_both=True, verbose=True):
+    """Steps 0-2: mask, certify scales, ONE dense tensor, write the maps.
+
+    Returns (scales, e3, lam, tissue) for the rest of the run to consume, so
+    every later stage reads the same decomposition instead of making its own.
+
+    Both e3 maps are written whenever `export_both`, not just the one the run
+    uses. They are the deliverable that answers "what would the other choice
+    have looked like" -- the adaptive-versus-global comparison was previously
+    only reachable by running `sigma_rho_adaptive.py` by hand on a different
+    region, so the two pictures were never of the same data.
+    """
+    A = nifti_affine(crop_origin, voxel_um)
+    tissue = tissue_mask(vol)
+    if verbose:
+        print(f"  [step 0] tissue {int(tissue.sum())}/{tissue.size} voxels "
+              f"({tissue.mean():.1%})")
+    save_nifti(vol, _out(outdir, f"raw_{tag}.nii.gz"), A, dtype=np.float32)
+
+    wanted = ("adaptive", "global") if export_both else (mode,)
+    picked, fields = {}, {}
+    for m in wanted:
+        if verbose:
+            print(f"  [step 1] certifying scales ({m}) ...")
+        sc = select_scales(vol, mode=m, block=block, verbose=verbose)
+        picked[m] = sc
+        save_scales(sc, _out(outdir, f"scales_{tag}_{m}.json"))
+        if verbose:
+            print(f"  [step 2] dense tensor at the {m} scale ...")
+        t = field_for(vol, sc, invariants=False)
+        fields[m] = t
+        # Name carries the scale, so a map on disk says what produced it.
+        if m == "global":
+            nm = (f"e3_{tag}_global_s{sc['sigma_global']:g}"
+                  f"_r{sc['rho_global']:g}.nii.gz")
+        else:
+            nm = f"e3_{tag}_adaptive.nii.gz"
+            sig, rho = paint_maps(sc, vol.shape)
+            save_nifti(sig, _out(outdir, f"sigma_map_{tag}.nii.gz"), A,
+                       dtype=np.float32)
+            save_nifti(rho, _out(outdir, f"rho_map_{tag}.nii.gz"), A,
+                       dtype=np.float32)
+        p = save_vector_field(t["e3"], _out(outdir, nm), A)
+        if verbose:
+            print(f"           {scale_summary(sc)}")
+            print(f"           wrote {os.path.basename(p)}")
+
+    scales = picked[mode]
+    t = fields[mode]
+    return scales, t["e3"], t["lam"], tissue
 
 
 def _crop(vol, centre, r):
@@ -117,28 +177,48 @@ def _status(truth, verdict):
     return "FAIL", f"verdict {verdict}, expected {truth}"
 
 
-def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True,
-             outdir=DEFAULT_OUTDIR, figures=True, refine=False):
+def run_case(name, vol, centre, truth, mode="adaptive", block=32,
+             stride=DEFAULT_STRIDE, iters=3,
+             verbose=True, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
+             crop_origin=(0, 0, 0), voxel_um=VOXEL_SIZE_UM, export=True,
+             export_both=True):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
-
-    # ---- Stage 1 + 2 --------------------------------------------------------
-    gated = build_gated_field(vol, block=block, stride=stride, verbose=verbose)
-    mask = gated.routing_mask()
     tag = name.split()[0].lower()
+
+    # ---- Steps 0-2: mask, scales, one dense tensor --------------------------
+    scales, e3, lam, tissue = steps_0_to_2(
+        vol, tag, outdir, crop_origin=crop_origin, voxel_um=voxel_um,
+        mode=mode, block=block, export_both=export_both, verbose=verbose)
+
+    # ---- Steps 3-5: the routing gate, then HOST -----------------------------
+    # e3 is handed in, so the gate reads the SAME field Stage 3 will follow.
+    gated = build_gated_field(vol, scales=scales, e3_xyz=e3[::-1], stride=stride,
+                              verbose=verbose)
+    mask = gated.routing_mask()
     gated.save(_out(outdir, f"unified_field_{tag}.npz"))
     print(f"  [stage 2] routing mask: {int(mask.sum())}/{gated.n} patches to HOST")
 
     # ---- Stage 3a: refine the field ----------------------------------------
-    e3 = S3.orientation_field(vol)
     if refine:
         e3, rinfo = refine_field(e3)
         print(f"  [stage 3a] Frank-Oseen refine: {rinfo['iterations']} iters, "
               f"E {rinfo['E_initial']:.1f} -> {rinfo['E_final']:.1f}")
 
     # ---- Stage 3b: crossing vs kissing, then tracts -------------------------
-    field, junctions, I0 = S3.field_from_gated(gated, vol, e3=e3)
-    print(f"  [stage 3] field {len(field)} patches, {len(junctions)} junction(s), "
-          f"I_0={I0:.3f}")
+    # host_only: Stage 3 is confined to voxels the gate routed to HOST.
+    field, junctions, I0 = S3.field_from_gated(gated, vol, e3=e3, host_only=True)
+    print(f"  [stage 3] field {len(field)} HOST patches, {len(junctions)} "
+          f"junction(s), I_0={I0:.3f}")
+
+    # The INITIAL field, before any demotion. Snapshotted here so the exported
+    # "before" is the state Stage 2 handed over, not a view onto an object the
+    # demotion below mutates in place.
+    gated_initial = gated.copy()
+    F_before = None
+    if export:
+        _p, F_before = export_field(gated_initial, e3, outdir, f"{tag}_initial",
+                                    crop_origin=crop_origin, voxel_um=voxel_um,
+                                    tissue=tissue, host_only=True)
 
     # Drawn here, before the no-junction early return, because that case is the
     # one most worth looking at: it is a claim that nothing crosses, and the
@@ -160,8 +240,15 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
         if status != "UNSCORED":
             print(f"  RESULT: {status} -- {reason}")
         fig_path = _figure(" -- no crossing claimed")
+        # Export the optimised state anyway, so the before/after pair always
+        # exists. With nothing to demote it is identical to the initial field,
+        # which is the correct answer here rather than a missing file.
+        if export:
+            export_field(gated, e3, outdir, f"{tag}_optimised",
+                         crop_origin=crop_origin, voxel_um=voxel_um,
+                         tissue=tissue, host_only=True)
         return dict(name=name, truth=truth, skipped=True, status=status,
-                    reason=reason, verdict=None, figure=fig_path,
+                    reason=reason, verdict=None, figure=fig_path, n_demoted=0,
                     correct=None if status == "UNSCORED" else status == "PASS",
                     n_patches=gated.n, n_routed=int(mask.sum()))
 
@@ -169,9 +256,50 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
         print(f"    junction {j['centre']}: I_c={j['I_c']:.2f} I_a={j['I_a']:.2f} "
               f"I_b={j['I_b']:.2f}  S={j['S']:.3f} -> {j['verdict']}")
 
-    D_obs, tissue = S3.anisotropy_target(vol)
-    theta, trace, info = S3.optimise(vol, field, junctions, D_obs, tissue, I0,
+    # Score only where a streamline can actually go. `integrate` stops when no
+    # patch lies within assoc_radius, so with Stage 3 confined to HOST patches
+    # most of `tissue` is unreachable by construction; including it measured
+    # the tracts' absence from forbidden voxels, a term constant in theta that
+    # swamped the rest (see loss_sensitivity.py).
+    # D_obs from the SAME eigenvalues that produced e3 -- not a second tensor at
+    # a second scale, which is what `anisotropy_target(vol)` used to do.
+    D_obs, _tissue_all = S3.anisotropy_target(vol, lam=lam, tissue=tissue)
+    support = tissue & S3.host_support(field, vol.shape,
+                                       float(S3.THETA0["assoc_radius"]))
+    D_obs = S3.renormalise(D_obs, support)
+    print(f"  [stage 3] reachable support {int(support.sum())} voxels "
+          f"({support.sum() / max(int(tissue.sum()), 1):.1%} of tissue)")
+    theta, trace, info = S3.optimise(vol, field, junctions, D_obs, support, I0,
                                      n_iter=iters, verbose=verbose)
+
+    # ---- demotion: superposition says which flagged crossings are kisses ----
+    # S below the decision point means the centre never carries two fibres'
+    # worth of brightness, so the two peaks HOST found do not both pass
+    # through. That patch is relabelled kissing and loses its second
+    # direction. AMBIGUOUS is deliberately left alone -- demoting on a verdict
+    # the metric itself will not commit to would launder uncertainty into a
+    # hard label.
+    overrides = {j["patch_index"]: "kissing"
+                 for j in junctions if j["verdict"] == "TANGENCY"}
+    gated_optimised = gated.copy()
+    for pi in overrides:
+        p = gated_optimised.patches[pi]
+        p["label"] = "kissing"
+        p["dirs"] = list(p["dirs"])[:1]
+        p["n_dirs"] = 1
+    n_dem = len(overrides)
+    print(f"  [demote] {n_dem}/{len(junctions)} junction(s) demoted "
+          f"crossing -> kissing on S < {S3.S_DECISION - S3.S_BAND:g}")
+
+    if export:
+        _p, F_after = export_field(gated_optimised, e3, outdir,
+                                   f"{tag}_optimised", crop_origin=crop_origin,
+                                   voxel_um=voxel_um, tissue=tissue,
+                                   host_only=True)
+        if F_before is not None:
+            export_difference(F_before, F_after, outdir, tag,
+                              crop_origin=crop_origin, voxel_um=voxel_um)
+        gated_optimised.save(_out(outdir, f"unified_field_{tag}_optimised.npz"))
 
     verdicts = [j["verdict"] for j in junctions]
     majority = max(set(verdicts), key=verdicts.count)
@@ -182,7 +310,7 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
           f"{trace[-1]['total']:.4f}")
     fig_path = _figure()
     return dict(name=name, truth=truth, skipped=False, status=status,
-                reason=reason, figure=fig_path,
+                reason=reason, figure=fig_path, n_demoted=n_dem,
                 n_patches=gated.n, n_routed=int(mask.sum()),
                 junctions=[{k: (v if not isinstance(v, tuple) else list(v))
                             for k, v in j.items() if k != "dirs"}
@@ -195,8 +323,9 @@ def run_case(name, vol, centre, truth, block=32, stride=8, iters=3, verbose=True
                 trace=trace, junction_log=info["junctions"])
 
 
-def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
-            outdir=DEFAULT_OUTDIR, figures=True, refine=False):
+def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
+            iters=3, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
+            mode="adaptive", export_both=True):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -211,15 +340,23 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
     c = tuple(centre)
     # load_volume's `crop` applies to ALL THREE axes, not just z -- slicing the
     # result again with absolute indices produces a zero-size array.
-    vol = load_volume(crop=(c[0] - radius, c[0] + radius),
+    lo = c[0] - radius
+    vol = load_volume(crop=(lo, c[0] + radius),
                       dtype=np.uint8).astype(np.float32)
+    # ...which is also why the crop origin is the SAME index on all three axes.
+    # Every exported NIfTI carries this offset in its affine, so the maps land
+    # on the real position in the 768^3 volume instead of at the world origin.
+    crop_origin = (lo, lo, lo)
     print("=" * 78)
     print(f"REAL i74 -- {vol.shape} at {c}, mean {vol.mean():.1f}")
+    print(f"  crop origin {crop_origin}, voxel {VOXEL_SIZE_UM:g} um, stride {stride}")
     print("=" * 78)
 
     r = run_case("I74 REGION", vol, tuple(v // 2 for v in vol.shape), "UNKNOWN",
-                 block=block, stride=stride, iters=iters, outdir=outdir,
-                 figures=figures, refine=refine)
+                 mode=mode, block=block, stride=stride, iters=iters,
+                 outdir=outdir, figures=figures, refine=refine,
+                 crop_origin=crop_origin, voxel_um=VOXEL_SIZE_UM,
+                 export_both=export_both)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -237,8 +374,9 @@ def run_i74(centre=(384, 384, 384), radius=32, block=32, stride=8, iters=3,
     return r
 
 
-def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
-         figures=True, refine=False):
+def main(iters=3, radius=24, stride=DEFAULT_STRIDE, block=32,
+         outdir=DEFAULT_OUTDIR, figures=True, refine=False, mode="adaptive",
+         export_both=True):
 
     print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
 
@@ -249,12 +387,12 @@ def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
     Kc, kc = _crop(K, tuple(s // 2 for s in K.shape), radius)
 
     out = []
-    out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING",
+    out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING", mode=mode,
                         block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures, refine=refine))
-    out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY",
+                        figures=figures, refine=refine, export_both=export_both))
+    out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY", mode=mode,
                         block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures, refine=refine))
+                        figures=figures, refine=refine, export_both=export_both))
 
     # Every phantom counts. A case with no junction is a pass or a fail
     # depending on its truth (see _status) -- never dropped from the tally.
@@ -284,26 +422,38 @@ def main(iters=3, radius=24, stride=8, block=32, outdir=DEFAULT_OUTDIR,
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Stage 1->2->3 phantom validation")
     ap.add_argument("--iters", type=int, default=3)
-    ap.add_argument("--radius", type=int, default=24)
-    ap.add_argument("--stride", type=int, default=8)
+    # Default resolved per path below: the phantoms are small, the i74 crop is
+    # sized for a map worth exporting. One shared default silently shrank the
+    # i74 region back to the phantom's.
+    ap.add_argument("--radius", type=int, default=None,
+                    help="crop half-width (default: 24 phantom, 48 i74)")
+    ap.add_argument("--stride", type=int, default=DEFAULT_STRIDE,
+                    help="patch grid spacing; smaller = denser HOST coverage")
     ap.add_argument("--block", type=int, default=32)
     ap.add_argument("--i74", action="store_true", help="run on real i74 instead")
     ap.add_argument("--centre", nargs=3, type=int, default=[384, 384, 384])
     ap.add_argument("--outdir", default=DEFAULT_OUTDIR,
                     help="where to write results (default: <repo>/results)")
+    ap.add_argument("--mode", choices=("adaptive", "global"), default="adaptive",
+                    help="scale selection: per-block, or one pair for the crop")
+    ap.add_argument("--single-e3", action="store_true",
+                    help="export only the e3 map the run uses, not both "
+                         "(skips certifying the other mode's scales)")
     ap.add_argument("--refine", action="store_true",
                     help="step 3a: Frank-Oseen smooth the director field first")
     ap.add_argument("--no-figures", action="store_true",
                     help="skip the orientation overlay PNGs")
     a = ap.parse_args()
     if a.i74:
-        run_i74(centre=tuple(a.centre), radius=a.radius, block=a.block,
+        run_i74(centre=tuple(a.centre), radius=a.radius or 48, block=a.block,
                 stride=a.stride, iters=a.iters, outdir=a.outdir,
-                figures=not a.no_figures, refine=a.refine)
+                figures=not a.no_figures, refine=a.refine, mode=a.mode,
+                export_both=not a.single_e3)
     else:
-        res = main(iters=a.iters, radius=a.radius, stride=a.stride,
-                   block=a.block, outdir=a.outdir,
-                   figures=not a.no_figures, refine=a.refine)
+        res = main(iters=a.iters, radius=a.radius or 24, stride=a.stride,
+                   block=a.block, outdir=a.outdir, mode=a.mode,
+                   figures=not a.no_figures, refine=a.refine,
+                   export_both=not a.single_e3)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)

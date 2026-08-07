@@ -60,11 +60,24 @@ folder and they pick their scale differently:
 | | `sigma_rho_gated_field.build_gated_field` | `adaptive_triage.triage_patch_v2` |
 |---|---|---|
 | Called by | **`3_global_tractography/run_pipeline.py`** — the pipeline | `visualize_i74_orientations.py` only |
-| σ for the gate | fixed `GATE_SIGMA_GRAD = 4.0` | per-patch Lindeberg sweep |
-| σ for directions | fixed `DIR_SIGMA_GRAD = 2.5` | the same per-patch pick |
+| σ for the gate | certified `gate_sigma_grad = 5.0` | per-patch Lindeberg sweep |
+| σ for directions | certified `dir_sigma_grad = 2.5` | the same per-patch pick |
 | Direction for a single patch | Stage 1's e3 at the block's certified (σ, ρ) | HOST's own peak |
 
-So the **live** path is `sigma_rho_gated_field`, on fixed scales. Step 1 below
+Both gate scales used to be module constants (`GATE_SIGMA_GRAD = 4.0`,
+`DIR_SIGMA_GRAD = 2.5`, `GATE_HALF = 14`) justified by a sweep table in the
+module docstring. They are now measured by
+`1_sigma_rho_selection/certify_gate_scales.py` and read from `gate_scales.json`.
+Re-deriving them moved one: the certification adds a **single-fibre control**
+the old table lacked, without which "maximise the crossing's c_s − FA" is
+monotone in σ_grad and simply walks to the largest scale swept. Against all
+three cases — crossing must fire, kissing and single must not — the gate scale
+comes out at **5.0**, at a genuine interior turnover (margin +0.598 at σ=4,
++0.961 at σ=5, +0.850 at σ=6). `half=14` and `dir_sigma_grad=2.5` are reproduced
+exactly, and half=14 turns out to be the *only* window that both fires the gate
+and lets HOST decompose the crossing into two peaks.
+
+So the **live** path is `sigma_rho_gated_field`, on certified scales. Step 1 below
 describes `adaptive_triage`'s per-patch Lindeberg pick, which is *not* in the
 pipeline — it is the more principled version, kept for the overlay figure and
 as the obvious upgrade path. Steps 2–4 are shared: both call the same
