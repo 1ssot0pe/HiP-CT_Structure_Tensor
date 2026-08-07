@@ -14,40 +14,36 @@ Output: `GatedField`, holding per patch
 Single-fibre patches carry one e3 from Stage 1's tensor; gated patches carry
 HOST's multi-orientation answer INSTEAD, which is the point of gating.
 
-Three scales, all measured
---------------------------
-The literal reading of "gate the patches from Stage 1" -- compute c_s and FA
-from the structure tensor at Stage 1's own certified (sigma, rho) -- gates
-NOTHING, including a true crossing:
+Three scales, all measured -- and none of them written here
+-----------------------------------------------------------
+The literal reading of "gate the patches from Stage 1" -- compute c_s and FA at
+Stage 1's own certified (sigma, rho) -- gates NOTHING, including a true
+crossing. At Stage 1's sigma (~0.85-1.0 vox) the crossing and kissing c_s differ
+by 0.9-1.2x: no separation at all. The reason is geometric. A single fibre's
+gradients already lie in a plane, so lambda3 is small; a crossing only raises
+lambda3 once the differentiation scale is coarse enough that gradients from BOTH
+fibre families land in the same neighbourhood, and Stage 1's scale is by
+construction the one at which a single fibre is best resolved.
 
-    patch half | sigma_grad | crossing c_s vs FA | fires | kissing | fires
-    -----------|------------|--------------------|-------|---------|------
-        14     |    1.0     |   0.216 vs 0.664   |  no   |  0.244  |  no
-         8     |    2.0     |   0.098 vs 0.719   |  no   |  0.070  |  no
-        10     |    4.0     |   0.342 vs 0.723   |  no   |  0.037  |  no
-        14     |    4.0     |   0.486 vs 0.454   | YES   |  0.148  |  no
+So three scales are in play, each doing a different job:
 
-At Stage 1's sigma (~0.85-1.0 vox) the crossing/kissing c_s ratio is 0.9-1.2x:
-no separation at all. The reason is geometric -- a single fibre's gradients
-already lie in a plane, so lambda3 is small; a crossing only raises lambda3
-once the integration window is wide enough to hold BOTH fibre families, and
-Stage 1's rho ~ 1 voxel is far too narrow to mix them.
+    Stage 1 (sigma, rho)   ->  the single-fibre direction e3    select_scales.py
+    gate sigma_grad        ->  c_s vs FA, the routing decision  certify_gate_
+    direction sigma_grad   ->  extracting the peak directions   scales.py
 
-A second measurement splits the scales again. HOST's second peak only exists in
-a window that does NOT include the gate scale:
+All three are now MEASURED rather than written down. They used to be module
+constants (GATE_HALF=14, GATE_SIGMA_GRAD=4.0, DIR_SIGMA_GRAD=2.5) justified by a
+sweep table in this docstring -- the values were right and the evidence was real,
+but it lived in a comment, so nothing re-derived it and nothing checked it still
+held. `1_sigma_rho_selection/certify_gate_scales.py` runs that sweep against
+known truth and writes `gate_scales.json`, which is read below.
 
-    sigma_grad :  1.0   1.5   2.0   2.5   3.0   4.0
-    n_peaks    :   1     1     2     2     2     1     (true crossing)
-
-So three different scales are in play, each doing its own job:
-
-    Stage 1 sigma ~0.85-1.0  ->  the single-fibre direction e3
-    GATE_SIGMA_GRAD = 4.0    ->  c_s vs FA, the routing decision
-    DIR_SIGMA_GRAD  = 2.5    ->  extracting the peak directions
-
-Using one scale for all three does not merely degrade the losers: at 1.0 the
-gate never fires, and at 4.0 the peaks that justified gating are already
-smoothed away.
+Re-deriving them changed one of the three. The certification adds a SINGLE-FIBRE
+control the old table lacked -- without it "maximise the crossing's c_s - FA" is
+monotone in sigma_grad and just walks to the largest scale swept -- and against
+all three cases the gate scale comes out at 5.0, not 4.0. half=14 and
+dir_sigma_grad=2.5 are reproduced exactly, and half=14 turns out to be the only
+window that both fires the gate and lets HOST decompose the crossing.
 """
 
 import argparse
@@ -55,7 +51,6 @@ import os
 import sys
 
 import numpy as np
-from structure_tensor import structure_tensor_3d, eig_special_3d
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
@@ -63,32 +58,14 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
 from host_fod import analyse, classify
-from sigma_rho_adaptive import compute_adaptive_map, SIGMA_FLOOR
+from tensor import tensor_field
+from reconstruction import AIR_FRAC
+from select_scales import select_scales, scale_at, distinct_scales
+from certify_gate_scales import load_gate_scales
 
 EPS = 1e-12
-GATE_HALF = 14           # = mass_conservation_validate.CROSS_HALF
-GATE_SIGMA_GRAD = 4.0    # the only swept scale where c_s overtakes FA
-DIR_SIGMA_GRAD = 2.5     # where HOST's second peak actually exists
-# The brief specifies a FOURTH-order ODF. Measured on the validated crossing
-# phantom at half=14, sigma_grad=2.5, order 4 returns n_peaks=1 and order 6
-# returns n_peaks=2 -- the fourth-order expansion cannot resolve a 40 deg
-# crossing here, and the whole repo's HOST validation is order 6. Using the
-# order that actually resolves the structure; order=4 is still settable.
-HOST_ORDER = 6
 DEFAULT_STRIDE = 6
-# Warn when fewer than this fraction of Stage-1 blocks certify a (sigma, rho):
-# below it, the run is effectively on one hardcoded fallback scale.
-FALLBACK_WARN_FRAC = 0.5
-
-
-def tensor_fields(vol, sigma, rho, truncate=4.0):
-    """Structure tensor eigenvalues (descending) and e3 at one (sigma, rho)."""
-    with np.errstate(divide="ignore", invalid="ignore"):
-        S = structure_tensor_3d(vol.astype(np.float32), float(sigma), float(rho),
-                                truncate=truncate)
-        val, vec = eig_special_3d(S)
-    del S
-    return val, vec
+DEFAULT_BLOCK = 32
 
 
 class GatedField:
@@ -146,6 +123,48 @@ class GatedField:
             shape=_np.array(self.shape, dtype=int))
         return path
 
+    @classmethod
+    def load(cls, path):
+        """Rebuild a GatedField from what `save` wrote.
+
+        The counterpart was missing, so `unified_field_*.npz` was written every
+        run and never read: Stage 3 could only ever run behind a fresh Stage
+        1+2. Reading it back is what lets the optimisation loop iterate on a
+        cached field in seconds instead of re-deriving the scale map each time.
+
+        `dirs` is NaN-padded to the widest patch on the way out, so the padding
+        rows are dropped here using `n_dirs` rather than by testing for NaN --
+        a real direction is never NaN, but relying on that would silently keep
+        a partly-written row.
+        """
+        import numpy as _np
+        z = _np.load(path, allow_pickle=False)
+        f = cls(tuple(int(v) for v in z["shape"]))
+        for i in range(len(z["centres"])):
+            k = int(z["n_dirs"][i])
+            f.add(centre=tuple(int(v) for v in z["centres"][i]),
+                  dirs=[_np.asarray(d, float) for d in z["dirs"][i][:k]],
+                  n_dirs=k,
+                  gated=bool(z["routed"][i]),
+                  c_s=float(z["c_s"][i]),
+                  FA=float(z["FA"][i]),
+                  sigma=float(z["sigma"][i]),
+                  rho=float(z["rho"][i]),
+                  label=str(z["labels"][i]))
+        return f
+
+    def copy(self):
+        """Deep copy -- the snapshot the optimiser compares against.
+
+        `patches` holds mutable dicts and `dirs` holds arrays, so a shallow
+        copy would let the optimiser's demotions write through into the
+        "initial" field and make the before/after export identical.
+        """
+        import copy as _copy
+        out = GatedField(self.shape)
+        out.patches = _copy.deepcopy(self.patches)
+        return out
+
     def summary(self):
         if not self.patches:
             return "empty field"
@@ -159,66 +178,47 @@ class GatedField:
                 f"| multi-orientation: {x} | {parts}")
 
 
-def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
-                      gate_sigma_grad=GATE_SIGMA_GRAD,
-                      dir_sigma_grad=DIR_SIGMA_GRAD, order=HOST_ORDER,
-                      sigma_fallback=SIGMA_FLOOR, verbose=True):
-    """Stage 1's adaptive (sigma, rho), then the c_s > FA routing gate."""
+def build_gated_field(vol, scales=None, mode="adaptive", block=DEFAULT_BLOCK,
+                      half=None, stride=DEFAULT_STRIDE, gate_sigma_grad=None,
+                      dir_sigma_grad=None, order=None, e3_xyz=None,
+                      verbose=True):
+    """The selected (sigma, rho), then the c_s > FA routing gate.
+
+    scales : the dict from `select_scales`. Selected here if not supplied, in
+             `mode` -- so a caller that has already certified the scales (the
+             pipeline) passes them in and they are certified ONCE per run, while
+             a caller that just wants a field (a test, a one-off) still works.
+    e3_xyz : the dense orientation field in (x, y, z) components, if the caller
+             already built it. Built here otherwise. Passing it in is what makes
+             the pipeline compute ONE decomposition and share it between the
+             gate, the density target and Stage 3's streamlines, instead of
+             three measurements of the same volume.
+    half, gate_sigma_grad, dir_sigma_grad, order
+           : default to the CERTIFIED values from `gate_scales.json`, not to
+             literals. Still overridable, for sweeps that deliberately vary them.
+    """
     vol = np.asarray(vol, dtype=np.float32)
     field = GatedField(vol.shape)
 
-    if verbose:
-        print(f"  [stage 1] adaptive sigma/rho on {block}^3 blocks ...")
-    m = compute_adaptive_map(vol, block=block, verbose=False)
-    sig_map, rho_map = m["sigma_map"], m["rho_map"]
-    zs, ys, xs = m["zs"], m["ys"], m["xs"]
-    # Stage 1 not certifying a block is not an error -- block_scale() falls back
-    # to sigma_fallback and the run continues. But when MOST blocks fail, the
-    # "adaptive" scale selection is not happening at all: every patch is being
-    # measured at one hardcoded fallback sigma, and nothing downstream says so.
-    # That is how the kissing phantom runs (0/8 certified, everything at
-    # SIGMA_FLOOR) -- fine there, but on a real volume it would silently mean
-    # Stage 1 contributed nothing. Warn loudly rather than print a count that
-    # is easy to read past.
-    fin = sig_map[np.isfinite(sig_map)]
-    n_blocks = int(sig_map.size)
-    frac = fin.size / n_blocks if n_blocks else 0.0
-    # Two different reasons a block has no (sigma, rho), and they need different
-    # responses, so report them separately rather than as one "certified" count:
-    #   background -- block mean < 5% of the volume max, so compute_adaptive_map
-    #                 skipped it before attempting a scale pick at all. Common on
-    #                 sparse phantoms; means "nothing here", not "the method
-    #                 failed".
-    #   below floor -- a sigma WAS picked but sits under the discretisation
-    #                 floor, i.e. the pick itself is not trustworthy.
-    n_background = n_blocks - int(fin.size)
-    n_below_floor = int((np.isfinite(sig_map) & ~m["valid"]).sum())
-    if verbose:
-        print(f"           {fin.size}/{n_blocks} blocks produced a (sigma, rho)"
-              + (f", sigma {fin.min():.2f}-{fin.max():.2f}" if fin.size else ""))
-    if frac < FALLBACK_WARN_FRAC:
-        who = "Every patch" if fin.size == 0 else "Most patches"
-        why = []
-        if n_background:
-            why.append(f"{n_background} rejected as background "
-                       f"(block mean < 5% of volume max)")
-        if n_below_floor:
-            why.append(f"{n_below_floor} picked a sigma below the "
-                       f"discretisation floor")
-        print(f"  [stage 1] WARNING: only {fin.size}/{n_blocks} blocks produced "
-              f"a (sigma, rho)"
-              + (" -- " + ", ".join(why) if why else "") + ".")
-        print(f"            {who} falls back to sigma={sigma_fallback:g}; "
-              f"adaptive scale selection did not run for this volume.")
+    gs = load_gate_scales()
+    half = int(gs["gate_half"]) if half is None else int(half)
+    gate_sigma_grad = (float(gs["gate_sigma_grad"]) if gate_sigma_grad is None
+                       else float(gate_sigma_grad))
+    dir_sigma_grad = (float(gs["dir_sigma_grad"]) if dir_sigma_grad is None
+                      else float(dir_sigma_grad))
+    order = int(gs["host_order"]) if order is None else int(order)
 
-    def block_scale(c):
-        bi = int(np.clip(np.searchsorted(zs, c[0], "right") - 1, 0, len(zs) - 1))
-        bj = int(np.clip(np.searchsorted(ys, c[1], "right") - 1, 0, len(ys) - 1))
-        bk = int(np.clip(np.searchsorted(xs, c[2], "right") - 1, 0, len(xs) - 1))
-        s, r = sig_map[bi, bj, bk], rho_map[bi, bj, bk]
-        if not np.isfinite(s) or s < sigma_fallback:
-            return float(sigma_fallback), float(sigma_fallback)
-        return float(s), float(r if np.isfinite(r) else s)
+    if scales is None:
+        if verbose:
+            print(f"  [stage 1] selecting scales ({mode}) ...")
+        scales = select_scales(vol, mode=mode, block=block, verbose=verbose)
+    elif verbose:
+        print(f"  [stage 1] using scales selected upstream: "
+              f"sigma={scales['sigma_global']:.3g}, rho={scales['rho_global']:.3g}")
+    if verbose:
+        print(f"  [stage 2] gate sigma_grad={gate_sigma_grad:g}, "
+              f"dir sigma_grad={dir_sigma_grad:g}, half={half}, order={order} "
+              f"(certified, not hardcoded)")
 
     # Grid ANCHORED ON THE VOLUME CENTRE, not on `half`. A grid that starts at
     # `half` and steps by `stride` silently misses the middle of the volume
@@ -231,68 +231,93 @@ def build_gated_field(vol, block=32, half=GATE_HALF, stride=DEFAULT_STRIDE,
         return [c0 + k * stride for k in ks if half <= c0 + k * stride < n - half]
     centres = [(z, y, x) for z in _axis(vol.shape[0])
                for y in _axis(vol.shape[1]) for x in _axis(vol.shape[2])]
-    scales = {}
-    for c in centres:
-        scales.setdefault(block_scale(c), []).append(c)
     if verbose:
         print(f"  [stage 1] {len(centres)} patch centres over "
-              f"{len(scales)} distinct (sigma, rho)")
+              f"{len(distinct_scales(scales, centres))} distinct (sigma, rho)")
 
-    air = 0.05 * float(vol.max())
-    for (sigma, rho), cs in scales.items():
-        val, vec = tensor_fields(vol, sigma, rho)
-        for c in cs:
-            patch = vol[c[0] - half:c[0] + half + 1,
-                        c[1] - half:c[1] + half + 1,
-                        c[2] - half:c[2] + half + 1]
-            # MAX, not mean: a patch holding one thin bundle in an otherwise
-            # empty crop has a low mean and was being discarded as air, which
-            # emptied the field entirely on the kissing phantom.
-            if patch.max() < air:
-                continue
-            # --- the routing gate, at ITS OWN scale --------------------------
-            gm = analyse(patch, sigma_grad=gate_sigma_grad, order=order)
-            if gm is None:
-                continue
-            c_s, fa = float(gm["c_s"]), float(gm["FA"])
-            # The n_peaks guard has to be HERE too, for the same reason it is in
-            # host_fod.classify and adaptive_triage._is_single: this fast path
-            # returns "single" WITHOUT calling classify(), so a >=3-peak patch
-            # whose c_s <= FA would bypass classify's "complex" branch and hand
-            # Stage 3 one confident direction for a patch the method has
-            # actually given up on. Sending it down the HOST branch instead
-            # lets classify() label it, which is what every other path does.
-            # Measured on i74 (48^3 at the volume centre, half=14, stride=6):
-            # 0 of 34 gate-passing patches had n_peaks >= 3, so this is a
-            # latent inconsistency rather than an active fault -- consistent
-            # with the ~0.5% rate recorded in this folder's README.
-            if c_s <= fa and int(gm["n_peaks"]) < 3:
-                e3 = vec[:, c[0], c[1], c[2]]
-                if not np.all(np.isfinite(e3)):
-                    # Skielex returns a non-finite eigenvector at isotropic
-                    # voxels. Dropping the patch here emptied the field
-                    # entirely on the sparse kissing phantom -- the patch
-                    # clearly HAS structure (it passed the air test), the
-                    # tensor is just degenerate at that one voxel at Stage 1's
-                    # sigma. Fall back to HOST's own direction rather than
-                    # discarding the patch.
-                    fb = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
-                    if fb is None or not len(fb["dirs"]):
-                        continue
-                    e3 = np.asarray(fb["dirs"][0], float)
-                field.add(centre=c, n_dirs=1, dirs=[np.asarray(e3, float)],
-                          gated=False, label="single", c_s=c_s, FA=fa,
-                          sigma=sigma, rho=rho)
-                continue
-            # --- routed to HOST: directions at the PEAK-RESOLVING scale ------
-            dm = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
-            if dm is None or not len(dm["dirs"]):
-                continue
-            lab = classify(dm)
-            dirs = [np.asarray(d, float) for d in dm["dirs"][:2]]
-            field.add(centre=c, n_dirs=len(dirs), dirs=dirs, gated=True,
-                      label=lab, c_s=c_s, FA=fa, sigma=sigma, rho=rho)
-        del val, vec
+    # ONE dense field for the whole volume, built at the selected scale(s) --
+    # per block in adaptive mode, in a single call in global mode. This used to
+    # be a loop computing a whole-volume structure tensor per distinct scale and
+    # reading only the centres assigned to it, which duplicated
+    # `tensor_field_adaptive` with a subtly different treatment of block edges
+    # (whole-volume support versus per-block context margins). One
+    # implementation, one answer.
+    if e3_xyz is None:
+        from tensor import field_for
+        e3_xyz = field_for(vol, scales, invariants=False)["e3"][::-1]
+    # tensor_field returns e3 in (z, y, x) components; GatedField stores
+    # directions in (x, y, z) to match host_fod, and Stage 3 reverses them back
+    # on the way in. Keeping that contract is what test_frame_convention.py
+    # checks, and the [::-1] above is where it is honoured.
+
+    air = AIR_FRAC * float(vol.max())
+    for c in centres:
+        sigma, rho = scale_at(scales, c)
+        patch = vol[c[0] - half:c[0] + half + 1,
+                    c[1] - half:c[1] + half + 1,
+                    c[2] - half:c[2] + half + 1]
+        # MAX, not mean: a patch holding one thin bundle in an otherwise
+        # empty crop has a low mean and was being discarded as air, which
+        # emptied the field entirely on the kissing phantom.
+        if patch.max() < air:
+            continue
+        # --- the routing gate, at ITS OWN scale --------------------------
+        # peaks=False: the routing decision needs only c_s and FA, which
+        # come from a 3x3 eigendecomposition of the gradient scatter. The
+        # sphere evaluation is 99% of analyse()'s cost (600 ms of 604) and
+        # is pure waste for a patch that is about to be routed anyway --
+        # the peak-resolving call at the direction scale supplies its
+        # directions.
+        gm = analyse(patch, sigma_grad=gate_sigma_grad, order=order,
+                     peaks=False)
+        if gm is None:
+            continue
+        c_s, fa = float(gm["c_s"]), float(gm["FA"])
+        # The n_peaks guard has to be HERE too, for the same reason it is in
+        # host_fod.classify and adaptive_triage._is_single: this fast path
+        # returns "single" WITHOUT calling classify(), so a >=3-peak patch
+        # whose c_s <= FA would bypass classify's "complex" branch and hand
+        # Stage 3 one confident direction for a patch the method has
+        # actually given up on. Sending it down the HOST branch instead
+        # lets classify() label it, which is what every other path does.
+        # Measured on i74 (48^3 at the volume centre, half=14, stride=6):
+        # 0 of 34 gate-passing patches had n_peaks >= 3, so this is a
+        # latent inconsistency rather than an active fault -- consistent
+        # with the ~0.5% rate recorded in this folder's README.
+        # Only a patch that would be called "single" needs the n_peaks >= 3
+        # guard, so the sphere is evaluated lazily, for those patches only.
+        # Routed patches never consult it -- identical decisions, less work.
+        if c_s <= fa:
+            gp = analyse(patch, sigma_grad=gate_sigma_grad, order=order)
+            n_pk = 99 if gp is None else int(gp["n_peaks"])
+        else:
+            n_pk = 99
+        if c_s <= fa and n_pk < 3:
+            e3 = e3_xyz[:, c[0], c[1], c[2]]
+            if not np.all(np.isfinite(e3)):
+                # Skielex returns a non-finite eigenvector at isotropic
+                # voxels. Dropping the patch here emptied the field
+                # entirely on the sparse kissing phantom -- the patch
+                # clearly HAS structure (it passed the air test), the
+                # tensor is just degenerate at that one voxel at Stage 1's
+                # sigma. Fall back to HOST's own direction rather than
+                # discarding the patch.
+                fb = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
+                if fb is None or not len(fb["dirs"]):
+                    continue
+                e3 = np.asarray(fb["dirs"][0], float)
+            field.add(centre=c, n_dirs=1, dirs=[np.asarray(e3, float)],
+                      gated=False, label="single", c_s=c_s, FA=fa,
+                      sigma=sigma, rho=rho)
+            continue
+        # --- routed to HOST: directions at the PEAK-RESOLVING scale ------
+        dm = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
+        if dm is None or not len(dm["dirs"]):
+            continue
+        lab = classify(dm)
+        dirs = [np.asarray(d, float) for d in dm["dirs"][:2]]
+        field.add(centre=c, n_dirs=len(dirs), dirs=dirs, gated=True,
+                  label=lab, c_s=c_s, FA=fa, sigma=sigma, rho=rho)
 
     if verbose:
         print(f"  [stage 2] {field.summary()}")

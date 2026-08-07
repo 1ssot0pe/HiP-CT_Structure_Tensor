@@ -80,6 +80,26 @@ DEFAULT_VOLUME_DIR = Path(
 )
 VOXEL_SIZE_UM = 20.0  # isotropic voxel edge, subject i74
 
+# Fraction of the volume max below which a voxel is treated as air. It is one
+# constant because it was three: `sigma_rho_gated_field.build_gated_field`,
+# `self_optimising_tractography.anisotropy_target` and `background_level` each
+# carried their own `air_frac=0.05` default and each recomputed the mask. Three
+# copies of a threshold is three chances for them to disagree, and the mask they
+# produce decides what counts as tissue in the loss, in the gate, and in I_0.
+AIR_FRAC = 0.05
+
+
+def tissue_mask(vol, air_frac=AIR_FRAC):
+    """Boolean tissue mask: everything above `air_frac` of the volume max.
+
+    Computed ONCE per run and passed down, rather than re-derived in each stage.
+    Relative to the volume's own maximum, not an absolute level -- the same
+    rank-not-level lesson the gate work recorded, where an absolute intensity
+    threshold never transferred between regions.
+    """
+    vol = np.asarray(vol)
+    return vol > float(air_frac) * float(vol.max())
+
 
 def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float):
     """Load and stack the TIFF slice folder into a 3D volume.

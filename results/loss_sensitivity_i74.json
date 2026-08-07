@@ -1,0 +1,46 @@
+[
+  {
+    "seed_density": 0.5,
+    "n_streams": 371,
+    "coverage": 0.15706402747604103,
+    "D_rec_mean": 0.03677558600788868,
+    "L": 1.305050011365889,
+    "L_no_tracts": 1.354885947220313,
+    "sensitivity": 0.04983593585442403,
+    "junction_density_median": 0.014614674664758439,
+    "seconds": 0.7567675113677979
+  },
+  {
+    "seed_density": 2.0,
+    "n_streams": 1532,
+    "coverage": 0.41797630996091184,
+    "D_rec_mean": 0.15510962497834946,
+    "L": 1.2053718524365165,
+    "L_no_tracts": 1.354885947220313,
+    "sensitivity": 0.14951409478379651,
+    "junction_density_median": 0.20405155823025928,
+    "seconds": 3.148508071899414
+  },
+  {
+    "seed_density": 8.0,
+    "n_streams": 6117,
+    "coverage": 0.7066780162027332,
+    "D_rec_mean": 0.6149523648631563,
+    "L": 1.6183411867386612,
+    "L_no_tracts": 1.354885947220313,
+    "sensitivity": -0.26345523951834826,
+    "junction_density_median": 0.9130975748421242,
+    "seconds": 15.554334163665771
+  },
+  {
+    "seed_density": 32.0,
+    "n_streams": 24538,
+    "coverage": 0.896786980218775,
+    "D_rec_mean": 2.481441123604325,
+    "L": 16.950634483166972,
+    "L_no_tracts": 1.354885947220313,
+    "sensitivity": -15.59574853594666,
+    "junction_density_median": 3.9021527933558806,
+    "seconds": 61.79862189292908
+  }
+]

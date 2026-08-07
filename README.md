@@ -78,8 +78,11 @@ boxes are just where they happen.
 │                            disorganised, complex
 │
 │    Three scales, not interchangeable:  σ≈1.0 for direction,
-│    4.0 for the gate, 2.5 for peaks. At 1.0 the gate never fires;
-│    at 4.0 the second peak is already smoothed away.
+│    5.0 for the gate, 2.5 for peaks. At 1.0 the gate never fires;
+│    at 5.0 the second peak is already smoothed away. All three are
+│    certified, not written down — select_scales.py picks the first
+│    from the data, certify_gate_scales.py picks the other two
+│    against phantoms with known truth.
 └──────────────────────────────────────────────────────────────────────────
                                    │
                                    ▼   GatedField → results/unified_field_*.npz

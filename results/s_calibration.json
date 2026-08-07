@@ -1,0 +1,281 @@
+[
+  {
+    "condition": "IDEAL",
+    "snap": true,
+    "clip": null,
+    "I0_mode": "true",
+    "S_crossing": 0.9736897919512809,
+    "S_kissing": 0.2497089079756998,
+    "I_c": 2.0,
+    "I_a": 1.0270211398601532,
+    "I0": 0.0,
+    "usable": true
+  },
+  {
+    "condition": "IDEAL",
+    "snap": false,
+    "clip": null,
+    "I0_mode": "true",
+    "S_crossing": 0.9736897919512809,
+    "S_kissing": 0.43196878366442776,
+    "I_c": 2.0,
+    "I_a": 1.0270211398601532,
+    "I0": 0.0,
+    "usable": true
+  },
+  {
+    "condition": "SCALED",
+    "snap": true,
+    "clip": null,
+    "I0_mode": "true",
+    "S_crossing": 0.9736898116439802,
+    "S_kissing": 0.24970895073653762,
+    "I_c": 313.0,
+    "I_a": 216.67509078979492,
+    "I0": 115.0,
+    "usable": true
+  },
+  {
+    "condition": "SCALED",
+    "snap": false,
+    "clip": null,
+    "I0_mode": "true",
+    "S_crossing": 0.9736898116439802,
+    "S_kissing": 2.9326014724532232,
+    "I_c": 313.0,
+    "I_a": 216.67509078979492,
+    "I0": 115.0,
+    "usable": false
+  },
+  {
+    "condition": "CLIPPED",
+    "snap": true,
+    "clip": 255.0,
+    "I0_mode": "true",
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 115.0,
+    "usable": false
+  },
+  {
+    "condition": "CLIPPED",
+    "snap": false,
+    "clip": 255.0,
+    "I0_mode": "true",
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 3.0625,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 115.0,
+    "usable": false
+  },
+  {
+    "condition": "EST_I0",
+    "snap": true,
+    "clip": null,
+    "I0_mode": "estimated",
+    "S_crossing": 0.9736915533194112,
+    "S_kissing": 0.24970895073653762,
+    "I_c": 313.0,
+    "I_a": 216.67509078979492,
+    "I0": 115.00037384033203,
+    "usable": true
+  },
+  {
+    "condition": "EST_I0",
+    "snap": false,
+    "clip": null,
+    "I0_mode": "estimated",
+    "S_crossing": 0.9736915533194112,
+    "S_kissing": 2.9326014724532232,
+    "I_c": 313.0,
+    "I_a": 216.67509078979492,
+    "I0": 115.00037384033203,
+    "usable": false
+  },
+  {
+    "condition": "REALISTIC",
+    "snap": true,
+    "clip": 255.0,
+    "I0_mode": "estimated",
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 115.0,
+    "usable": false
+  },
+  {
+    "condition": "REALISTIC",
+    "snap": false,
+    "clip": 255.0,
+    "I0_mode": "estimated",
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 3.0625,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 115.0,
+    "usable": false
+  },
+  {
+    "condition": "TISSUE_I0",
+    "snap": true,
+    "clip": 255.0,
+    "I0_mode": "tissue",
+    "S_crossing": 1.0588235294117647,
+    "S_kissing": -0.31666666666666665,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 183.0,
+    "usable": true
+  },
+  {
+    "condition": "TISSUE_I0",
+    "snap": false,
+    "clip": 255.0,
+    "I0_mode": "tissue",
+    "S_crossing": 1.0588235294117647,
+    "S_kissing": 0.15833333333333333,
+    "I_c": 255.0,
+    "I_a": 217.0,
+    "I0": 183.0,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "air-referenced",
+    "estimator": "air",
+    "I0": 115.0,
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air-referenced",
+    "estimator": "local_q10",
+    "I0": 115.0,
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air-referenced",
+    "estimator": "local_q25",
+    "I0": 115.0,
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air-referenced",
+    "estimator": "local_q50",
+    "I0": 120.0,
+    "S_crossing": 0.6958762886597938,
+    "S_kissing": 0.25,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air-referenced",
+    "estimator": "true",
+    "I0": 115.0,
+    "S_crossing": 0.6862745098039216,
+    "S_kissing": 0.25,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "tissue-pedestal",
+    "estimator": "air",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "tissue-pedestal",
+    "estimator": "local_q10",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "tissue-pedestal",
+    "estimator": "local_q25",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "tissue-pedestal",
+    "estimator": "local_q50",
+    "I0": 184.0,
+    "S_crossing": 0.9838709677419355,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "tissue-pedestal",
+    "estimator": "true",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "air+tissue",
+    "estimator": "air",
+    "I0": 115.0,
+    "S_crossing": 0.65,
+    "S_kissing": 0.41919191919191917,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air+tissue",
+    "estimator": "local_q10",
+    "I0": 115.0,
+    "S_crossing": 0.65,
+    "S_kissing": 0.41919191919191917,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air+tissue",
+    "estimator": "local_q25",
+    "I0": 115.0,
+    "S_crossing": 0.65,
+    "S_kissing": 0.41919191919191917,
+    "usable": false
+  },
+  {
+    "part": 2,
+    "regime": "air+tissue",
+    "estimator": "local_q50",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  },
+  {
+    "part": 2,
+    "regime": "air+tissue",
+    "estimator": "true",
+    "I0": 183.0,
+    "S_crossing": 0.96875,
+    "S_kissing": 0.24193548387096775,
+    "usable": true
+  }
+]
