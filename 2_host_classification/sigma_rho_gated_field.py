@@ -67,6 +67,47 @@ EPS = 1e-12
 DEFAULT_STRIDE = 6
 DEFAULT_BLOCK = 32
 
+# The three buckets a routed patch can land in. This is the triage the pipeline
+# always described and never performed: every routed patch used to be truncated
+# to `dirs[:2]` regardless of what HOST said about it, so a patch the method had
+# explicitly given up on arrived at Stage 3 carrying two confident directions and
+# was scored, and possibly demoted, as though it were a crossing candidate.
+#
+# Measured on the i74 run this replaces: of 67 junctions handed to Stage 3, only
+# 34 were patches HOST labelled "crossing". 28 were "disorganised" -- an ODF flat
+# enough that no direction in it means much -- and 5 were "complex", i.e. three
+# or more peaks, beyond this method's validated two-fibre ceiling.
+BUCKET_SINGLE = "single"            # one trustworthy direction
+BUCKET_CANDIDATE = "candidate"      # exactly two clean peaks -> kissing vs crossing
+BUCKET_UNRESOLVABLE = "unresolvable"  # >=3 peaks, or too isotropic to call
+
+
+def triage(m, label):
+    """Which bucket a routed patch belongs in, from HOST's own verdict.
+
+    The rule is by PEAK COUNT, with `classify`'s quality tests deciding whether
+    a 2-peak patch is clean enough to be a candidate:
+
+        >= 3 peaks          -> unresolvable  (past the validated ceiling)
+        isotropic ODF       -> unresolvable  (`classify` says "disorganised")
+        2 clean peaks       -> candidate     (`classify` says "crossing")
+        2 peaks, not clean  -> single        (amp2 or separation failed, so the
+                                              second peak is not trustworthy --
+                                              keeping it would launder a
+                                              rejected peak into a junction)
+        1 peak              -> single
+    """
+    if m is None:
+        return BUCKET_UNRESOLVABLE
+    n = m.get("n_peaks")
+    if n is not None and n >= 3:
+        return BUCKET_UNRESOLVABLE
+    if label == "disorganised":
+        return BUCKET_UNRESOLVABLE
+    if label == "crossing":
+        return BUCKET_CANDIDATE
+    return BUCKET_SINGLE
+
 
 class GatedField:
     """Per-patch orientation field plus the boolean routing mask."""
@@ -120,6 +161,9 @@ class GatedField:
             sigma=_np.array([p["sigma"] for p in self.patches]),
             rho=_np.array([p["rho"] for p in self.patches]),
             labels=_np.array([p["label"] for p in self.patches]),
+            buckets=_np.array([p.get("bucket", "") for p in self.patches]),
+            n_peaks=_np.array([int(p.get("n_peaks", p["n_dirs"]))
+                               for p in self.patches], dtype=int),
             shape=_np.array(self.shape, dtype=int))
         return path
 
@@ -150,7 +194,13 @@ class GatedField:
                   FA=float(z["FA"][i]),
                   sigma=float(z["sigma"][i]),
                   rho=float(z["rho"][i]),
-                  label=str(z["labels"][i]))
+                  label=str(z["labels"][i]),
+                  # Older archives predate the triage, so a missing bucket is
+                  # inferred from the direction count rather than defaulted to
+                  # a value that would silently promote patches to candidates.
+                  bucket=(str(z["buckets"][i]) if "buckets" in z.files
+                          else (BUCKET_CANDIDATE if k >= 2 else BUCKET_SINGLE)),
+                  n_peaks=int(z["n_peaks"][i]) if "n_peaks" in z.files else k)
         return f
 
     def copy(self):
@@ -174,8 +224,13 @@ class GatedField:
         for p in self.patches:
             labs[p["label"]] = labs.get(p["label"], 0) + 1
         parts = ", ".join(f"{k} {v}" for k, v in sorted(labs.items()))
+        bk = {}
+        for p in self.patches:
+            if p["gated"]:
+                bk[p.get("bucket", "?")] = bk.get(p.get("bucket", "?"), 0) + 1
+        bparts = ", ".join(f"{k} {v}" for k, v in sorted(bk.items()))
         return (f"{self.n} patches | routed to HOST (c_s>FA): {g} ({g/self.n:.0%}) "
-                f"| multi-orientation: {x} | {parts}")
+                f"| candidates: {x} | routed triage: {bparts} | {parts}")
 
 
 def build_gated_field(vol, scales=None, mode="adaptive", block=DEFAULT_BLOCK,
@@ -307,17 +362,24 @@ def build_gated_field(vol, scales=None, mode="adaptive", block=DEFAULT_BLOCK,
                     continue
                 e3 = np.asarray(fb["dirs"][0], float)
             field.add(centre=c, n_dirs=1, dirs=[np.asarray(e3, float)],
-                      gated=False, label="single", c_s=c_s, FA=fa,
-                      sigma=sigma, rho=rho)
+                      gated=False, label="single", bucket=BUCKET_SINGLE,
+                      n_peaks=1, c_s=c_s, FA=fa, sigma=sigma, rho=rho)
             continue
         # --- routed to HOST: directions at the PEAK-RESOLVING scale ------
         dm = analyse(patch, sigma_grad=dir_sigma_grad, order=order)
         if dm is None or not len(dm["dirs"]):
             continue
         lab = classify(dm)
-        dirs = [np.asarray(d, float) for d in dm["dirs"][:2]]
+        bucket = triage(dm, lab)
+        # Only a CANDIDATE keeps two directions. An unresolvable patch keeps its
+        # strongest peak so the vector field still has an orientation there and
+        # the label says how much to trust it -- but it makes no two-fibre
+        # claim, so Stage 3 never scores it as a junction.
+        k = 2 if bucket == BUCKET_CANDIDATE else 1
+        dirs = [np.asarray(d, float) for d in dm["dirs"][:k]]
         field.add(centre=c, n_dirs=len(dirs), dirs=dirs, gated=True,
-                  label=lab, c_s=c_s, FA=fa, sigma=sigma, rho=rho)
+                  label=lab, bucket=bucket, n_peaks=int(dm["n_peaks"]),
+                  c_s=c_s, FA=fa, sigma=sigma, rho=rho)
 
     if verbose:
         print(f"  [stage 2] {field.summary()}")

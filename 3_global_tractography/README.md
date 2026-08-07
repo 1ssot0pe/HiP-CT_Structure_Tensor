@@ -69,13 +69,49 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
 
    | | | |
    |---|---|---|
-   | **3a** field | `field_refine.py` | Frank-Oseen smooth the director field |
-   | **3b** topology + tracts | `self_optimising_tractography.py` → `tract_density.py` | superposition S decides crossing vs kissing, then the tracts are fitted |
+   | **3a** field | `field_refine.py` *(archived)* | Frank-Oseen smooth the director field |
+   | **3b** the input | `dense_field.py` | `DenseField`: Stage 1's e3 at every voxel, HOST's peaks painted over it where the gate routed |
+   | **3c** tracts | `dense_tracker.py` → `dense_optimise.py` → `tract_density.py` | cone search over that field; superposition S decides crossing vs kissing; coordinate descent on (lookahead, θ) |
 
    Driven by `run_pipeline.py`; 3a is opt-in with `--refine`.
 
+   **3b — what Stage 3 actually reads.** A *dense* field, not the patch list.
+   `field_from_gated(..., host_only=True)` used to drop every non-routed patch —
+   987 of 1331 on i74, i.e. every single-fibre measurement — so tracts existed
+   only in `assoc_radius` bubbles around the 344 HOST patches, and `host_support`
+   had to shrink the loss support to match. Now `vec1` carries e3 everywhere and
+   `vec2` carries HOST's second peak only where there is one, so the loss is
+   scored over the whole tissue mask. `vec2` and the labels remain *patch*-
+   resolution evidence upsampled by nearest-centre fill — stated in
+   `dense_field.py`, not quietly reported as per-voxel.
+
+   > **Two findings from building the tracker, both measured on the crossing
+   > phantom, both standing gates now.**
+   >
+   > *Brightness must not choose the turn.* Scoring candidate directions by
+   > `intensity × |d·e3|` makes the walker follow the intensity ridge, not the
+   > director: tracts left e3 by a median **12.7°** in voxels carrying exactly
+   > one direction, where there is nothing to decide, while e3 is coherent to
+   > **1.4°** voxel-to-voxel. The deviation is *flat* in the cone's angular
+   > sampling (11.98° at α=0.4 through 12.93° at α=0.025, a 16× refinement), so
+   > it is the support function and not the discretisation. Dropping intensity
+   > from the direction choice — it still sets the floor that ends a walk — gives
+   > **5.7°**, with crossing traversal (0.104) and kissing bridge (0.000)
+   > **unchanged**. `single_fibre_check.py`.
+   >
+   > *Directors interpolate as `v vᵀ`.* 13.2% of adjacent voxel pairs are
+   > sign-opposed, so componentwise trilinear sampling of `vec1` returned |v|
+   > with median 0.78 and 31.8% of reads below 0.5 — the alignment evidence was
+   > being cancelled before any exponent could sharpen it. The outer product has
+   > no sign to cancel and `dᵀT d = (d·v)²` is exact. 
+   
+   > Same seam mechanism as the
+   > 3a sign-alignment note above in frank-oseen, removed at the source.
+
    **3a — the whole field.** An orientation field has no head or tail, so its
-   correct smoothing energy is Frank-Oseen, not a Gaussian blur. Measured:
+   correct smoothing energy is Frank-Oseen, not a Gaussian blur. 
+   
+   Measured:
    angular error 9.10 → 8.21° at noise 0.3, tractography loss −1.3% (crossing)
    and −3.0% (kissing). Gaussian blurring of the same field makes it *worse*
    (15.99°), because componentwise blurring averages across the sign ambiguity;
@@ -125,7 +161,10 @@ Phantom-based scripts need no real data; the i74 ones need the volume.
 
 | Script | Needs | What it shows |
 |---|---|---|
-| **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run**; exits non-zero on any FAIL |
+| **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run**; exits non-zero on any FAIL. `--tracker patch` for the old walker, `--alpha-check` to test the cone's angular sampling |
+| `test_frame_convention.py` | nothing | the `(x,y,z)`→`(z,y,x)` reversal, at the tensor, in `DenseField`, and end-to-end |
+| `dense_tracker.py` | nothing | self-test: the vectorised tracker is bit-identical to `cone_search.track`, 15–171× faster |
+| `single_fibre_check.py` | phantom | **standing gate**: tracts follow e3 where e3 is the only direction on offer |
 | `phase1_kissing_crossing.py` | phantom | tracker separates kissing from crossing |
 | `phase2_i74_demote.py` | i74 volume | straightness demotes ~76% of HOST crossings |
 | `phase3_i74.py` | i74 volume | joint global tractography on real tissue |

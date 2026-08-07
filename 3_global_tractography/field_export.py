@@ -1,30 +1,35 @@
 """
-field_export.py -- turn the sparse GatedField into dense per-voxel maps and
-write them as NIfTI.
+field_export.py -- write the dense per-voxel field to NIfTI.
 
 Why this exists
 ---------------
-`GatedField` is the object that carries state across Stages 1-3, but it is a
-PATCH LIST, not a volume: a few hundred centres, each with 1-2 directions and a
-HOST label. Nothing downstream could look at it in a viewer, and nothing could
-diff "before optimisation" against "after". This module paints it back onto the
-voxel grid and writes the result with a correct spatial affine.
+`GatedField` is a PATCH LIST, not a volume: a few hundred centres, each with 1-2
+directions and a HOST label. Nothing downstream could look at it in a viewer,
+and nothing could diff "before optimisation" against "after". This module writes
+the painted field to disk with a correct spatial affine.
 
-What "per-voxel" honestly means here
-------------------------------------
-Two different resolutions are being combined, and conflating them would
-overstate the result:
+Where the painting now happens
+------------------------------
+`dense_fields` used to build the dense maps here, as an export-only convenience.
+It no longer does: the dense field became the actual Stage 2 -> Stage 3 carrier,
+so the construction moved to `dense_field.DenseField` and this module is a thin
+layout conversion plus file I/O. `LABEL_CODES` / `CODE_LABELS` moved with it and
+are re-exported below, so callers that import them from here still work.
 
-  * the PRIMARY direction is genuinely per-voxel -- it is Stage 1's dense e3
-    field, one orientation at every voxel;
-  * the SECOND direction and the LABEL are per-PATCH. HOST evaluates a patch of
-    half-width GATE_HALF (=14, so a 29^3 neighbourhood) to resolve two peaks.
-    There is no per-voxel second orientation to be had; assigning each voxel the
-    value of its nearest patch centre is an upsampling of patch-resolution
-    evidence, not a measurement at that voxel.
+Two things changed in the written maps as a result, both because the carrier
+must be trackable rather than merely viewable:
 
-So `vec2` and `label` are nearest-patch fills, capped at `max_radius` so a
-patch never claims voxels it did not see. Voxels beyond that stay background.
+  * `vec1` is filled at isotropic voxels, where the tensor solver returns a
+    non-finite eigenvector, instead of being left at zero -- a tracker cannot
+    step through NaN and a hole in the middle of measured tissue is not a
+    faithful picture of it either;
+  * `n_dirs` counts directions that EXIST, so oriented tissue outside every
+    routed patch reads 1 rather than 0. The demotion test below (`n_dirs
+    2 -> 1`) is unaffected: those voxels read the same before and after.
+
+The "per-voxel" caveat is unchanged and lives in `dense_field`: `vec2` and
+`labels` are patch-resolution evidence upsampled by nearest-centre fill, not
+measurements at the voxel.
 
 The affine, the axis-order trap, and where that code now lives
 --------------------------------------------------------------
@@ -51,131 +56,54 @@ import sys
 
 import numpy as np
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+_HERE = os.path.dirname(os.path.abspath(__file__))
+for _p in (os.path.dirname(_HERE), _HERE):
+    sys.path.insert(0, _p)
 from nifti_io import nifti_affine, save_nifti, save_vector_field  # noqa: F401,E402
 
 EPS = 1e-12
 
-# Label codes for the discrete map. 0 is reserved for "no evidence" so an
-# unsigned map reads naturally in a viewer with 0 as background.
-LABEL_CODES = {
-    "background":   0,
-    "single":       1,
-    "crossing":     2,
-    "kissing":      3,     # a crossing the optimiser demoted
-    "dispersed":    4,
-    "disorganised": 5,
-}
-CODE_LABELS = {v: k for k, v in LABEL_CODES.items()}
+# Re-exported from the carrier; see the module docstring.
+from dense_field import (DenseField, LABEL_CODES, CODE_LABELS,  # noqa: F401,E402
+                         _patch_assignment)
 
 
 # ---------------------------------------------------------------------------
 # sparse patches -> dense volumes
 # ---------------------------------------------------------------------------
 
-def _patch_assignment(shape, centres, max_radius):
-    """Index of the nearest patch centre for every voxel, -1 beyond max_radius.
-
-    A KD-tree query over the whole grid rather than painting a cube per patch:
-    the patches OVERLAP (half=14 against a stride of 4-8), so cube painting
-    makes the result depend on the order the patches happen to be stored in.
-    Nearest-centre is order-independent.
-    """
-    from scipy.spatial import cKDTree
-
-    grid = np.stack(np.meshgrid(*[np.arange(s) for s in shape], indexing="ij"),
-                    axis=-1).reshape(-1, 3)
-    d, i = cKDTree(np.asarray(centres, float)).query(grid, k=1)
-    i = np.where(d <= max_radius, i, -1)
-    return i.reshape(shape), d.reshape(shape)
-
-
 def dense_fields(gated, e3, tissue=None, host_only=True, max_radius=14.0,
                  label_overrides=None):
-    """Paint a GatedField onto the voxel grid.
+    """Paint a GatedField onto the voxel grid, in the layout NIfTI wants.
 
-    gated       : GatedField (patch centres in (z,y,x), dirs in (x,y,z))
-    e3          : dense (3, Z, Y, X) primary orientation, components (z,y,x)
-    tissue      : optional boolean mask; everything outside is background
-    host_only   : if True, only patches the routing gate passed (`gated`) may
-                  write a second direction or a label. This is the "strictly on
-                  HOST-identified voxels" constraint -- without it, single
-                  patches that never went through HOST would also paint.
-    max_radius  : a patch may not claim voxels further than this from its
-                  centre (default = GATE_HALF, the neighbourhood HOST saw)
-    label_overrides : {patch_index: "kissing"} from the optimiser's demotions
-
-    Returns a dict of (z,y,x)-indexed arrays.
+    A thin wrapper on `DenseField.build` -- see that for what the arguments
+    mean. Kept because the exporters, the before/after diff and the figures all
+    want `(z, y, x, 3)` arrays in a dict, while the tracker wants
+    `(3, Z, Y, X)`; converting once here beats every caller doing it.
     """
-    shape = tuple(gated.shape)
-    overrides = label_overrides or {}
-
-    # --- primary direction: dense, straight from Stage 1 --------------------
-    e3 = np.asarray(e3, float)
-    if e3.shape[0] != 3:
-        raise ValueError(f"e3 must be (3, Z, Y, X), got {e3.shape}")
-    vec1 = np.moveaxis(e3, 0, -1).copy()               # (z, y, x, 3), (z,y,x) comps
-    n = np.linalg.norm(vec1, axis=-1, keepdims=True)
-    vec1 = np.where(n > EPS, vec1 / (n + EPS), 0.0)
-
-    vec2 = np.zeros_like(vec1)
-    labels = np.zeros(shape, np.uint8)
-    n_dirs = np.zeros(shape, np.uint8)
-
-    idx = [i for i, p in enumerate(gated.patches)
-           if (p["gated"] or not host_only)]
-    if not idx:
-        return dict(vec1=vec1, vec2=vec2, labels=labels, n_dirs=n_dirs,
-                    patch_index=np.full(shape, -1, np.int32))
-
-    centres = [gated.patches[i]["centre"] for i in idx]
-    assign, _dist = _patch_assignment(shape, centres, max_radius)
-
-    for slot, pi in enumerate(idx):
-        p = gated.patches[pi]
-        m = assign == slot
-        if not m.any():
-            continue
-        lab = overrides.get(pi, p["label"])
-        labels[m] = LABEL_CODES.get(lab, 0)
-        n_dirs[m] = int(p["n_dirs"])
-        dirs = [np.asarray(d, float)[::-1] for d in p["dirs"]]   # ->(z,y,x)
-        if dirs:
-            d0 = dirs[0] / (np.linalg.norm(dirs[0]) + EPS)
-            vec1[m] = d0
-        if len(dirs) >= 2 and lab != "kissing":
-            # A demoted patch carries ONE fibre by definition, so its second
-            # direction must not survive into the optimised field -- that is
-            # the whole point of the demotion.
-            d1 = dirs[1] / (np.linalg.norm(dirs[1]) + EPS)
-            vec2[m] = d1
-
-    patch_index = np.full(shape, -1, np.int32)
-    for slot, pi in enumerate(idx):
-        patch_index[assign == slot] = pi
-
-    if tissue is not None:
-        out = ~np.asarray(tissue, bool)
-        labels[out] = LABEL_CODES["background"]
-        vec1[out] = 0.0
-        vec2[out] = 0.0
-        n_dirs[out] = 0
-        patch_index[out] = -1
-
-    return dict(vec1=vec1, vec2=vec2, labels=labels, n_dirs=n_dirs,
-                patch_index=patch_index)
+    return DenseField.build(gated, e3, tissue=tissue, host_only=host_only,
+                            max_radius=max_radius,
+                            label_overrides=label_overrides).as_export_dict()
 
 
 # ---------------------------------------------------------------------------
 
 def export_field(gated, e3, outdir, tag, crop_origin=(0, 0, 0), voxel_um=20.0,
                  tissue=None, host_only=True, max_radius=14.0,
-                 label_overrides=None, verbose=True):
-    """Write vec1 / vec2 / labels for one field state. Returns the paths."""
+                 label_overrides=None, dense=None, verbose=True):
+    """Write vec1 / vec2 / labels for one field state. Returns the paths.
+
+    `dense` : an already-built DenseField to write instead of building one.
+    Stage 3 now tracks through that object, so handing it in is what guarantees
+    the exported map IS the field the tracts were integrated through, rather
+    than a second construction that agrees with it only as long as nobody
+    changes an argument at one call site and not the other.
+    """
     os.makedirs(outdir, exist_ok=True)
     A = nifti_affine(crop_origin, voxel_um)
-    F = dense_fields(gated, e3, tissue=tissue, host_only=host_only,
-                     max_radius=max_radius, label_overrides=label_overrides)
+    F = (dense.as_export_dict() if dense is not None else
+         dense_fields(gated, e3, tissue=tissue, host_only=host_only,
+                      max_radius=max_radius, label_overrides=label_overrides))
 
     paths = {}
     paths["vec1"] = save_nifti(F["vec1"], os.path.join(outdir, f"vec1_{tag}.nii.gz"),
