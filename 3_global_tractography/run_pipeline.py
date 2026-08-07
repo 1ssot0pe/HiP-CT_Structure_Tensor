@@ -13,8 +13,16 @@ Here the flow is:
        |     -> GatedField: routing mask + directions
        |        (single patches keep e3; routed patches carry HOST's peaks)
        v
-    Stage 3  integrate -> D_rec -> L -> update theta   [this folder]
-             -> converged theta, loss trace, per-junction S and verdict
+    Stage 2->3  DenseField: e3 at every voxel, HOST's peaks painted over it
+       |        where the gate routed. ONE DIRECTION PER VOXEL, plus a second
+       |        wherever Stage 2 resolved one. This is what Stage 3 tracks
+       |        through -- see dense_field.py for why it is not the patch list.
+       v
+    Stage 3  cone-search tracts -> D_rec -> L -> update (lookahead, theta)
+             -> converged parameters, loss trace, per-junction S and verdict
+
+`--tracker patch` restores the old nearest-HOST-patch walker, so the two can be
+compared on identical data rather than the change being asserted.
 
 Validation is on phantoms with known truth before any real data, per the brief:
 a localized crossing (truth CROSSING) and a kissing pair (truth TANGENCY).
@@ -57,7 +65,13 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
     sys.path.insert(0, _p)
 
 import self_optimising_tractography as S3
-from field_refine import refine as refine_field
+import dense_tracker as DT
+import dense_optimise as DO
+from dense_field import DenseField
+# Step 3a's Frank-Oseen smoother is opt-in (--refine) and its module has been
+# archived, so it is imported only if asked for rather than at start-up. An
+# unconditional import here is what currently stops the pipeline from starting
+# at all, for a feature that is off by default.
 from field_export import export_field, export_difference
 from render_field import render_field
 from sigma_rho_gated_field import build_gated_field, DEFAULT_STRIDE
@@ -181,7 +195,8 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
              stride=DEFAULT_STRIDE, iters=3,
              verbose=True, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
              crop_origin=(0, 0, 0), voxel_um=VOXEL_SIZE_UM, export=True,
-             export_both=True):
+             export_both=True, tracker="cone", max_seeds=DO.MAX_SEEDS,
+             alpha_check=False):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
     tag = name.split()[0].lower()
 
@@ -200,14 +215,27 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
 
     # ---- Stage 3a: refine the field ----------------------------------------
     if refine:
+        try:
+            from field_refine import refine as refine_field
+        except ImportError:
+            sys.path.insert(0, os.path.join(_ROOT, "archive"))
+            from field_refine import refine as refine_field
         e3, rinfo = refine_field(e3)
         print(f"  [stage 3a] Frank-Oseen refine: {rinfo['iterations']} iters, "
               f"E {rinfo['E_initial']:.1f} -> {rinfo['E_final']:.1f}")
 
     # ---- Stage 3b: crossing vs kissing, then tracts -------------------------
-    # host_only: Stage 3 is confined to voxels the gate routed to HOST.
+    # THE INPUT TO STAGE 3: one direction per VOXEL. Stage 1's e3 everywhere,
+    # overwritten by HOST's peaks inside the patches the gate routed. `host_only`
+    # no longer removes single-fibre tissue from the field -- e3 carries it --
+    # it only decides who may overwrite e3. See dense_field.py.
+    dense = DenseField.build(gated, e3, tissue=tissue, host_only=True)
+    print(f"  [stage 3] dense field: {dense.summary()}")
+
+    # The patch list is still what the superposition metric is defined on: S is
+    # measured at a junction, from the two peak directions HOST resolved there.
     field, junctions, I0 = S3.field_from_gated(gated, vol, e3=e3, host_only=True)
-    print(f"  [stage 3] field {len(field)} HOST patches, {len(junctions)} "
+    print(f"  [stage 3] {len(field)} HOST patches, {len(junctions)} "
           f"junction(s), I_0={I0:.3f}")
 
     # The INITIAL field, before any demotion. Snapshotted here so the exported
@@ -218,7 +246,7 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
     if export:
         _p, F_before = export_field(gated_initial, e3, outdir, f"{tag}_initial",
                                     crop_origin=crop_origin, voxel_um=voxel_um,
-                                    tissue=tissue, host_only=True)
+                                    tissue=tissue, host_only=True, dense=dense)
 
     # Drawn here, before the no-junction early return, because that case is the
     # one most worth looking at: it is a claim that nothing crosses, and the
@@ -246,31 +274,60 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
         if export:
             export_field(gated, e3, outdir, f"{tag}_optimised",
                          crop_origin=crop_origin, voxel_um=voxel_um,
-                         tissue=tissue, host_only=True)
+                         tissue=tissue, host_only=True, dense=dense)
         return dict(name=name, truth=truth, skipped=True, status=status,
                     reason=reason, verdict=None, figure=fig_path, n_demoted=0,
                     correct=None if status == "UNSCORED" else status == "PASS",
-                    n_patches=gated.n, n_routed=int(mask.sum()))
+                    n_patches=gated.n, n_routed=int(mask.sum()),
+                    tracker=tracker, n_oriented=dense.n_valid,
+                    n_two_direction=dense.n_multi)
 
     for j in junctions:
         print(f"    junction {j['centre']}: I_c={j['I_c']:.2f} I_a={j['I_a']:.2f} "
               f"I_b={j['I_b']:.2f}  S={j['S']:.3f} -> {j['verdict']}")
 
-    # Score only where a streamline can actually go. `integrate` stops when no
-    # patch lies within assoc_radius, so with Stage 3 confined to HOST patches
-    # most of `tissue` is unreachable by construction; including it measured
-    # the tracts' absence from forbidden voxels, a term constant in theta that
-    # swamped the rest (see loss_sensitivity.py).
     # D_obs from the SAME eigenvalues that produced e3 -- not a second tensor at
     # a second scale, which is what `anisotropy_target(vol)` used to do.
     D_obs, _tissue_all = S3.anisotropy_target(vol, lam=lam, tissue=tissue)
-    support = tissue & S3.host_support(field, vol.shape,
-                                       float(S3.THETA0["assoc_radius"]))
+
+    # Score only where a streamline can actually go. For the PATCH tracker that
+    # is a neighbourhood of the HOST patches -- `integrate` stops when no patch
+    # lies within assoc_radius, so most of `tissue` is unreachable by
+    # construction, and including it measured the tracts' absence from forbidden
+    # voxels: a term constant in theta that swamped the rest (loss_sensitivity).
+    # The CONE tracker walks a dense field and has no forbidden region, so the
+    # same restriction would now throw away most of the evidence instead of
+    # correcting a bias.
+    if tracker == "cone":
+        support = tissue
+    else:
+        support = tissue & S3.host_support(field, vol.shape,
+                                           float(S3.THETA0["assoc_radius"]))
     D_obs = S3.renormalise(D_obs, support)
-    print(f"  [stage 3] reachable support {int(support.sum())} voxels "
+    print(f"  [stage 3] scored support {int(support.sum())} voxels "
           f"({support.sum() / max(int(tissue.sum()), 1):.1%} of tissue)")
-    theta, trace, info = S3.optimise(vol, field, junctions, D_obs, support, I0,
-                                     n_iter=iters, verbose=verbose)
+
+    dense_optimised, alpha_info, demote_info = dense, None, None
+    if tracker == "cone":
+        seeds, sdirs = DT.seeds_from(dense, max_seeds=max_seeds, mask=support)
+        print(f"  [stage 3] cone tracker: {len(seeds)} seeds "
+              f"({int((dense.n_dirs[tuple(seeds.astype(int).T)] >= 2).sum())} "
+              f"on two-direction voxels), alpha={DO.ALPHA:g} fixed")
+        theta, trace, info = DO.optimise(vol, dense, D_obs, support, junctions,
+                                         seeds, sdirs, n_iter=iters,
+                                         verbose=verbose)
+        if alpha_check:
+            alpha_info = DO.alpha_convergence(vol, dense, D_obs, support, theta,
+                                              junctions, seeds, sdirs)
+        # The demotion changes the FIELD, so its effect is only visible by
+        # tracking again at the same parameters over the same seeds.
+        dense_optimised, L_dem, info_dem, demote_info = DO.demote_and_retrack(
+            vol, dense, D_obs, support, theta, junctions, seeds, sdirs)
+        demote_info["L_before"] = float(info["total"])
+        demote_info["L_after"] = float(L_dem)
+    else:
+        theta, trace, info = S3.optimise(vol, field, junctions, D_obs, support,
+                                         I0, n_iter=iters, verbose=verbose)
 
     # ---- demotion: superposition says which flagged crossings are kisses ----
     # S below the decision point means the centre never carries two fibres'
@@ -295,11 +352,12 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
         _p, F_after = export_field(gated_optimised, e3, outdir,
                                    f"{tag}_optimised", crop_origin=crop_origin,
                                    voxel_um=voxel_um, tissue=tissue,
-                                   host_only=True)
+                                   host_only=True, dense=dense_optimised)
         if F_before is not None:
             export_difference(F_before, F_after, outdir, tag,
                               crop_origin=crop_origin, voxel_um=voxel_um)
         gated_optimised.save(_out(outdir, f"unified_field_{tag}_optimised.npz"))
+        dense_optimised.save(_out(outdir, f"dense_field_{tag}_optimised.npz"))
 
     verdicts = [j["verdict"] for j in junctions]
     majority = max(set(verdicts), key=verdicts.count)
@@ -317,15 +375,17 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
                            for j in junctions],
                 verdict=majority,
                 correct=None if status == "UNSCORED" else status == "PASS",
-                theta=theta,
+                theta=theta, tracker=tracker,
                 L_initial=float(trace[0]["total"]),
                 L_final=float(trace[-1]["total"]),
+                alpha_check=alpha_info, demotion=demote_info,
                 trace=trace, junction_log=info["junctions"])
 
 
 def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
             iters=3, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
-            mode="adaptive", export_both=True):
+            mode="adaptive", export_both=True, tracker="cone",
+            max_seeds=DO.MAX_SEEDS, alpha_check=False):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -356,7 +416,8 @@ def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
                  mode=mode, block=block, stride=stride, iters=iters,
                  outdir=outdir, figures=figures, refine=refine,
                  crop_origin=crop_origin, voxel_um=VOXEL_SIZE_UM,
-                 export_both=export_both)
+                 export_both=export_both, tracker=tracker,
+                 max_seeds=max_seeds, alpha_check=alpha_check)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -376,9 +437,11 @@ def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
 
 def main(iters=3, radius=24, stride=DEFAULT_STRIDE, block=32,
          outdir=DEFAULT_OUTDIR, figures=True, refine=False, mode="adaptive",
-         export_both=True):
+         export_both=True, tracker="cone", max_seeds=DO.MAX_SEEDS,
+         alpha_check=False):
 
-    print("THREE-STAGE PIPELINE -- phantom validation (known truth)")
+    print(f"THREE-STAGE PIPELINE -- phantom validation (known truth), "
+          f"{tracker} tracker")
 
 
     X = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5, CROSS_R1, CROSS_TAPER)
@@ -386,13 +449,12 @@ def main(iters=3, radius=24, stride=DEFAULT_STRIDE, block=32,
     K = raw_kissing(4.0, 0.028, 1.6, 1.6)
     Kc, kc = _crop(K, tuple(s // 2 for s in K.shape), radius)
 
+    kw = dict(mode=mode, block=block, stride=stride, iters=iters, outdir=outdir,
+              figures=figures, refine=refine, export_both=export_both,
+              tracker=tracker, max_seeds=max_seeds, alpha_check=alpha_check)
     out = []
-    out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING", mode=mode,
-                        block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures, refine=refine, export_both=export_both))
-    out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY", mode=mode,
-                        block=block, stride=stride, iters=iters, outdir=outdir,
-                        figures=figures, refine=refine, export_both=export_both))
+    out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING", **kw))
+    out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY", **kw))
 
     # Every phantom counts. A case with no junction is a pass or a fail
     # depending on its truth (see _status) -- never dropped from the tally.
@@ -443,17 +505,29 @@ if __name__ == "__main__":
                     help="step 3a: Frank-Oseen smooth the director field first")
     ap.add_argument("--no-figures", action="store_true",
                     help="skip the orientation overlay PNGs")
+    ap.add_argument("--tracker", choices=("cone", "patch"), default="cone",
+                    help="cone: walk the dense per-voxel field (default). "
+                         "patch: the old nearest-HOST-patch walker, kept so the "
+                         "two can be compared on the same data")
+    ap.add_argument("--max-seeds", type=int, default=DO.MAX_SEEDS,
+                    help="cone tracker seed budget; a compute cost, not a "
+                         "parameter to optimise")
+    ap.add_argument("--alpha-check", action="store_true",
+                    help="re-run the descent at half the cone's angular "
+                         "sampling and report whether the optimum moves")
     a = ap.parse_args()
     if a.i74:
         run_i74(centre=tuple(a.centre), radius=a.radius or 48, block=a.block,
                 stride=a.stride, iters=a.iters, outdir=a.outdir,
                 figures=not a.no_figures, refine=a.refine, mode=a.mode,
-                export_both=not a.single_e3)
+                export_both=not a.single_e3, tracker=a.tracker,
+                max_seeds=a.max_seeds, alpha_check=a.alpha_check)
     else:
         res = main(iters=a.iters, radius=a.radius or 24, stride=a.stride,
                    block=a.block, outdir=a.outdir, mode=a.mode,
                    figures=not a.no_figures, refine=a.refine,
-                   export_both=not a.single_e3)
+                   export_both=not a.single_e3, tracker=a.tracker,
+                   max_seeds=a.max_seeds, alpha_check=a.alpha_check)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)

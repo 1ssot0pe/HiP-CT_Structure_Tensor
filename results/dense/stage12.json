@@ -1,0 +1,32 @@
+{
+  "shape": [
+    48,
+    48,
+    48
+  ],
+  "crop_origin": [
+    360,
+    360,
+    360
+  ],
+  "sigma": 1.0,
+  "rho": 1.4142135623730951,
+  "mode": "adaptive",
+  "fire_fraction": 0.14,
+  "gate_threshold": 0.7918698176528091,
+  "n_tissue": 110592,
+  "n_fired": 15483,
+  "counts": {
+    "candidate": 5018,
+    "unresolved": 9989,
+    "unresolvable": 476
+  },
+  "odf": {
+    "order": 8,
+    "sigma_grad": 2.5,
+    "rho": 5.0,
+    "resolution_floor_deg": 50.0
+  },
+  "sep_median": 72.99686224722834,
+  "seconds": 7.890472888946533
+}

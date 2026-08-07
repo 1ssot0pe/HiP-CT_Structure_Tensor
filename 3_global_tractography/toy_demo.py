@@ -122,7 +122,7 @@ def build_toy(noise=0.0, seed=0):
 
 def measure(vol, truth, verbose=True):
     """Superposition S at both sites, with the local-tissue baseline."""
-    _sc, e3, _lam = S3.fields_for(vol)
+    e3 = S3.orientation_field(vol)
     out = []
     if verbose:
         print(f"  {'site':<22} {'I_0':>6} {'I_c':>6} {'I_a':>6} {'I_b':>6} "

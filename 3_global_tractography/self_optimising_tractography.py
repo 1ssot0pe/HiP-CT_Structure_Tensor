@@ -66,6 +66,8 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
     sys.path.insert(0, _p)
 
 from host_fod import analyse
+from sigma_rho_gated_field import (BUCKET_CANDIDATE, BUCKET_SINGLE,
+                                  BUCKET_UNRESOLVABLE)
 from tensor import tensor_field, anisotropy as _anisotropy
 from reconstruction import AIR_FRAC, tissue_mask
 from tract_density import rasterise, density_at, mse
@@ -765,8 +767,15 @@ def field_from_gated(gated, vol, I0=None, e3=None, host_only=True, scales=None):
         field.append(dict(centre=tuple(p["centre"]), dirs=dirs,
                           n_dirs=len(dirs), c_s=p["c_s"], FA=p["FA"],
                           gated=p["gated"], label=p["label"],
+                          bucket=p.get("bucket", BUCKET_CANDIDATE),
                           patch_index=patch_index))
-        if len(dirs) >= 2:
+        # A junction requires the CANDIDATE bucket, not merely two directions.
+        # Stage 2 used to hand over `dirs[:2]` for every routed patch, so a
+        # >=3-peak "complex" patch or a flat "disorganised" one arrived looking
+        # exactly like a clean crossing and was scored, and demoted, as one. On
+        # the i74 run that was 33 of 67 junctions. Patches outside the candidate
+        # bucket now carry a single direction and make no two-fibre claim.
+        if p.get("bucket", BUCKET_CANDIDATE) == BUCKET_CANDIDATE and len(dirs) >= 2:
             I0_here = (local_baseline(vol, p["centre"], half=BASELINE_HALF)
                        if I0 is None else global_I0)
             S, Ic, Ia, Ib, _ = superposition_S(vol, p["centre"], dirs[0], dirs[1],

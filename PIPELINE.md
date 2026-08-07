@@ -152,25 +152,84 @@ gating is already smoothed away:
 | | |
 |---|---|
 | **Question** | Do two fibres genuinely cross here, or merely touch? |
-| **Files** | `3_global_tractography/self_optimising_tractography.py` → `tract_density.py` |
-| **In** | `GatedField`, `vol` |
-| **Out** | per-junction S + verdict, fitted θ, `results/pipeline_results.json` |
+| **Files** | `3_global_tractography/dense_field.py` → `dense_tracker.py` → `dense_optimise.py` → `tract_density.py` |
+| **In** | **`DenseField`** (one direction per voxel), `vol` |
+| **Out** | per-junction S + verdict, fitted (lookahead, θ), `results/pipeline_results.json` |
 
-A single voxel cannot answer this: crossing and kissing look the same up close.
-You have to follow the fibres and see whether both continue. Two independent
-signals are used:
+### The input is a dense per-voxel field
+
+Stage 3 consumes a **voxel grid, not a patch list**:
+
+| | |
+|---|---|
+| `vec1` | Stage 1's e3 at **every** voxel, overwritten by HOST's first peak inside the patches the gate routed |
+| `vec2` | HOST's second peak, zero everywhere else |
+
+So a tracker walks continuously through single-fibre tissue on Stage 1's own
+measurement, and sees a second option only where Stage 2 found one. This
+replaced `field_from_gated(..., host_only=True)`, which **dropped every
+non-routed patch** — on i74 that was 987 of 1331, i.e. all the single-fibre
+evidence — leaving streamlines confined to 8-voxel bubbles around the 344 HOST
+patches. That is why `host_support` existed; with a dense field there is no
+forbidden region, so the loss is scored over the whole tissue mask.
+
+> **Honesty about resolution.** `vec1` is a genuine per-voxel measurement only
+> where it is Stage 1's e3. `vec2` and the labels are per-*patch* evidence
+> (HOST sees a 29³ neighbourhood) upsampled by nearest-centre fill, capped at
+> `max_radius` so a patch never claims voxels it did not see.
+
+A single voxel cannot answer the crossing/kissing question: crossing and kissing
+look the same up close. You have to follow the fibres and see whether both
+continue. Two independent signals are used:
 
 **Superposition (local, physical).** At a real crossing both fibres deposit
 intensity at the same point, so it is roughly their sum. At a kissing point
 neither centreline passes through, so it can never exceed about one fibre.
 `superposition_S` reads that ratio; `S ≳ 0.75` → CROSSING, low → TANGENCY.
 
-**Global consistency.** Streamlines are integrated through the field and
-rasterised into a reconstructed density `D_rec` (`tract_density.rasterise`,
-trilinear splatting so density 2 literally means two fibres). This is compared
-against `D_obs`, taken from the image's own anisotropy `λ1 − λ3`. Coordinate
-descent over θ = (step, angle threshold, seed density, link weight) minimises
+**Global consistency.** Cone-search streamlines are integrated through the dense
+field and rasterised into a reconstructed density `D_rec`
+(`tract_density.rasterise`, trilinear splatting so density 2 literally means two
+fibres). This is compared against `D_obs`, taken from the image's own anisotropy
+`λ1 − λ3`. Coordinate descent over **(lookahead, θ)** — how far ahead the cone
+gathers evidence, and how sharply it may turn — minimises
 `L = mse(D_rec, D_obs) + verdict penalty`.
+
+At a two-direction voxel the candidate directions are scored against
+`max(|d·vec1|, |d·vec2|)`, so a walker arriving along either fibre keeps its own
+evidence. `vec2` is zero in single-fibre tissue and `|d·0| = 0`, so the `max`
+degrades exactly to the one-direction case with no branch. A demotion needs no
+special case in the tracker either: zeroing `vec2` simply removes the option.
+
+Two things are **not** searched, because neither has a minimum to find:
+
+- **`alpha`**, the cone's angular sampling — cost scales as `(θ/alpha)²` and
+  finer is always at least as good, so a descent on it just walks to the edge of
+  its ladder. Fixed; `--alpha-check` re-runs the descent at `alpha/2` and reports
+  whether the optimum actually moves. θ is quantised in units of alpha (the cone
+  carries `round(θ/alpha)` tilt rings), so θ = 0.15, 0.20 and 0.30 give
+  bit-identical tracts at alpha = 0.2 — a reported θ means nothing finer than alpha.
+- **the seed budget** — more streamlines is more columns in the design matrix, so
+  the fitted residual can essentially only fall (see `weight_fit.py`).
+
+> **Brightness picks when to stop, not which way to turn.** The support that
+> selects a direction is `max(|d·vec1|, |d·vec2|)` alone; intensity enters only
+> the floor that ends a walk. Weighting the turn by brightness made the tracker
+> follow the intensity ridge instead of the director: measured on the crossing
+> phantom, tracts left Stage 1's e3 by a median **12.7°** in voxels carrying one
+> direction, where there is nothing to decide — while e3 itself is coherent to
+> 1.4° voxel-to-voxel. Removing it gives **5.7°** at no cost whatsoever to
+> crossing traversal (0.104 either way) or kissing bridging (0.000 either way).
+> `single_fibre_check.py` is the standing gate.
+
+> **Directors are interpolated as `v vᵀ`, never componentwise.** e3's sign is
+> arbitrary per voxel, so trilinear interpolation averages `v` against `−v` and
+> returns ≈0: 13.2% of adjacent voxel pairs on the crossing phantom are
+> sign-opposed, and sampling `vec1` at half-voxel offsets gave |v| with a median
+> of 0.78 and 31.8% of reads below 0.5. The outer product is invariant under
+> `v → −v`, and `dᵀ T d = (d·v)²` recovers the alignment exactly. This is the
+> same seam problem the Stage 3a note records for sign alignment, dissolved
+> rather than worked around.
 
 > **The join.** `host_fod` returns directions as `(x, y, z)`; Step 3 indexes
 > positions as `(z, y, x)`. `field_from_gated` reverses every direction. Getting
@@ -185,6 +244,8 @@ descent over θ = (step, angle threshold, seed density, link weight) minimises
 |---|---|
 | `results/field_*.png` | greyscale slab with the recovered orientations drawn on it |
 | `results/unified_field_*.npz` | the orientation field: per patch, its directions, label, c_s, FA, σ, ρ |
+| `results/dense_field_*_optimised.npz` | the per-voxel field Stage 3 tracked through, after demotion |
+| `results/vec1_*.nii.gz`, `vec2_*`, `labels_*`, `ndirs_*` | the same field as NIfTI, before and after |
 | `results/pipeline_results.json` | per-junction S and verdict, fitted θ, loss trace |
 | stdout | `PASS` / `FAIL` per phantom; on real data, verdict with no correctness claim |
 
