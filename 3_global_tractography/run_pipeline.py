@@ -196,7 +196,8 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
              verbose=True, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
              crop_origin=(0, 0, 0), voxel_um=VOXEL_SIZE_UM, export=True,
              export_both=True, tracker="cone", max_seeds=DO.MAX_SEEDS,
-             alpha_check=False):
+             alpha_check=False, demote_mode="none",
+             align_weight=DO.ALIGN_WEIGHT):
     print(f"\n{'-' * 78}\n{name}   (truth: {truth})   volume {vol.shape}\n{'-' * 78}")
     tag = name.split()[0].lower()
 
@@ -308,6 +309,7 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
           f"({support.sum() / max(int(tissue.sum()), 1):.1%} of tissue)")
 
     dense_optimised, alpha_info, demote_info = dense, None, None
+    evidence_info = None
     if tracker == "cone":
         seeds, sdirs = DT.seeds_from(dense, max_seeds=max_seeds, mask=support)
         print(f"  [stage 3] cone tracker: {len(seeds)} seeds "
@@ -315,16 +317,30 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
               f"on two-direction voxels), alpha={DO.ALPHA:g} fixed")
         theta, trace, info = DO.optimise(vol, dense, D_obs, support, junctions,
                                          seeds, sdirs, n_iter=iters,
-                                         verbose=verbose)
+                                         verbose=verbose,
+                                         align_weight=align_weight)
         if alpha_check:
             alpha_info = DO.alpha_convergence(vol, dense, D_obs, support, theta,
                                               junctions, seeds, sdirs)
         # The demotion changes the FIELD, so its effect is only visible by
         # tracking again at the same parameters over the same seeds.
-        dense_optimised, L_dem, info_dem, demote_info = DO.demote_and_retrack(
-            vol, dense, D_obs, support, theta, junctions, seeds, sdirs)
-        demote_info["L_before"] = float(info["total"])
-        demote_info["L_after"] = float(L_dem)
+        if demote_mode in ("s", "both"):
+            dense_optimised, L_dem, info_dem, demote_info = \
+                DO.demote_and_retrack(vol, dense, D_obs, support, theta,
+                                      junctions, seeds, sdirs,
+                                      align_weight=align_weight)
+            demote_info["L_before"] = float(info["total"])
+            demote_info["L_after"] = float(L_dem)
+
+        # ...and the same question asked of the TRACTS rather than of S. Run
+        # alongside rather than instead, so the two rules can be compared on
+        # identical junctions instead of one replacing the other untested.
+        if demote_mode in ("evidence", "both"):
+            dense_ev, ev_rows, ev_info = DO.demote_by_evidence(
+                vol, dense, D_obs, support, theta, junctions, seeds, sdirs)
+            evidence_info = dict(ev_info, junctions=ev_rows)
+            if demote_mode == "evidence":
+                dense_optimised = dense_ev
     else:
         theta, trace, info = S3.optimise(vol, field, junctions, D_obs, support,
                                          I0, n_iter=iters, verbose=verbose)
@@ -336,17 +352,28 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
     # direction. AMBIGUOUS is deliberately left alone -- demoting on a verdict
     # the metric itself will not commit to would launder uncertainty into a
     # hard label.
-    overrides = {j["patch_index"]: "kissing"
-                 for j in junctions if j["verdict"] == "TANGENCY"}
     gated_optimised = gated.copy()
-    for pi in overrides:
-        p = gated_optimised.patches[pi]
-        p["label"] = "kissing"
-        p["dirs"] = list(p["dirs"])[:1]
-        p["n_dirs"] = 1
-    n_dem = len(overrides)
-    print(f"  [demote] {n_dem}/{len(junctions)} junction(s) demoted "
-          f"crossing -> kissing on S < {S3.S_DECISION - S3.S_BAND:g}")
+    if demote_mode == "none":
+        # Stage 2's routing is taken as given, OVER-CALLS INCLUDED. Deciding
+        # kissing from crossing here meant reading a fibre count off the
+        # tractogram, and that count is scale-free: junction density divided by
+        # the tractogram's own single-fibre density, both of which scale
+        # together. It could never have distinguished one fibre from two. So
+        # the question is not asked, rather than answered badly.
+        n_dem = 0
+        print(f"  [demote] disabled -- keeping all {len(junctions)} HOST "
+              f"crossing(s), over-calls included")
+    else:
+        overrides = {j["patch_index"]: "kissing"
+                     for j in junctions if j["verdict"] == "TANGENCY"}
+        for pi in overrides:
+            p = gated_optimised.patches[pi]
+            p["label"] = "kissing"
+            p["dirs"] = list(p["dirs"])[:1]
+            p["n_dirs"] = 1
+        n_dem = len(overrides)
+        print(f"  [demote] {n_dem}/{len(junctions)} junction(s) demoted "
+              f"crossing -> kissing on S < {S3.S_DECISION - S3.S_BAND:g}")
 
     if export:
         _p, F_after = export_field(gated_optimised, e3, outdir,
@@ -379,13 +406,15 @@ def run_case(name, vol, centre, truth, mode="adaptive", block=32,
                 L_initial=float(trace[0]["total"]),
                 L_final=float(trace[-1]["total"]),
                 alpha_check=alpha_info, demotion=demote_info,
+                demote_mode=demote_mode, evidence=evidence_info,
                 trace=trace, junction_log=info["junctions"])
 
 
 def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
             iters=3, outdir=DEFAULT_OUTDIR, figures=True, refine=False,
             mode="adaptive", export_both=True, tracker="cone",
-            max_seeds=DO.MAX_SEEDS, alpha_check=False):
+            max_seeds=DO.MAX_SEEDS, alpha_check=False, demote_mode="none",
+            align_weight=DO.ALIGN_WEIGHT):
     """Real i74. No ground truth -- this is the case S exists for.
 
     On phantoms the gate already rejects a tangency upstream, so S never fires.
@@ -417,7 +446,8 @@ def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
                  outdir=outdir, figures=figures, refine=refine,
                  crop_origin=crop_origin, voxel_um=VOXEL_SIZE_UM,
                  export_both=export_both, tracker=tracker,
-                 max_seeds=max_seeds, alpha_check=alpha_check)
+                 max_seeds=max_seeds, alpha_check=alpha_check,
+                 demote_mode=demote_mode, align_weight=align_weight)
     if not r["skipped"]:
         S = np.array([j["S"] for j in r["junctions"]], float)
         S = S[np.isfinite(S)]
@@ -438,10 +468,11 @@ def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
 def main(iters=3, radius=24, stride=DEFAULT_STRIDE, block=32,
          outdir=DEFAULT_OUTDIR, figures=True, refine=False, mode="adaptive",
          export_both=True, tracker="cone", max_seeds=DO.MAX_SEEDS,
-         alpha_check=False):
+         alpha_check=False, demote_mode="none",
+         align_weight=DO.ALIGN_WEIGHT):
 
     print(f"THREE-STAGE PIPELINE -- phantom validation (known truth), "
-          f"{tracker} tracker")
+          f"{tracker} tracker, align_weight={align_weight:g}")
 
 
     X = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5, CROSS_R1, CROSS_TAPER)
@@ -451,7 +482,8 @@ def main(iters=3, radius=24, stride=DEFAULT_STRIDE, block=32,
 
     kw = dict(mode=mode, block=block, stride=stride, iters=iters, outdir=outdir,
               figures=figures, refine=refine, export_both=export_both,
-              tracker=tracker, max_seeds=max_seeds, alpha_check=alpha_check)
+              tracker=tracker, max_seeds=max_seeds, alpha_check=alpha_check,
+              demote_mode=demote_mode, align_weight=align_weight)
     out = []
     out.append(run_case("TRUE CROSSING", Xc, xc, "CROSSING", **kw))
     out.append(run_case("TANGENCY (kissing)", Kc, kc, "TANGENCY", **kw))
@@ -512,6 +544,18 @@ if __name__ == "__main__":
     ap.add_argument("--max-seeds", type=int, default=DO.MAX_SEEDS,
                     help="cone tracker seed budget; a compute cost, not a "
                          "parameter to optimise")
+    ap.add_argument("--demote", dest="demote_mode",
+                    choices=("none", "s", "evidence", "both"), default="none",
+                    help="what retracts a second direction: s = the "
+                         "superposition verdict (original), evidence = whichever "
+                         "field explains the image better, both = run each and "
+                         "compare (default)")
+    ap.add_argument("--align-weight", type=float, default=DO.ALIGN_WEIGHT,
+                    help="weight on the tract-vs-field alignment term. 0 (the "
+                         "default) is the objective as it was; "
+                         f"{DO.ALIGN_WEIGHT_VALIDATED:g} is the value validated "
+                         "against phantom angular error -- see "
+                         "objective_search.py")
     ap.add_argument("--alpha-check", action="store_true",
                     help="re-run the descent at half the cone's angular "
                          "sampling and report whether the optimum moves")
@@ -521,13 +565,15 @@ if __name__ == "__main__":
                 stride=a.stride, iters=a.iters, outdir=a.outdir,
                 figures=not a.no_figures, refine=a.refine, mode=a.mode,
                 export_both=not a.single_e3, tracker=a.tracker,
-                max_seeds=a.max_seeds, alpha_check=a.alpha_check)
+                max_seeds=a.max_seeds, alpha_check=a.alpha_check,
+                demote_mode=a.demote_mode, align_weight=a.align_weight)
     else:
         res = main(iters=a.iters, radius=a.radius or 24, stride=a.stride,
                    block=a.block, outdir=a.outdir, mode=a.mode,
                    figures=not a.no_figures, refine=a.refine,
                    export_both=not a.single_e3, tracker=a.tracker,
-                   max_seeds=a.max_seeds, alpha_check=a.alpha_check)
+                   max_seeds=a.max_seeds, alpha_check=a.alpha_check,
+                   demote_mode=a.demote_mode, align_weight=a.align_weight)
         # Non-zero exit on any FAIL, so the phantom validation is usable as a
         # regression check rather than something you have to read carefully.
         sys.exit(1 if any(r["status"] == "FAIL" for r in res) else 0)
