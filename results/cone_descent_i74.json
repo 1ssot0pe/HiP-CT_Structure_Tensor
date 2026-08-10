@@ -1,0 +1,622 @@
+{
+  "volume": [
+    96,
+    96,
+    96
+  ],
+  "tag": "i74",
+  "ladder": {
+    "L": [
+      2.0,
+      4.0,
+      8.0
+    ],
+    "alpha": [
+      0.4,
+      0.2
+    ],
+    "theta": [
+      0.15,
+      0.3,
+      0.6
+    ]
+  },
+  "fa_threshold": 0.7,
+  "n_seeds_requested": 1500,
+  "results": {
+    "random": {
+      "n_seeds": 1586,
+      "sweep": [
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3129918806150016,
+          "scale": 1.4320042099911559,
+          "n_tracts": 3124,
+          "rings": 0,
+          "mean_len": 41.77272727272727,
+          "coverage": 0.4753101490162037,
+          "seconds": 1.9348499774932861
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.375416487996468,
+          "scale": 0.8530119068641985,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 49.99326923076923,
+          "coverage": 0.43260249385127314,
+          "seconds": 6.480396747589111
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.375416487996468,
+          "scale": 0.8530119068641985,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 49.99326923076923,
+          "coverage": 0.43260249385127314,
+          "seconds": 6.525776624679565
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3758681698673012,
+          "scale": 0.8631057483311788,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 48.27564102564103,
+          "coverage": 0.4178760669849537,
+          "seconds": 5.860363006591797
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3758681698673012,
+          "scale": 0.8631057483311788,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 48.27564102564103,
+          "coverage": 0.4178760669849537,
+          "seconds": 5.831477642059326
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.3922135119863026,
+          "scale": 0.7404641461370999,
+          "n_tracts": 3122,
+          "rings": 3,
+          "mean_len": 50.51024983984625,
+          "coverage": 0.4196675618489583,
+          "seconds": 24.250051498413086
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3068665715619774,
+          "scale": 1.429338370951036,
+          "n_tracts": 3123,
+          "rings": 0,
+          "mean_len": 43.07877041306436,
+          "coverage": 0.4861043294270833,
+          "seconds": 2.373809814453125
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.3736251631463932,
+          "scale": 0.900577735602887,
+          "n_tracts": 3121,
+          "rings": 1,
+          "mean_len": 47.19929509772509,
+          "coverage": 0.4166090223524306,
+          "seconds": 6.950791835784912
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.3736251631463932,
+          "scale": 0.900577735602887,
+          "n_tracts": 3121,
+          "rings": 1,
+          "mean_len": 47.19929509772509,
+          "coverage": 0.4166090223524306,
+          "seconds": 6.816508769989014
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3966367454996216,
+          "scale": 0.7588795837814314,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 46.88333333333333,
+          "coverage": 0.3974937156394676,
+          "seconds": 6.203880310058594
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3966367454996216,
+          "scale": 0.7588795837814314,
+          "n_tracts": 3120,
+          "rings": 1,
+          "mean_len": 46.88333333333333,
+          "coverage": 0.3974937156394676,
+          "seconds": 6.168893814086914
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.3924521911677028,
+          "scale": 0.7819292041813302,
+          "n_tracts": 3122,
+          "rings": 3,
+          "mean_len": 47.19730941704036,
+          "coverage": 0.40102358217592593,
+          "seconds": 24.060376167297363
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3040098558550388,
+          "scale": 1.4289687632690458,
+          "n_tracts": 3124,
+          "rings": 0,
+          "mean_len": 43.6190781049936,
+          "coverage": 0.4907543041087963,
+          "seconds": 2.58150315284729
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.3656005150988064,
+          "scale": 0.9789568244484624,
+          "n_tracts": 3121,
+          "rings": 1,
+          "mean_len": 44.99967958987504,
+          "coverage": 0.4096001519097222,
+          "seconds": 6.912529706954956
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.3656005150988064,
+          "scale": 0.9789568244484624,
+          "n_tracts": 3121,
+          "rings": 1,
+          "mean_len": 44.99967958987504,
+          "coverage": 0.4096001519097222,
+          "seconds": 6.863911390304565
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3912037113556817,
+          "scale": 0.8213382076684218,
+          "n_tracts": 3124,
+          "rings": 1,
+          "mean_len": 44.547695262484,
+          "coverage": 0.38896800853587965,
+          "seconds": 6.465469598770142
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3912037113556817,
+          "scale": 0.8213382076684218,
+          "n_tracts": 3124,
+          "rings": 1,
+          "mean_len": 44.547695262484,
+          "coverage": 0.38896800853587965,
+          "seconds": 8.859089374542236
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.390032054593784,
+          "scale": 0.82518983179821,
+          "n_tracts": 3126,
+          "rings": 3,
+          "mean_len": 44.735444657709536,
+          "coverage": 0.3876297562210648,
+          "seconds": 30.997618198394775
+        }
+      ],
+      "best": {
+        "L": 8.0,
+        "alpha": 0.4,
+        "theta": 0.15
+      },
+      "best_mse": 1.3040098558550388,
+      "path": [
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3966367454996216,
+          "round": -1
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3129918806150016,
+          "round": 0
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3040098558550388,
+          "round": 1
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3040098558550388,
+          "round": 2
+        }
+      ],
+      "n_evaluations": 19,
+      "grid_min": {
+        "L": 8.0,
+        "alpha": 0.4,
+        "theta": 0.15,
+        "mse": 1.3040098558550388,
+        "scale": 1.4289687632690458,
+        "n_tracts": 3124,
+        "rings": 0,
+        "mean_len": 43.6190781049936,
+        "coverage": 0.4907543041087963,
+        "seconds": 2.58150315284729
+      },
+      "verdict": {
+        "summary": "NO usable minimum -- the best score is a DEGENERATE cone (0 rings: the tracker cannot turn at all)",
+        "detail": [
+          "minimum MSE 1.30401 at L=8 alpha=0.4 theta=0.15",
+          "best cone that CAN turn: MSE 1.36560 at L=8 alpha=0.4 theta=0.3 (1 rings) -- +0.06159 worse",
+          "every 0-ring setting scores 1.3040-1.3130; every turning cone scores 1.3656-1.3966",
+          "=> MSE(TDI, D_obs) alone does not select a cone. It is monotone in theta towards zero, so the tracker is scored best when it is switched off."
+        ],
+        "on_boundary": [
+          "L at its HIGHEST value (8)",
+          "alpha at its HIGHEST value (0.4)",
+          "theta at its LOWEST value (0.15)"
+        ],
+        "degenerate": true,
+        "best": {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.3040098558550388,
+          "scale": 1.4289687632690458,
+          "n_tracts": 3124,
+          "rings": 0,
+          "mean_len": 43.6190781049936,
+          "coverage": 0.4907543041087963,
+          "seconds": 2.58150315284729
+        }
+      }
+    },
+    "fa": {
+      "n_seeds": 1586,
+      "sweep": [
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2449062777354427,
+          "scale": 1.632223182900937,
+          "n_tracts": 3051,
+          "rings": 0,
+          "mean_len": 40.89446083251393,
+          "coverage": 0.43074092158564814,
+          "seconds": 2.1142842769622803
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.3297876661701207,
+          "scale": 0.991336111079422,
+          "n_tracts": 3051,
+          "rings": 1,
+          "mean_len": 46.56014421501147,
+          "coverage": 0.38398121021412035,
+          "seconds": 5.757848262786865
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.3297876661701207,
+          "scale": 0.991336111079422,
+          "n_tracts": 3051,
+          "rings": 1,
+          "mean_len": 46.56014421501147,
+          "coverage": 0.38398121021412035,
+          "seconds": 6.0078442096710205
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3393956309052895,
+          "scale": 0.9250280093418491,
+          "n_tracts": 3052,
+          "rings": 1,
+          "mean_len": 46.54193971166448,
+          "coverage": 0.3745015462239583,
+          "seconds": 5.780108690261841
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3393956309052895,
+          "scale": 0.9250280093418491,
+          "n_tracts": 3052,
+          "rings": 1,
+          "mean_len": 46.54193971166448,
+          "coverage": 0.3745015462239583,
+          "seconds": 5.5255372524261475
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.3564325256033027,
+          "scale": 0.8475204292004386,
+          "n_tracts": 3050,
+          "rings": 3,
+          "mean_len": 46.773770491803276,
+          "coverage": 0.3667952926070602,
+          "seconds": 21.83116579055786
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2410794665579163,
+          "scale": 1.6260186205038385,
+          "n_tracts": 3051,
+          "rings": 0,
+          "mean_len": 41.803998688954444,
+          "coverage": 0.4391716851128472,
+          "seconds": 2.169650077819824
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.3403762291044221,
+          "scale": 0.9701060509063665,
+          "n_tracts": 3050,
+          "rings": 1,
+          "mean_len": 44.511475409836066,
+          "coverage": 0.3647133156105324,
+          "seconds": 6.123133897781372
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.3403762291044221,
+          "scale": 0.9701060509063665,
+          "n_tracts": 3050,
+          "rings": 1,
+          "mean_len": 44.511475409836066,
+          "coverage": 0.3647133156105324,
+          "seconds": 6.194173812866211
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3605433010991517,
+          "scale": 0.840602172600449,
+          "n_tracts": 3053,
+          "rings": 1,
+          "mean_len": 45.65247297739928,
+          "coverage": 0.35399825484664355,
+          "seconds": 6.136642694473267
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3605433010991517,
+          "scale": 0.840602172600449,
+          "n_tracts": 3053,
+          "rings": 1,
+          "mean_len": 45.65247297739928,
+          "coverage": 0.35399825484664355,
+          "seconds": 5.969318628311157
+        },
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.359757157474381,
+          "scale": 0.8589316050331789,
+          "n_tracts": 3053,
+          "rings": 3,
+          "mean_len": 44.710121192269895,
+          "coverage": 0.35196714048032407,
+          "seconds": 24.292031049728394
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2378575941883967,
+          "scale": 1.6233019246553866,
+          "n_tracts": 3051,
+          "rings": 0,
+          "mean_len": 42.403802032120616,
+          "coverage": 0.44413474754050924,
+          "seconds": 2.826542377471924
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.3,
+          "mse": 1.3186974004446004,
+          "scale": 1.098831248140966,
+          "n_tracts": 3052,
+          "rings": 1,
+          "mean_len": 43.467234600262124,
+          "coverage": 0.3648964210792824,
+          "seconds": 8.33013391494751
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.6,
+          "mse": 1.3186974004446004,
+          "scale": 1.098831248140966,
+          "n_tracts": 3052,
+          "rings": 1,
+          "mean_len": 43.467234600262124,
+          "coverage": 0.3648964210792824,
+          "seconds": 8.209301233291626
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.15,
+          "mse": 1.3539366664393115,
+          "scale": 0.9159610754414794,
+          "n_tracts": 3051,
+          "rings": 1,
+          "mean_len": 43.23861029170764,
+          "coverage": 0.3431871202256944,
+          "seconds": 9.946510314941406
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3539366664393115,
+          "scale": 0.9159610754414794,
+          "n_tracts": 3051,
+          "rings": 1,
+          "mean_len": 43.23861029170764,
+          "coverage": 0.3431871202256944,
+          "seconds": 8.946676969528198
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.2,
+          "theta": 0.6,
+          "mse": 1.357289854029347,
+          "scale": 0.8971133420141572,
+          "n_tracts": 3055,
+          "rings": 3,
+          "mean_len": 42.752864157119475,
+          "coverage": 0.3371751573350694,
+          "seconds": 29.276720762252808
+        }
+      ],
+      "best": {
+        "L": 8.0,
+        "alpha": 0.4,
+        "theta": 0.15
+      },
+      "best_mse": 1.2378575941883967,
+      "path": [
+        {
+          "L": 4.0,
+          "alpha": 0.2,
+          "theta": 0.3,
+          "mse": 1.3605433010991517,
+          "round": -1
+        },
+        {
+          "L": 2.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2449062777354427,
+          "round": 0
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2378575941883967,
+          "round": 1
+        },
+        {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2378575941883967,
+          "round": 2
+        }
+      ],
+      "n_evaluations": 19,
+      "grid_min": {
+        "L": 8.0,
+        "alpha": 0.4,
+        "theta": 0.15,
+        "mse": 1.2378575941883967,
+        "scale": 1.6233019246553866,
+        "n_tracts": 3051,
+        "rings": 0,
+        "mean_len": 42.403802032120616,
+        "coverage": 0.44413474754050924,
+        "seconds": 2.826542377471924
+      },
+      "verdict": {
+        "summary": "NO usable minimum -- the best score is a DEGENERATE cone (0 rings: the tracker cannot turn at all)",
+        "detail": [
+          "minimum MSE 1.23786 at L=8 alpha=0.4 theta=0.15",
+          "best cone that CAN turn: MSE 1.31870 at L=8 alpha=0.4 theta=0.3 (1 rings) -- +0.08084 worse",
+          "every 0-ring setting scores 1.2379-1.2449; every turning cone scores 1.3187-1.3605",
+          "=> MSE(TDI, D_obs) alone does not select a cone. It is monotone in theta towards zero, so the tracker is scored best when it is switched off."
+        ],
+        "on_boundary": [
+          "L at its HIGHEST value (8)",
+          "alpha at its HIGHEST value (0.4)",
+          "theta at its LOWEST value (0.15)"
+        ],
+        "degenerate": true,
+        "best": {
+          "L": 8.0,
+          "alpha": 0.4,
+          "theta": 0.15,
+          "mse": 1.2378575941883967,
+          "scale": 1.6233019246553866,
+          "n_tracts": 3051,
+          "rings": 0,
+          "mean_len": 42.403802032120616,
+          "coverage": 0.44413474754050924,
+          "seconds": 2.826542377471924
+        }
+      }
+    }
+  }
+}
