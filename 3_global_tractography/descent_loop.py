@@ -127,6 +127,68 @@ def field_for_variant(dense, variant):
     return dense
 
 
+def write_timelog(trace, path, variant, header=()):
+    """The descent's wall clock, one row per step, as a plain-text table.
+
+    Written per STEP rather than as a total because the per-iteration cost is
+    not constant and the variation is what the log is for. Each iteration is a
+    central difference over three parameters -- 6 tracking passes, a fixed cost
+    -- plus a backtracking line search whose length depends on how badly the
+    first proposal overshot, so a 2-pass iteration and a 6-pass one differ by a
+    factor of two in wall clock for reasons that are about the optimiser, not
+    the machine.
+
+    `s/pass` is therefore the column to read for anomalies: it should be roughly
+    flat across the whole descent, because a tracking pass is the same work
+    every time. If it drifts, the time is going somewhere other than tracking
+    (a competing process, or the objective rather than the tracker), and the
+    per-iteration seconds cannot be compared.
+
+    Row `-1` is the initial evaluation at the start point, which costs exactly
+    one pass and is not an iteration.
+    """
+    tr = list(trace)
+    lines = list(header) + [
+        f"DESCENT TIME LOG -- {variant}",
+        f"generated {time.strftime('%Y-%m-%d %H:%M:%S')}",
+        "",
+        "  it |    seconds     t_cum | passes  s/pass |          loss      d(loss) "
+        "|      L    theta    alpha |     |g|      lr",
+        "  " + "-" * 118,
+    ]
+    prev = None
+    for t in tr:
+        d = "" if prev is None else f"{t['loss'] - prev:+.6f}"
+        sp = t["seconds"] / max(t["passes"], 1)
+        gn = "      -" if t["grad_norm"] is None else f"{t['grad_norm']:7.4f}"
+        lr = "      -" if t["lr"] is None else f"{t['lr']:7.4f}"
+        lines.append(
+            f"  {t['iter']:2d} | {t['seconds']:9.2f} {t['t_cum']:9.2f} | "
+            f"{t['passes']:6d} {sp:7.2f} | {t['loss']:13.6f} {d:>12} | "
+            f"{t['L']:6.3f} {np.degrees(t['theta']):7.2f}d "
+            f"{np.degrees(t['alpha']):7.2f}d | {gn} {lr}")
+        prev = t["loss"]
+
+    tot = tr[-1]["t_cum"]
+    npass = tr[-1]["n_eval"]
+    it_s = [t["seconds"] for t in tr[1:]]
+    lines += [
+        "  " + "-" * 118,
+        f"  total {tot:.1f} s ({tot / 60:.2f} min) over {len(tr) - 1} iterations"
+        f" and {npass} tracking passes",
+        f"  per iteration: min {min(it_s):.1f} s, median "
+        f"{float(np.median(it_s)):.1f} s, max {max(it_s):.1f} s"
+        if it_s else "  no iterations ran",
+        f"  per pass: {tot / max(npass, 1):.2f} s mean",
+        f"  loss {tr[0]['loss']:.6f} -> {tr[-1]['loss']:.6f} "
+        f"({tr[-1]['loss'] - tr[0]['loss']:+.6f}, "
+        f"{100 * (tr[-1]['loss'] - tr[0]['loss']) / abs(tr[0]['loss']):+.3f}%)",
+    ]
+    with open(path, "w") as f:
+        f.write("\n".join(lines) + "\n")
+    return path
+
+
 def sweep(prob, n, verbose=True):
     """The loss on a log-spaced (L, theta, alpha) grid -- the descent's terrain."""
     Ls = np.exp(np.linspace(*np.log(L_RANGE), n))
@@ -218,6 +280,15 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
         title=f"{label} {variant}: descent on MSE(preprocessed image, "
               f"normalised TDI)")
     print(f"      html      {paths['html']}")
+    paths["timelog"] = write_timelog(
+        trace, os.path.join(outdir, f"timelog_{tag}.txt"), variant,
+        header=[f"{label} {tuple(vol.shape)}  |  {len(s)} seeds  |  "
+                f"support {int(tissue.sum())} voxels  |  "
+                f"smoothing {smooth:g} vox",
+                f"objective: MSE(preprocessed image, normalised TDI); "
+                f"start L={L0:g} theta={np.degrees(theta0):.2f}d "
+                f"alpha={np.degrees(alpha0):.2f}d, cap {max_iters} iters"])
+    print(f"      timelog   {paths['timelog']}")
 
     out = dict(variant=variant, L=L, theta=th, alpha=al,
                theta_deg=float(np.degrees(th)),
