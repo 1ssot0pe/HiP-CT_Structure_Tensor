@@ -175,18 +175,41 @@ def _bar(done, total, width=24):
 
 def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
             lr0=LR0, verbose=True):
-    """Gradient descent with backtracking. Returns (L, theta, alpha, trace)."""
+    """Gradient descent with backtracking. Returns (L, theta, alpha, trace).
+
+    Every trace entry carries WALL-CLOCK TIMING as well as parameters:
+    `seconds` for that iteration, `t_cum` since the descent started, `n_eval`
+    (cumulative tracking passes) and `passes` (this iteration's share).
+
+    Timing is recorded per ITERATION rather than divided out afterwards from a
+    total, because the cost per iteration is not constant and the variation is
+    the informative part: an iteration is one central difference (6 passes, a
+    fixed cost) plus a backtracking line search whose length depends on how
+    badly the first step overshot. An iteration that took four halvings is
+    visibly more expensive than one that took none, and a mean pass time hides
+    exactly that. `seconds / passes` is therefore reported too -- it should be
+    roughly flat, and if it is not, the cost is coming from somewhere other than
+    tracking.
+    """
+    import time as _time
+
     u = np.log([float(L0), float(theta0), float(alpha0)])
+    t_start = _time.time()
+    n_prev = prob.n_eval
     f0 = prob.f(u)
-    lr = lr0
     trace = [dict(iter=-1, L=float(np.exp(u[0])), theta=float(np.exp(u[1])),
                   alpha=float(np.exp(u[2])), loss=float(f0), grad_norm=None,
-                  lr=None)]
+                  lr=None, seconds=float(_time.time() - t_start),
+                  t_cum=float(_time.time() - t_start),
+                  n_eval=int(prob.n_eval), passes=int(prob.n_eval - n_prev))]
+    lr = lr0
     if verbose:
         print(f"    start  L={np.exp(u[0]):6.3f} theta={np.exp(u[1]):6.4f} "
-              f"alpha={np.exp(u[2]):6.4f}  loss {f0:.6f}")
+              f"alpha={np.exp(u[2]):6.4f}  loss {f0:.6f}"
+              f"  [{trace[0]['seconds']:.2f} s]")
 
     for it in range(max_iters):
+        t_it, n_prev = _time.time(), prob.n_eval
         g, f_here = prob.grad(u)
         gn = float(np.linalg.norm(g))
         if gn < EPS:
@@ -204,16 +227,20 @@ def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
                 u, f0, acc = u_try, f_try, True
                 break
             lr_try *= 0.5
+        dt = float(_time.time() - t_it)
         trace.append(dict(iter=it, L=float(np.exp(u[0])),
                           theta=float(np.exp(u[1])),
                           alpha=float(np.exp(u[2])), loss=float(f0),
-                          grad_norm=gn, lr=float(lr_try)))
+                          grad_norm=gn, lr=float(lr_try), seconds=dt,
+                          t_cum=float(_time.time() - t_start),
+                          n_eval=int(prob.n_eval),
+                          passes=int(prob.n_eval - n_prev)))
         if verbose:
             print(f"    {_bar(it + 1, max_iters)} it {it:2d} "
                   f"L={np.exp(u[0]):6.3f} theta={np.exp(u[1]):6.4f} "
                   f"alpha={np.exp(u[2]):6.4f}  loss {f0:.6f}  "
-                  f"|g| {gn:.4f}  lr {lr_try:.4f}  ({prob.n_eval} passes)",
-                  flush=True)
+                  f"|g| {gn:.4f}  lr {lr_try:.4f}  ({prob.n_eval} passes, "
+                  f"{dt:5.1f} s)", flush=True)
         if not acc:
             if verbose:
                 print("    line search exhausted -- converged")

@@ -154,8 +154,22 @@ def save_trk(streamlines, shape, path, crop_origin=(0, 0, 0), voxel_um=20.0,
 # the comparison figure
 # ---------------------------------------------------------------------------
 
-def comparison_figure(image, tdi_norm, support, path, title="", info=None):
+def comparison_figure(image, tdi_norm, support, path, title="", info=None,
+                      tdi_cmap="magma"):
     """TDI against image: three slices, the residual, and the joint histogram.
+
+    `tdi_cmap` is "magma" by default and "gray" for the like-for-like version.
+    Two different maps make the TDI easy to SEE -- a sparse line measure on a
+    perceptually uniform map reads clearly against a black background -- but
+    they make the two panels impossible to compare by eye, because any
+    difference in apparent brightness could be the colour map rather than the
+    data. Drawing both in grey on the identical [0, 1] scale means a voxel that
+    looks equally bright in the two panels IS equally valued. The cost is that a
+    TDI covering ~12-20% of the support becomes a faint line drawing, which is
+    an honest picture of how sparse it is rather than a flattering one.
+
+    The residual keeps its diverging map in both versions: it is a SIGNED
+    quantity, and grey would render +0.5 and -0.5 as the same tone.
 
     The joint histogram is the panel that decides the question. Slices show that
     the tracts are roughly where the tissue is, which they always are -- both
@@ -183,7 +197,7 @@ def comparison_figure(image, tdi_norm, support, path, title="", info=None):
 
     for j, (arr, nm, cm, vr) in enumerate((
             (I, "preprocessed image  (clip 1-99%, 0-1)", "gray", (0, 1)),
-            (D, "normalised TDI  (log10, 0-1)", "magma", (0, 1)),
+            (D, "normalised TDI  (log10, 0-1)", tdi_cmap, (0, 1)),
             (np.where(S, D - I, np.nan), "residual  TDI - image", "coolwarm",
              (-1, 1)))):
         ax = fig.add_subplot(gs[0, j])
@@ -284,8 +298,412 @@ def save_param_volume(Ls, thetas, alphas, Z, path, descrip=b"tdi_mse"):
 
 
 # ---------------------------------------------------------------------------
+# the loss volume with the descent drawn on it
+# ---------------------------------------------------------------------------
+
+def _upsample_axis(v, n_new):
+    """Log-spaced axis resampled to n_new points. The grids are log-spaced by
+    construction, so interpolating in log and exponentiating is exact at the
+    original nodes rather than assuming the parameter is linear in index."""
+    lg = np.log(np.asarray(v, float))
+    return np.exp(np.interp(np.linspace(0, len(lg) - 1, n_new),
+                            np.arange(len(lg)), lg))
+
+
+def _read_sweep(outdir, variant, json_name="descent_loop.json", up=1):
+    """(volume, log10 axes, descent path in log10, grid-min, run dict).
+
+    Coordinates are log10(parameter), not the parameter. The three grids are
+    log-spaced by construction, so in log10 the sample points are EVENLY spaced
+    -- which is what a volume renderer requires and what `save_param_volume`'s
+    affine already encodes. Handing raw parameter values to a renderer that
+    assumes a regular grid would draw the cube stretched, and the stretch would
+    look like structure in the loss.
+
+    The two ANGLES are in degrees, as everywhere else a human reads them; L
+    stays in voxels because it is a length.
+    """
+    import json
+    import nibabel as nib
+    from scipy.ndimage import zoom
+
+    with open(os.path.join(outdir, json_name)) as f:
+        run = json.load(f)
+    d = run["runs"][variant]
+    if "sweep" not in d:
+        raise ValueError(f"{variant} in {outdir} has no sweep; use --sweep-n")
+    sw = d["sweep"]
+    Z = np.asarray(nib.load(os.path.join(
+        outdir, f"lossvol_{variant.replace('+', '_')}.nii.gz")).get_fdata(),
+        float)
+    if up > 1:
+        Z = zoom(Z, up, order=3)
+    ax = [_upsample_axis(np.array(sw[k], float), Z.shape[i])
+          for i, k in enumerate(("L", "theta_deg", "alpha_deg"))]
+    lg = [np.log10(a) for a in ax]
+
+    tr = d["trace"]
+    P = np.array([[np.log10(t["L"]), np.log10(np.degrees(t["theta"])),
+                   np.log10(np.degrees(t["alpha"]))] for t in tr])
+    loss = np.array([t["loss"] for t in tr], float)
+    gm = sw["grid_min"]
+    g = np.log10([gm["L"], gm["theta_deg"], gm["alpha_deg"]])
+    return Z, lg, P, loss, g, d, run
+
+
+def _log_ticks(lo, hi):
+    """Tick positions in log10 with labels in the real parameter, so the axis
+    reads in voxels/degrees even though the coordinate is a logarithm."""
+    cand = np.array([1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40], float)
+    v = cand[(cand >= 10 ** lo * 0.999) & (cand <= 10 ** hi * 1.001)]
+    if len(v) < 3:
+        v = 10 ** np.linspace(lo, hi, 5)
+    return np.log10(v), [f"{x:g}" for x in v]
+
+
+def descent_volume_3d(outdir, path, variants=None, up=5, opacity=0.10,
+                      surface_count=18, json_name="descent_loop.json",
+                      title=""):
+    """The (L, theta, alpha) loss as a VOLUME, with the descent flown through it.
+
+    One rotatable scene per field variant, side by side, each containing:
+
+      * the loss as a semi-transparent volume rendering -- every sampled
+        (L, theta, alpha) contributes, so a basin is a solid dark region rather
+        than something inferred from three flat projections
+      * the descent path as a line through that volume, coloured by its own loss
+      * the start, the descent's end, and the GRID minimum as distinct markers
+
+    The grid minimum is drawn because it is usually not where the descent
+    stopped, and the gap between them is the finding. A picture with only the
+    path in it cannot show that the optimiser settled somewhere the sweep had
+    already beaten.
+
+    HONESTY ABOUT THE PICTURE: the sweep is 5x5x5 = 125 MEASURED points. `up`
+    spline-upsamples so the render is not 125 cubes; everything between the
+    nodes is the interpolant, not measurement. The measured nodes are drawn as
+    small dots inside the volume so the two can never be confused. Same caveat
+    and same reason as `param_volume_figure.iso_shell`.
+
+    Self-contained HTML with plotly inlined -- opens offline in a browser, or in
+    VS Code with the Live Preview extension.
+    """
+    import json
+    import plotly.graph_objects as go
+    from plotly.subplots import make_subplots
+
+    with open(os.path.join(outdir, json_name)) as f:
+        variants = variants or [v for v in json.load(f)["runs"]]
+    keep = []
+    for v in variants:
+        try:
+            _read_sweep(outdir, v, json_name)
+            keep.append(v)
+        except (ValueError, FileNotFoundError):
+            pass
+    if not keep:
+        raise ValueError(f"no variant in {outdir} has a sweep volume")
+
+    fig = make_subplots(rows=1, cols=len(keep),
+                        specs=[[{"type": "scene"}] * len(keep)],
+                        subplot_titles=keep, horizontal_spacing=0.03)
+
+    run = None
+    for c, v in enumerate(keep, start=1):
+        Zf, lg, P, loss, g, d, run = _read_sweep(outdir, v, json_name, up=up)
+        Z0, _lg0, *_ = _read_sweep(outdir, v, json_name, up=1)
+        X, Y, W = np.meshgrid(lg[0], lg[1], lg[2], indexing="ij")
+        show = c == 1
+
+        fig.add_trace(go.Volume(
+            x=X.ravel(), y=Y.ravel(), z=W.ravel(), value=Zf.ravel(),
+            isomin=float(Zf.min()), isomax=float(Zf.max()),
+            opacity=opacity, surface_count=surface_count,
+            colorscale="Viridis", reversescale=True, showscale=show,
+            colorbar=dict(title="loss", len=0.65, thickness=12, x=-0.06),
+            name=f"{v} loss", hoverinfo="skip"), row=1, col=c)
+
+        # the 125 points that were actually measured
+        m0 = [np.log10(np.array(d["sweep"][k], float))
+              for k in ("L", "theta_deg", "alpha_deg")]
+        MX, MY, MW = np.meshgrid(*m0, indexing="ij")
+        fig.add_trace(go.Scatter3d(
+            x=MX.ravel(), y=MY.ravel(), z=MW.ravel(), mode="markers",
+            marker=dict(size=1.6, color="#888888"), showlegend=show,
+            name="measured node (125)",
+            text=[f"loss {q:.6f}" for q in Z0.ravel()], hoverinfo="text"),
+            row=1, col=c)
+
+        fig.add_trace(go.Scatter3d(
+            x=P[:, 0], y=P[:, 1], z=P[:, 2], mode="lines+markers",
+            line=dict(color=PATH_C, width=7),
+            marker=dict(size=5, color=loss, colorscale="Plasma"),
+            name="descent path", showlegend=show,
+            text=[f"it {t['iter']}<br>loss {t['loss']:.6f}<br>"
+                  f"L {t['L']:.3f} vox<br>theta {np.degrees(t['theta']):.2f} deg"
+                  f"<br>alpha {np.degrees(t['alpha']):.2f} deg"
+                  for t in d["trace"]], hoverinfo="text"), row=1, col=c)
+
+        gm = d["sweep"]["grid_min"]
+        for xyz, nm, col, sym, txt in (
+                (P[0], "start", START_C, "circle",
+                 f"start, loss {loss[0]:.6f}"),
+                (P[-1], "descent end", "#d62728", "diamond",
+                 f"descent end, loss {loss[-1]:.6f}"),
+                (g, "grid minimum", "#ffd400", "x",
+                 f"grid min, loss {gm['loss']:.6f}"
+                 + (" (ON A BOUNDARY)" if gm.get("on_boundary") else ""))):
+            fig.add_trace(go.Scatter3d(
+                x=[xyz[0]], y=[xyz[1]], z=[xyz[2]], mode="markers",
+                marker=dict(size=9, color=col, symbol=sym,
+                            line=dict(color="white", width=1)),
+                name=nm, showlegend=show, hovertext=txt, hoverinfo="text"),
+                row=1, col=c)
+
+        tl = _log_ticks(lg[0][0], lg[0][-1])
+        tt = _log_ticks(lg[1][0], lg[1][-1])
+        ta = _log_ticks(lg[2][0], lg[2][-1])
+        scene = dict(
+            xaxis=dict(title="L  lookahead (vox)", tickvals=tl[0],
+                       ticktext=tl[1]),
+            yaxis=dict(title="theta  half-width (deg)", tickvals=tt[0],
+                       ticktext=tt[1]),
+            zaxis=dict(title="alpha  resolution (deg)", tickvals=ta[0],
+                       ticktext=ta[1]),
+            aspectmode="cube",
+            camera=dict(eye=dict(x=1.6, y=1.5, z=1.1)))
+        fig.layout[f"scene{c if c > 1 else ''}"].update(scene)
+
+    gaps = []
+    for v in keep:
+        d = run["runs"][v]
+        gaps.append(f"{v}: end {d['end']['mse']:.6f} vs grid "
+                    f"{d['sweep']['grid_min']['loss']:.6f} "
+                    f"({d['end']['mse'] - d['sweep']['grid_min']['loss']:+.6f})")
+    fig.update_layout(
+        title=dict(text=(title or
+                   f"{run.get('label', 'i74')} {tuple(run['shape'])} -- "
+                   f"MSE(preprocessed image, normalised TDI) over "
+                   f"(L, theta, alpha), with the descent path<br>"
+                   f"<sub>5x5x5 measured (grey dots), spline-upsampled "
+                   f"{up}x for rendering &nbsp;|&nbsp; "
+                   + " &nbsp;|&nbsp; ".join(gaps) + "</sub>"), x=0.01,
+                   font=dict(size=13)),
+        template="plotly_white", height=760,
+        legend=dict(orientation="h", y=-0.02))
+    fig.write_html(path, include_plotlyjs=True, full_html=True)
+    return path
+
+
+def descent_volume_3d_png(outdir, path, variants=None, up=7,
+                          json_name="descent_loop.json", title="",
+                          quantiles=(0.02, 0.12, 0.35), band=0.018,
+                          max_pts=2600, rng_seed=0):
+    """A still of the same scene, for contexts that cannot run the HTML.
+
+    Drawn as NESTED ISO-SHELLS, not as a fog. matplotlib has no volume renderer,
+    and the obvious substitute -- every sample as a low-alpha point -- fails for
+    a reason worth recording: thousands of points at the alpha needed to see
+    through them composite to nothing, so the box renders empty and the picture
+    silently shows no data at all.
+
+    A shell at loss quantile q is the set of parameter settings the loss is
+    (roughly) equal at, so nesting three of them shows the basin the way contour
+    lines show a hill: the innermost shell is where the loss is lowest, and its
+    SHAPE says which parameters the loss actually cares about. A shell that
+    spans the full range of an axis means that axis does not matter.
+
+    HONESTY: the sweep is 5x5x5 = 125 measured points; `up` spline-upsamples for
+    display, so the shells are surfaces of the interpolant. Same caveat as
+    `param_volume_figure.iso_shell`, which uses the identical construction.
+    """
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    from matplotlib.lines import Line2D
+    import json
+
+    with open(os.path.join(outdir, json_name)) as f:
+        variants = variants or [v for v in json.load(f)["runs"]]
+    keep = []
+    for v in variants:
+        try:
+            _read_sweep(outdir, v, json_name)
+            keep.append(v)
+        except (ValueError, FileNotFoundError):
+            pass
+    if not keep:
+        raise ValueError(f"no variant in {outdir} has a sweep volume")
+
+    rng = np.random.default_rng(rng_seed)
+    fig = plt.figure(figsize=(7.6 * len(keep), 7.0))
+    fig.patch.set_facecolor("white")
+    cmap = plt.get_cmap("viridis")
+    run = None
+    for c, v in enumerate(keep, start=1):
+        Zf, lg, P, loss, g, d, run = _read_sweep(outdir, v, json_name, up=up)
+        ax = fig.add_subplot(1, len(keep), c, projection="3d")
+        X, Y, W = np.meshgrid(lg[0], lg[1], lg[2], indexing="ij")
+        val = Zf.ravel()
+        lo, hi = float(val.min()), float(val.max())
+
+        for si, q in enumerate(quantiles):
+            iso = float(np.quantile(val, q))
+            m = np.abs(val - iso) <= band * (hi - lo)
+            idx = np.flatnonzero(m)
+            if len(idx) > max_pts:
+                idx = rng.choice(idx, max_pts, replace=False)
+            col = cmap((iso - lo) / max(hi - lo, 1e-12))
+            # Innermost (lowest-loss) shell is the most opaque: it is the one
+            # carrying the answer, and the outer ones are context.
+            ax.scatter(X.ravel()[idx], Y.ravel()[idx], W.ravel()[idx],
+                       color=col, s=13.0 - 3.0 * si,
+                       alpha=0.55 - 0.16 * si, linewidths=0, depthshade=False,
+                       zorder=1 + si)
+
+        # Dropped to the theta-alpha floor as well as drawn in place: five
+        # iterates inside a translucent cube are almost impossible to localise
+        # in depth from a still, and the shadow pins where the path sits.
+        ax.plot(P[:, 0], P[:, 1], np.full(len(P), lg[2][0]), "-",
+                color="#999999", lw=1.4, zorder=2, alpha=0.9)
+        ax.plot(P[:, 0], P[:, 1], P[:, 2], "-", color=PATH_C, lw=4.0, zorder=8,
+                solid_capstyle="round")
+        ax.scatter(P[:, 0], P[:, 1], P[:, 2], color=PATH_C, s=46,
+                   edgecolors="white", linewidths=1.0, zorder=9,
+                   depthshade=False)
+        ax.scatter(*P[0], s=190, color=START_C, edgecolors="white",
+                   linewidths=1.3, zorder=10, depthshade=False)
+        ax.scatter(*P[-1], s=300, marker="*", color="#d62728",
+                   edgecolors="white", linewidths=1.1, zorder=10,
+                   depthshade=False)
+        ax.scatter(*g, s=230, marker="X", color="#ffd400",
+                   edgecolors="#222222", linewidths=1.0, zorder=10,
+                   depthshade=False)
+
+        for setter, lab_setter, lim, lab in (
+                (ax.set_xticks, ax.set_xticklabels, lg[0], "L  lookahead (vox)"),
+                (ax.set_yticks, ax.set_yticklabels, lg[1],
+                 "theta  half-width (deg)"),
+                (ax.set_zticks, ax.set_zticklabels, lg[2],
+                 "alpha  resolution (deg)")):
+            tv, tt = _log_ticks(lim[0], lim[-1])
+            setter(tv)
+            lab_setter(tt, fontsize=8)
+        ax.set_xlabel("L  lookahead (vox)", fontsize=9, labelpad=2)
+        ax.set_ylabel("theta  half-width (deg)", fontsize=9, labelpad=2)
+        ax.set_zlabel("alpha  resolution (deg)", fontsize=9, labelpad=2)
+
+        gm = d["sweep"]["grid_min"]
+        gap = d["end"]["mse"] - gm["loss"]
+        ax.set_title(
+            f"{v}\ndescent end {d['end']['mse']:.6f}    grid min "
+            f"{gm['loss']:.6f}    ({gap:+.6f})\n"
+            + (f"grid min ON A BOUNDARY -- theta at the range floor "
+               f"({gm['theta_deg']:.2f} deg)" if gm.get("on_boundary")
+               else "grid min is interior"),
+            fontsize=9.5, pad=2)
+        ax.view_init(elev=22, azim=-60)
+
+        # How much of the box the path actually crosses. Without this the
+        # reader cannot tell a descent that barely moved from a path the
+        # renderer failed to draw -- and here it really did barely move.
+        span = [(P[:, i].max() - P[:, i].min()) / (lg[i][-1] - lg[i][0])
+                for i in range(3)]
+        ax.text2D(0.02, 0.02,
+                  f"path spans {span[0]:.1%} of L, {span[1]:.1%} of theta, "
+                  f"{span[2]:.1%} of alpha\n"
+                  f"({len(P)} iterates; the low-loss shell fills most of the "
+                  f"box, so there is no basin to fall into)",
+                  transform=ax.transAxes, fontsize=8, color="#444444")
+
+        if c == 1:
+            handles = [Line2D([], [], marker="o", ls="", color=cmap(
+                (float(np.quantile(val, q)) - lo) / max(hi - lo, 1e-12)),
+                label=f"loss shell, {q:.0%} quantile "
+                      f"({np.quantile(val, q):.4f})", ms=7)
+                for q in quantiles]
+            handles += [
+                Line2D([], [], color=PATH_C, lw=3, label="descent path"),
+                Line2D([], [], marker="o", ls="", color=START_C, ms=9,
+                       label="start"),
+                Line2D([], [], marker="*", ls="", color="#d62728", ms=13,
+                       label="descent end"),
+                Line2D([], [], marker="X", ls="", color="#ffd400", ms=11,
+                       label="grid minimum")]
+            ax.legend(handles=handles, fontsize=8, loc="upper left",
+                      bbox_to_anchor=(-0.14, 1.02), frameon=False)
+
+    fig.suptitle(title or
+                 f"{run.get('label', 'i74')} {tuple(run['shape'])} -- "
+                 f"loss VOLUME over (L, theta, alpha) with the descent path   "
+                 f"[5x5x5 measured, {up}x spline-upsampled for display]",
+                 fontsize=12)
+    fig.subplots_adjust(left=0.06, right=0.98, top=0.86, bottom=0.03,
+                        wspace=0.06)
+    fig.savefig(path, dpi=150, facecolor="white")
+    plt.close(fig)
+    return path
+
+
+# ---------------------------------------------------------------------------
 # the interactive 3D plot
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# redraw a figure from what a run already wrote
+# ---------------------------------------------------------------------------
+
+def regenerate_figure(outdir, variant="vec1", tdi_cmap="gray", suffix="_gray",
+                      verbose=True):
+    """Redraw one run's comparison figure from its saved outputs.
+
+    Exists so a change of colour map costs a file read instead of the ~20 minute
+    descent + sweep that produced the numbers. Everything the figure needs was
+    already written: the two [0, 1] volumes as NIfTI, and the diagnostics in
+    `descent_loop.json`.
+
+    The support mask is the one thing NOT written out, and it is recomputed here
+    rather than guessed: `reconstruction.tissue_mask` is `vol > AIR_FRAC *
+    vol.max()`, a pure function of the volume, and the volume it was originally
+    computed on IS the saved preprocessed image (`load_chunk` preprocesses, and
+    `tdi_mse.prepare_image` then detects the [0, 1] range and does nothing). So
+    re-running it on the saved image reproduces the original mask exactly, up to
+    the float32 the NIfTI was written in.
+
+    Arrays come back off disk in (x, y, z) -- `nifti_io.save_nifti` transposes on
+    the way out -- so they are transposed back to (z, y, x). Without that the
+    figure would slice a DIFFERENT plane of the same volume and quietly not be
+    comparable to the figure it is supposed to be a recolour of.
+    """
+    import json
+    import nibabel as nib
+    from reconstruction import tissue_mask
+
+    tag = variant.replace("+", "_")
+    with open(os.path.join(outdir, "descent_loop.json")) as f:
+        run = json.load(f)
+    r = run["runs"][variant]
+
+    def _load(nm):
+        a = np.asarray(nib.load(os.path.join(outdir, f"{nm}_{tag}.nii.gz")
+                                ).get_fdata(), float)
+        return np.ascontiguousarray(a.transpose(2, 1, 0))      # -> (z, y, x)
+
+    image, tdi = _load("image"), _load("tdi")
+    support = tissue_mask(image)
+    path = os.path.join(outdir, f"compare_{tag}{suffix}.png")
+    p = comparison_figure(
+        image, tdi, support, path, info=r["end"], tdi_cmap=tdi_cmap,
+        title=f"{run.get('label', 'i74')} -- {variant} field, converged cone "
+              f"(L={r['L']:.2f} vox, theta={r['theta_deg']:.1f} deg, "
+              f"alpha={r['alpha_deg']:.1f} deg)   [TDI in {tdi_cmap}]")
+    if verbose:
+        n_orig, n_new = run["tissue_voxels"], int(support.sum())
+        print(f"  {variant:>10}: support {n_new} voxels "
+              f"({'matches' if n_new == n_orig else f'DIFFERS from {n_orig}'}"
+              f" the run)  ->  {p}")
+    return p
+
 
 def _cone_mesh(L, theta, n_phi=48):
     """A search cone of length L and half-angle theta, apex at the origin,
@@ -397,3 +815,26 @@ def descent_3d_html(trace, path, title="", alphas_shown=3):
 
     fig.write_html(path, include_plotlyjs=True, full_html=True)
     return path
+
+
+if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser(
+        description="redraw a run's comparison figure with a different colour "
+                    "map, from what it already wrote")
+    ap.add_argument("outdir", help="a directory containing descent_loop.json")
+    ap.add_argument("--cmap", default="gray",
+                    help="colour map for the TDI panel (default gray, to match "
+                         "the image panel)")
+    ap.add_argument("--suffix", default="_gray",
+                    help="appended to the output filename, so the original is "
+                         "not overwritten")
+    ap.add_argument("--variant", default="both")
+    a = ap.parse_args()
+
+    import json as _json
+    with open(os.path.join(a.outdir, "descent_loop.json")) as _f:
+        _variants = list(_json.load(_f)["runs"])
+    for _v in (_variants if a.variant == "both" else [a.variant]):
+        regenerate_figure(a.outdir, _v, tdi_cmap=a.cmap, suffix=a.suffix)

@@ -1,0 +1,83 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (48, 48, 48) at (384,384,384), mean 0.5
+  [setup] volume loaded in 2.7 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.2 min; 108643/110592 voxels oriented (98%), 0 with two directions | background 1949, disorganised 14952, dispersed 13859, unclassified 79832
+  150 shared seeds (fa); 108643 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.3 min
+
+  NOTE no voxel carries a second direction, so 'vec1' and 'vec1+vec2' are the
+       identical field here and the two descents must return identical numbers --
+       which reads exactly like agreement between them, hence this warning.
+       `DenseField.build` writes vec2 only for bucket=='candidate' patches and
+       `triage` grants that only to the label 'crossing'. Such patches are RARE and
+       LOCATION-specific on i74: measured zero at centres 300/450/520/600 (radius 24),
+       450 (radius 32) and 300 (radius 40), but 8332 at centre 384 radius 32 --
+       a BIGGER chunk does not help. Use --centre 384 --radius 32 for a real
+       comparison, or --dataset crossing.
+
+------------------------------------------------------------------------------
+  VARIANT: vec1
+------------------------------------------------------------------------------
+    image already preprocessed: True; support 108643 voxels
+    one pass 2.52 s; start loss 0.292685; descent cap 12 iters (~4.4 min)
+    start  L= 4.000 theta=0.1500 alpha=0.1500  loss 0.292685  [2.48 s]
+    [##----------------------]   8% it  0 L= 4.139 theta=0.1736 alpha=0.1503  loss 0.291970  |g| 0.0098  lr 0.1500  (11 passes,  23.4 s)
+    [####--------------------]  17% it  1 L= 4.648 theta=0.1468 alpha=0.1324  loss 0.289711  |g| 0.0153  lr 0.2400  (19 passes,  21.2 s)
+    [######------------------]  25% it  2 L= 4.805 theta=0.1455 alpha=0.1305  loss 0.289152  |g| 0.0352  lr 0.0375  (30 passes,  28.7 s)
+    [########----------------]  33% it  3 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0102  lr 0.0075  (41 passes,  29.7 s)
+    [##########--------------]  42% it  4 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0058  lr 0.0008  (52 passes,  37.0 s)
+    line search exhausted -- converged
+
+    start   loss 0.292685  offset 84.8%  r +0.0277  coverage 19.49%  145 tracts
+    end     loss 0.289141  offset 83.9%  r +0.0335  coverage 19.80%  145 tracts
+
+    [export]
+      image     ../results/loop_timed\image_vec1.nii.gz
+      tdi       ../results/loop_timed\tdi_vec1.nii.gz
+      residual  ../results/loop_timed\residual_vec1.nii.gz
+      trk       ../results/loop_timed\tracts_vec1.trk  (145 tracts, 6380 points)
+      trk       ../results/loop_timed\tracts_vec1_start.trk  (145 tracts, 6218 points)
+      figure    ../results/loop_timed\compare_vec1.png
+      html      ../results/loop_timed\descent_vec1.html
+      timelog   ../results/loop_timed\timelog_vec1.txt
+
+------------------------------------------------------------------------------
+  VARIANT: vec1+vec2
+------------------------------------------------------------------------------
+    image already preprocessed: True; support 108643 voxels
+    one pass 3.98 s; start loss 0.292685; descent cap 12 iters (~6.9 min)
+    start  L= 4.000 theta=0.1500 alpha=0.1500  loss 0.292685  [3.67 s]
+    [##----------------------]   8% it  0 L= 4.139 theta=0.1736 alpha=0.1503  loss 0.291970  |g| 0.0098  lr 0.1500  (11 passes,  29.4 s)
+    [####--------------------]  17% it  1 L= 4.648 theta=0.1468 alpha=0.1324  loss 0.289711  |g| 0.0153  lr 0.2400  (19 passes,  30.7 s)
+    [######------------------]  25% it  2 L= 4.805 theta=0.1455 alpha=0.1305  loss 0.289152  |g| 0.0352  lr 0.0375  (30 passes,  37.7 s)
+    [########----------------]  33% it  3 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0102  lr 0.0075  (41 passes,  34.8 s)
+    [##########--------------]  42% it  4 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0058  lr 0.0008  (52 passes,  40.8 s)
+    line search exhausted -- converged
+
+    start   loss 0.292685  offset 84.8%  r +0.0277  coverage 19.49%  145 tracts
+    end     loss 0.289141  offset 83.9%  r +0.0335  coverage 19.80%  145 tracts
+
+    [export]
+      image     ../results/loop_timed\image_vec1_vec2.nii.gz
+      tdi       ../results/loop_timed\tdi_vec1_vec2.nii.gz
+      residual  ../results/loop_timed\residual_vec1_vec2.nii.gz
+      trk       ../results/loop_timed\tracts_vec1_vec2.trk  (145 tracts, 6380 points)
+      trk       ../results/loop_timed\tracts_vec1_vec2_start.trk  (145 tracts, 6218 points)
+      figure    ../results/loop_timed\compare_vec1_vec2.png
+      html      ../results/loop_timed\descent_vec1_vec2.html
+      timelog   ../results/loop_timed\timelog_vec1_vec2.txt
+
+==============================================================================
+       variant       L     theta     alpha       loss   offset         r   cover  tracts
+          vec1    4.83     8.29d     7.47d   0.289141   83.9%   +0.0335 19.80%     145
+     vec1+vec2    4.83     8.29d     7.47d   0.289141   83.9%   +0.0335 19.80%     145
+
+  the descent moved L by vec1 20.8%, vec1+vec2 20.8%
+  WARNING offset is 84% of the loss at the optimum: this objective is
+          dominated by how much of the tissue the tracts COVER, not by where they
+          went. See tdi_mse.decompose and the standing result in cone_objective.
+==============================================================================
+  wrote ../results/loop_timed\descent_loop.json
+  all outputs in ../results/loop_timed
