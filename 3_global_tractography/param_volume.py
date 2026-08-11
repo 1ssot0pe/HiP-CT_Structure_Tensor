@@ -49,6 +49,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
 
 import smooth_tracker as ST                                  # noqa: E402
 from cone_descent import stage2, seed, FLOOR_FRAC            # noqa: E402
+import cone_objective as CO
 from gradient_optimise import Problem, descend, hard_gradient  # noqa: E402
 
 # Grid extents. theta's lower end sits below the quadrature step on purpose --
@@ -146,7 +147,7 @@ def save_volume(Ls, ths, als, Z, outdir, tag="i74"):
 
 def main(centre=384, radius=24, n=8, n_seeds=150, seeding="fa",
          do_descent=True, L0=4.0, theta0=0.15, alpha0=0.15, max_iters=40,
-         outdir=None):
+         objective="align", outdir=None):
     outdir = outdir or os.path.join(_ROOT, "results")
     os.makedirs(outdir, exist_ok=True)
 
@@ -172,7 +173,9 @@ def main(centre=384, radius=24, n=8, n_seeds=150, seeding="fa",
           f"{int(tissue.sum())} tissue voxels; "
           f"setup total {(time.time() - t_setup) / 60:.1f} min")
 
-    prob = Problem(vol, dense, s, sd, floor)
+    ctx = CO.Context(vol, dense, D_obs, tissue, rho=float(_sc['rho_global']))
+    prob = Problem(vol, dense, s, sd, floor, objective=objective, ctx=ctx)
+    print(f"  OBJECTIVE: {objective}")
 
     # Calibrate on one real evaluation, so the estimate printed before a long
     # sweep is measured rather than guessed.
@@ -198,6 +201,7 @@ def main(centre=384, radius=24, n=8, n_seeds=150, seeding="fa",
     print(f"  wrote {ps}   (parameter value at every index)")
 
     out = dict(centre=centre, radius=radius, n=n, n_seeds=int(len(s)),
+               objective=objective,
                volume=list(vol.shape), seconds_per_pass=per,
                L=[float(v) for v in Ls], theta=[float(v) for v in ths],
                alpha=[float(v) for v in als],
@@ -252,6 +256,8 @@ if __name__ == "__main__":
     ap.add_argument("--L0", type=float, default=4.0)
     ap.add_argument("--theta0", type=float, default=0.15)
     ap.add_argument("--alpha0", type=float, default=0.15)
+    ap.add_argument("--objective", choices=("align","mse","image_mse"),
+                    default="align")
     ap.add_argument("--max-iters", type=int, default=40,
                     help="descent iteration cap; each costs ~8.7 passes")
     ap.add_argument("--outdir", default=None)
@@ -260,4 +266,4 @@ if __name__ == "__main__":
     main(centre=a.centre, radius=a.radius, n=a.n, n_seeds=a.seeds,
          seeding=a.seeding, do_descent=not a.no_descent, L0=a.L0,
          theta0=a.theta0, alpha0=a.alpha0, max_iters=a.max_iters,
-         outdir=a.outdir)
+         objective=a.objective, outdir=a.outdir)

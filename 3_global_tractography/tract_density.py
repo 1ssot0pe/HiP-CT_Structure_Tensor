@@ -57,6 +57,51 @@ def splat(tdi, p, w):
                 tdi[iz, iy, ix] += w * wz * wy * wx
 
 
+def rasterise_points(points, shape, weights):
+    """Trilinear splat of a POINT CLOUD, vectorised. Same arithmetic as `splat`.
+
+    `rasterise` walks a Python loop over streamlines and another over the points
+    inside each, calling `splat` (itself an 8-iteration loop) per point. That is
+    fine for a few hundred long streamlines and pathological for the smooth
+    tracker, which emits one two-point segment PER STEP -- ~11,000 of them on a
+    64^3 chunk, i.e. ~176,000 interpreter iterations for one rasterisation, and
+    it dominated the cost of every image-domain loss evaluation (12.2 s per
+    tracking pass, of which the tracking itself was a small part).
+
+    Identical result, computed with np.add.at over the eight neighbours at once.
+    Out-of-bounds neighbours are DROPPED, not clamped, exactly as `splat` does --
+    clamping would pile an escaped tail onto the boundary voxel and invent
+    density there.
+
+    points  : (M, 3) continuous (z, y, x)
+    weights : (M,) mass deposited by each point
+    """
+    tdi = np.zeros(tuple(shape), dtype=np.float64)
+    P = np.asarray(points, float)
+    if P.size == 0:
+        return tdi
+    w = np.asarray(weights, float)
+    base = np.floor(P).astype(np.int64)
+    frac = P - base
+    nz, ny, nx = shape
+    for kz in (0, 1):
+        fz = frac[:, 0] if kz else 1.0 - frac[:, 0]
+        iz = base[:, 0] + kz
+        for ky in (0, 1):
+            fy = frac[:, 1] if ky else 1.0 - frac[:, 1]
+            iy = base[:, 1] + ky
+            for kx in (0, 1):
+                fx = frac[:, 2] if kx else 1.0 - frac[:, 2]
+                ix = base[:, 2] + kx
+                ok = ((iz >= 0) & (iz < nz) & (iy >= 0) & (iy < ny)
+                      & (ix >= 0) & (ix < nx))
+                if not ok.any():
+                    continue
+                np.add.at(tdi, (iz[ok], iy[ok], ix[ok]),
+                          w[ok] * fz[ok] * fy[ok] * fx[ok])
+    return tdi
+
+
 def rasterise(streamlines, shape, step=1.0, weights=None):
     """Streamlines -> D_rec, in units of fibres per voxel.
 

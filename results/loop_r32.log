@@ -1,0 +1,51 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (64, 64, 64) at (384,384,384), mean 0.5
+  [setup] volume loaded in 3.9 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 1.3 min; 257657/262144 voxels oriented (98%), 8332 with two directions | background 4487, crossing 8332, disorganised 52777, dispersed 28341, unclassified 168207
+  153 shared seeds (fa); 257657 tissue voxels; 8332 two-direction voxels; floor 0.0500
+  setup total 1.4 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1
+------------------------------------------------------------------------------
+    image already preprocessed: True; support 257657 voxels
+    one pass 5.20 s; start loss 0.322151; descent cap 12 iters (~9.0 min) + sweep 125 passes (~10.8 min)
+    start  L= 4.000 theta=0.1500 alpha=0.1500  loss 0.322151
+    [##----------------------]   8% it  0 L= 3.763 theta=0.1497 alpha=0.1566  loss 0.322043  |g| 0.0060  lr 0.0750  (12 passes)
+    [####--------------------]  17% it  1 L= 3.993 theta=0.1484 alpha=0.1565  loss 0.321992  |g| 0.0050  lr 0.0600  (21 passes)
+    [######------------------]  25% it  2 L= 3.848 theta=0.1516 alpha=0.1601  loss 0.321853  |g| 0.0052  lr 0.0480  (30 passes)
+    [########----------------]  33% it  3 L= 3.919 theta=0.1508 alpha=0.1597  loss 0.321791  |g| 0.0040  lr 0.0192  (40 passes)
+    [##########--------------]  42% it  4 L= 3.911 theta=0.1528 alpha=0.1586  loss 0.321770  |g| 0.0019  lr 0.0154  (49 passes)
+    [############------------]  50% it  5 L= 3.911 theta=0.1528 alpha=0.1586  loss 0.321770  |g| 0.0014  lr 0.0008  (61 passes)
+    line search exhausted -- converged
+
+    start   loss 0.322151  offset 87.1%  r +0.0326  coverage 11.59%  151 tracts
+    end     loss 0.321770  offset 87.0%  r +0.0343  coverage 11.84%  151 tracts
+
+    [export]
+      image     ../results/loop_r32\image_vec1.nii.gz
+      tdi       ../results/loop_r32\tdi_vec1.nii.gz
+      residual  ../results/loop_r32\residual_vec1.nii.gz
+      trk       ../results/loop_r32\tracts_vec1.trk  (151 tracts, 7750 points)
+      trk       ../results/loop_r32\tracts_vec1_start.trk  (151 tracts, 7612 points)
+      figure    ../results/loop_r32\compare_vec1.png
+      html      ../results/loop_r32\descent_vec1.html
+
+    [sweep] 5^3 over (L, theta, alpha)
+      [#-------------------------]  4.0% 5/125  0.3m elapsed, ~6.4m left
+      [##------------------------]  8.0% 10/125  0.5m elapsed, ~6.1m left
+      [###-----------------------] 12.0% 15/125  0.8m elapsed, ~5.9m left
+      [####----------------------] 16.0% 20/125  1.1m elapsed, ~5.6m left
+      [#####---------------------] 20.0% 25/125  1.3m elapsed, ~5.4m left
+      [######--------------------] 24.0% 30/125  1.6m elapsed, ~5.1m left
+      [#######-------------------] 28.0% 35/125  1.9m elapsed, ~4.9m left
+      [########------------------] 32.0% 40/125  2.2m elapsed, ~4.6m left
+      [#########-----------------] 36.0% 45/125  2.5m elapsed, ~4.4m left
+      [##########----------------] 40.0% 50/125  2.7m elapsed, ~4.1m left
+      [###########---------------] 44.0% 55/125  3.0m elapsed, ~3.9m left
+      [############--------------] 48.0% 60/125  3.3m elapsed, ~3.6m left
+      [##############------------] 52.0% 65/125  3.6m elapsed, ~3.3m left
+      [###############-----------] 56.0% 70/125  3.9m elapsed, ~3.0m left
+      [################----------] 60.0% 75/125  4.2m elapsed, ~2.8m left

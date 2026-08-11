@@ -1,0 +1,53 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (48, 48, 48) at (384,384,384), mean 0.5
+  [setup] chunk loaded in 2.5 s; range [0.000, 1.000]  (preprocessed by load_volume)
+  [setup] stage 1-2 in 0.1 min; 108643/110592 voxels oriented (98%), 0 with two directions | background 1949, disorganised 14952, dispersed 13859, unclassified 79832
+  150 shared seeds (fa); 108643 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.2 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1
+------------------------------------------------------------------------------
+    image already preprocessed: True; support 108643 voxels
+    one pass 3.19 s; start loss 0.292685; descent cap 12 iters (~5.5 min) + sweep 125 passes (~6.6 min)
+    start  L= 4.000 theta=0.1500 alpha=0.1500  loss 0.292685
+    [##----------------------]   8% it  0 L= 4.139 theta=0.1736 alpha=0.1503  loss 0.291970  |g| 0.0098  lr 0.1500  (11 passes)
+    [####--------------------]  17% it  1 L= 4.648 theta=0.1468 alpha=0.1324  loss 0.289711  |g| 0.0153  lr 0.2400  (19 passes)
+    [######------------------]  25% it  2 L= 4.805 theta=0.1455 alpha=0.1305  loss 0.289152  |g| 0.0352  lr 0.0375  (30 passes)
+    [########----------------]  33% it  3 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0102  lr 0.0075  (41 passes)
+    [##########--------------]  42% it  4 L= 4.830 theta=0.1447 alpha=0.1304  loss 0.289141  |g| 0.0058  lr 0.0008  (52 passes)
+    line search exhausted -- converged
+
+    start   loss 0.292685  offset 84.8%  r +0.0277  coverage 19.49%  145 tracts
+    end     loss 0.289141  offset 83.9%  r +0.0335  coverage 19.80%  145 tracts
+
+    [export]
+      image     C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\image_vec1.nii.gz
+      tdi       C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\tdi_vec1.nii.gz
+      residual  C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\residual_vec1.nii.gz
+      trk       C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\tracts_vec1.trk  (145 tracts, 6380 points)
+      trk       C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\tracts_vec1_start.trk  (145 tracts, 6218 points)
+      figure    C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\compare_vec1.png
+      html      C:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop\descent_vec1.html
+
+    [sweep] 5^3 over (L, theta, alpha)
+      [#-------------------------]  4.0% 5/125  0.3m elapsed, ~8.4m left
+      [##------------------------]  8.0% 10/125  0.7m elapsed, ~7.9m left
+      [###-----------------------] 12.0% 15/125  1.0m elapsed, ~7.5m left
+      [####----------------------] 16.0% 20/125  1.4m elapsed, ~7.2m left
+      [#####---------------------] 20.0% 25/125  1.7m elapsed, ~6.8m left
+      [######--------------------] 24.0% 30/125  1.9m elapsed, ~6.1m left
+      [#######-------------------] 28.0% 35/125  2.2m elapsed, ~5.5m left
+      [########------------------] 32.0% 40/125  2.5m elapsed, ~5.2m left
+      [#########-----------------] 36.0% 45/125  2.8m elapsed, ~5.0m left
+      [##########----------------] 40.0% 50/125  3.1m elapsed, ~4.7m left
+      [###########---------------] 44.0% 55/125  3.5m elapsed, ~4.5m left
+      [############--------------] 48.0% 60/125  3.7m elapsed, ~4.0m left
+      [##############------------] 52.0% 65/125  4.0m elapsed, ~3.7m left
+      [###############-----------] 56.0% 70/125  4.4m elapsed, ~3.4m left
+      [################----------] 60.0% 75/125  4.7m elapsed, ~3.2m left
+      [#################---------] 64.0% 80/125  5.1m elapsed, ~2.9m left
+      [##################--------] 68.0% 85/125  5.4m elapsed, ~2.5m left
+      [###################-------] 72.0% 90/125  5.6m elapsed, ~2.2m left

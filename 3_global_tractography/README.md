@@ -72,8 +72,10 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    | **3a** field | `field_refine.py` *(archived)* | Frank-Oseen smooth the director field |
    | **3b** the input | `dense_field.py` | `DenseField`: Stage 1's e3 at every voxel, HOST's peaks painted over it where the gate routed |
    | **3c** tracts | `dense_tracker.py` → `dense_optimise.py` → `tract_density.py` | cone search over that field; superposition S decides crossing vs kissing; coordinate descent on (lookahead, θ) |
+   | **3d** the loop | `smooth_tracker.py` → `gradient_optimise.py` → `tdi_mse.py` → `descent_loop.py` | true gradient descent on (L, θ, α), scored by MSE(preprocessed image, normalised TDI), with every output written for a viewer |
 
-   Driven by `run_pipeline.py`; 3a is opt-in with `--refine`.
+   Driven by `run_pipeline.py`; 3a is opt-in with `--refine`. **3d** is its own
+   entry point, `descent_loop.py`.
 
    **3b — what Stage 3 actually reads.** A *dense* field, not the patch list.
    `field_from_gated(..., host_only=True)` used to drop every non-routed patch —
@@ -145,6 +147,100 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    > merge. This is why brightness beats geometry here, and it is the same
    > mechanism behind Phase 2's local certifier failing on real i74.
 
+   **3d — the optimisation loop.** `descent_loop.py` is the entry point and runs
+   three things that used to be separate: a real gradient descent on the search
+   cone, an objective scored against the raw greyscale, and the export of
+   everything a viewer needs to check the result.
+
+   *Why the descent is possible at all.* `dense_tracker` has **no derivative**
+   in θ or α — θ reaches it only through `int(round(θ/α))`, a ring count, so
+   `d/dθ` is exactly zero. `smooth_tracker` replaces the three discrete
+   operations (ring count, argmax, hard floor) with a fixed quadrature plus an
+   angular-resolution kernel, a softmax, and a sigmoid survival weight. The
+   hard tracker is its τ→0 limit, not a different model. `gradient_optimise`
+   measures the hard finite difference as its own control and prints it coming
+   back at zero.
+
+   *The objective.* `tdi_mse.py`. Both sides are put on [0, 1] before they are
+   compared — the image by percentile clip + rescale (`preprocess.py`), the TDI
+   by `log10(1 + D)` + rescale — so the residual is a plain mean square with no
+   fitted scale and no fitted intercept. That fixes the scale mismatch that made
+   the previous raw number meaningless (0.327 against a `mean(I²)` of 0.314);
+   it does **not** fix the standing result in `cone_objective`. So every report
+   carries `decompose`, which splits the loss exactly into
+
+   > `MSE = (mean TDI − mean I)²  +  var TDI + var I − 2 cov(TDI, I)`
+   >  ⟵ offset ⟶      ⟵ pattern ⟶
+
+   and the run states what fraction of its own loss is the sparsity offset. If
+   `offset_frac` is near 1 the descent is minimising **coverage**, not tracking
+   quality, and the direction it moved means nothing. Stating that from the
+   loop's own numbers is the point — it is not left to be inferred from where
+   the descent ended.
+
+   *Both field variants, always.* The loop runs twice on one setup: `vec1` only,
+   and the full `vec1 + vec2` HOST field. Seeds are drawn **once from the full
+   field and shared**, because `_dirs_at` seeds along `vec2` wherever Stage 2
+   resolved one — letting each variant draw its own would give them different
+   seed counts in different places and the difference between the two descents
+   would be partly a difference in seeding.
+
+   *Exports.* `viz_export.py`, on one affine so everything overlays: the
+   preprocessed image, the normalised TDI and their **residual** as NIfTI; the
+   tractogram as `.trk` (TrackVis, not `.tck` — a `.trk` carries dimensions,
+   voxel size and voxel-to-RAS in its own header, which is the whole game for a
+   crop out of a larger volume); the loss over (L, θ, α) as a NIfTI whose axes
+   are parameters; a comparison figure whose joint histogram is the panel that
+   decides the question; and the descent path plus the cone geometry as an
+   interactive self-contained HTML.
+
+   > **What the loop found (2026-08-11).** The normalisation does what it was
+   > for and does not rescue the objective.
+   >
+   > *It works on a phantom.* Curved bundle, 4 iterations: loss 0.0422 → 0.0325,
+   > Pearson r **+0.744 → +0.826**, offset 22% → 28%, and θ moved **up**
+   > (0.30 → 0.35 rad). It does not collapse to the no-turn cone.
+   >
+   > *On real i74 it is a coverage term.* 48³ at centre 384: loss 0.2927 →
+   > 0.2891, but `decompose` splits the endpoint as **offset 83.9%, pattern
+   > 16.1%**, with r = **+0.034** and 19.8% coverage. 64³: offset **87.0%**,
+   > r = +0.034. The image is bright over ~98% of tissue and a TDI is zero over
+   > ~85% of it, so `log10(1+D)` cannot close the gap — zeros stay zero.
+   >
+   > *The global minimum is still degenerate.* The 5³ sweep on the 48³ chunk
+   > minimises at **θ = 1.72°, the bottom of the range**, flagged automatically
+   > as `ON A BOUNDARY`. The descent's own endpoint (θ = 8.3°, 0.28914) sits
+   > *above* that grid minimum (0.28089) — it converged into a local basin, not
+   > to the loss's actual preference. Note the whole 5³ grid spans only
+   > **0.2809–0.2935**, i.e. 4.3% of the value: the surface is shallow, and what
+   > slope it has points at no-turn. Same structure as `objective_search`'s
+   > result for `mse_raw`, now measured with the scale mismatch removed rather
+   > than fitted away.
+   >
+   > **`vec1` vs `vec1+vec2` needs the right chunk.** Two-direction voxels are
+   > rare and *location*-specific on i74 — measured **zero** at centres
+   > 300/450/520/600 (r=24), 450 (r=32) and 300 (r=**40**), but **8332** at
+   > centre 384 r=32. A bigger chunk does not help. At a zero chunk the two
+   > variants are the same array and return **bit-identical** TDIs and
+   > streamlines, which reads exactly like two methods agreeing — hence the
+   > explicit `n_multi == 0` warning in `main`. Caveat on the non-zero chunk:
+   > FA seeding gates at FA > 0.7 and a crossing has *lower* FA, so only 3 of
+   > 153 seeds start on a two-direction voxel; walkers can still switch onto
+   > `vec2` in transit, but a small variant difference is partly a seeding
+   > effect and not evidence that `vec2` is inert.
+
+   > **The tractogram written out is the one the loss scored.** `track_soft`
+   > concatenates every walker's steps, because every loss here is a sum over
+   > steps and does not care which walker a step came from — but a polyline
+   > does. `return_ids` carries a walker index through so `as_streamlines` can
+   > reassemble it; without that the file a viewer opens would have to come from
+   > a *second* tracking run. The reassembly needs a **stable** sort (steps are
+   > appended in time order and walkers keep their relative order within each
+   > append) and it rejoins the `both_ways` halves, reversing the backward one —
+   > written out separately they appear as two tracts meeting end-to-end at
+   > every seed, doubling the tract count and putting a spurious endpoint in the
+   > middle of every fibre.
+
 6. **Kissing gap — the resolution limit** — `kissing_gap_sweep.py` +
    `test_kissing_phantom.py`. Global tractography stays clean down to a gap of
    **~5× the fibre radius**; below that the phantom itself fuses — a resolution
@@ -162,6 +258,9 @@ Phantom-based scripts need no real data; the i74 ones need the volume.
 | Script | Needs | What it shows |
 |---|---|---|
 | **`run_pipeline.py`** | phantom (`--i74` for real) | **the end-to-end Stage 1→2→3 run**; exits non-zero on any FAIL. `--tracker patch` for the old walker, `--alpha-check` to test the cone's angular sampling |
+| **`descent_loop.py`** | i74 volume | **the 3d loop**: gradient descent on (L, θ, α) against MSE(preprocessed image, normalised TDI), both field variants, all viewer exports. `--sweep-n 5` adds the loss volume, `--smooth` the scale-matched variant |
+| `tdi_mse.py` | nothing | self-test: the loss decomposition is exact, `log10` normalisation keeps zeros at zero and is monotone, the image transform is a no-op on an already-[0,1] volume |
+| `viz_export.py` | — | library: NIfTI / `.trk` / comparison figure / parameter volume / interactive HTML, all on one affine |
 | `test_frame_convention.py` | nothing | the `(x,y,z)`→`(z,y,x)` reversal, at the tensor, in `DenseField`, and end-to-end |
 | `dense_tracker.py` | nothing | self-test: the vectorised tracker is bit-identical to `cone_search.track`, 15–171× faster |
 | `single_fibre_check.py` | phantom | **standing gate**: tracts follow e3 where e3 is the only direction on offer |

@@ -113,6 +113,9 @@ def path_overlay(side, run, outdir, tag="i74"):
 
 
 def figure(side, run, Z, outdir, tag="i74"):
+    # Name the objective on the axes. It was hardcoded to "align loss",
+    # which silently mislabels every volume swept on a different one.
+    obj = run.get("objective", "align")
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -143,8 +146,9 @@ def figure(side, run, Z, outdir, tag="i74"):
 
     fig = plt.figure(figsize=(15.6, 8.4))
     fig.patch.set_facecolor("white")
-    fig.suptitle("(L, theta, alpha) loss volume on i74  --  descent path and "
-                 "minima     [L in voxels, angles in DEGREES]", fontsize=13)
+    fig.suptitle(f"(L, theta, alpha) loss volume on i74, objective = {obj}"
+                 "  --  descent path and minima     "
+                 "[L in voxels, angles in DEGREES]", fontsize=13)
 
     # ---- the volume ------------------------------------------------------
     ax = fig.add_subplot(1, 2, 1, projection="3d")
@@ -201,7 +205,7 @@ def figure(side, run, Z, outdir, tag="i74"):
               fontsize=7.5, loc="upper left", framealpha=0.9)
     ax.view_init(elev=24, azim=-62)
     cb = fig.colorbar(sc, ax=ax, shrink=0.55, pad=0.11)
-    cb.set_label("align loss  (DARKER = worse)", fontsize=8)
+    cb.set_label(f"{obj}  (DARKER = worse)", fontsize=8)
 
     # ---- three faces -----------------------------------------------------
     # Each is the MINIMUM over the axis not shown, not a slice: a slice would

@@ -1,0 +1,14 @@
+DESCENT LOG -- objective image_mse = MSE(preprocessed volume, TDI)
+generated 2026-08-11 16:58
+chunk i74 (40, 40, 40) at centre 384, radius 20 | 62878 tissue voxels | 100 seeds (fa)
+smooth tracker, tau=0.02 beta=0.05 | ceiling var(I)=0.040081, mean(I^2)=0.314242
+
+  it     L   theta   alpha |    RAW MSE   fit-scale  fit+intercept |   Pearson r   loss/var(I)  steps
+  --------------------------------------------------------------------------------------------------
+   -1 4.000   8.59d   8.59d |   0.327243    0.294833       0.040077 |     +0.0091      0.999918   2688
+    0 4.073   7.96d   7.56d |   0.327812    0.294374       0.040076 |     +0.0106      0.999887   2749
+    1 4.073   7.96d   7.56d |   0.327812    0.294374       0.040076 |     +0.0106      0.999887   2749
+
+  the descended loss is the fit+intercept column; it equals var(I)*(1-r^2) exactly.
+  RAW MSE is ~mean(I^2) because the TDI mean (~0.04) is far below the image mean (~0.55):
+  it measures the scale mismatch, not the fit.

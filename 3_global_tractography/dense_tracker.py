@@ -341,39 +341,62 @@ def seeds_from(field, max_seeds=2000, mask=None, second=True, jitter=0.0,
     that the same setting means the same cost on a 48^3 phantom and a 96^3 crop
     -- a fixed stride that gives 1,400 seeds on the phantom gives 50,000 on i74.
 
-    EACH family gets its own budget, so the total is at most 2 * max_seeds.
-    Seeding two-direction voxels at full density was tried and does not scale:
-    it is defensible on the crossing phantom, where 590 of 35,033 oriented
-    voxels carry a second direction, and catastrophic on i74, where 51,444 do --
-    a nearest-patch fill spreads each routed patch over its whole
-    neighbourhood, so "two-direction voxel" counts patch volume, not junctions.
-    That produced 53,322 seeds against a budget of 2,000.
+    ONE BUDGET ON LOCATIONS, NOT ONE PER FAMILY
+    -------------------------------------------
+    The seed LOCATIONS are chosen once by striding the oriented voxels; a
+    location that carries two directions then emits both. So a two-direction
+    voxel contributes exactly 2 seeds and a one-direction voxel exactly 1 --
+    which is what makes the tract density mean what `tract_density` says it
+    means.
+
+    This replaces a per-family budget, under which each family was strided
+    INDEPENDENTLY. Because the two-direction set is far smaller, it received
+    nearly the same ABSOLUTE seed count as the whole oriented set and was
+    therefore massively over-sampled per voxel. Measured on preprocessed i74
+    (64^3 at the volume centre):
+
+        1-direction   249,325 voxels    1,933 seeds      7.75 per 1000 voxels
+        2-direction     8,332 voxels    1,732 seeds    207.87 per 1000 voxels
+
+    -- 26.8x over-seeded. The TDI at those voxels was then reporting SEED
+    density, not fibre density: the median smoothed TDI ratio between two- and
+    one-direction voxels came out at 13.91 where the model requires 2. With one
+    budget on locations that ratio measures 2.09, and coverage of tissue rises
+    from 64.6% to 81.1% at the same total seed count.
+
+    The old scheme was not arbitrary -- it was guarding a real problem, that
+    seeding two-direction voxels at FULL density does not scale (51,444 such
+    voxels on i74 produced 53,322 seeds against a budget of 2,000, because a
+    nearest-patch fill spreads each routed patch over its whole neighbourhood,
+    so "two-direction voxel" counts patch volume, not junctions). Striding the
+    locations solves that without the bias: the second family is subsampled by
+    the same stride as the first, so it can never exceed the location budget.
+
+    The total returned is therefore max_seeds + (chosen locations carrying a
+    second direction), i.e. between 1x and 2x max_seeds rather than a hard 2x.
     """
     n_dirs = field.n_dirs
-
-    def _budget(idx):
-        # Stride the FLAT list, not each axis: a per-axis stride samples a
-        # lattice and can systematically miss whole fibres lying between its
-        # planes. Deterministic, so two loss evaluations see the same seeds.
-        if max_seeds and len(idx) > max_seeds:
-            return idx[::int(np.ceil(len(idx) / max_seeds))]
-        return idx
 
     keep = n_dirs >= 1
     if mask is not None:
         keep &= np.asarray(mask, bool)
-    idx = _budget(np.argwhere(keep))
+    idx = np.argwhere(keep)
+    # Stride the FLAT list, not each axis: a per-axis stride samples a lattice
+    # and can systematically miss whole fibres lying between its planes.
+    # Deterministic, so two loss evaluations see the same seeds.
+    if max_seeds and len(idx) > max_seeds:
+        idx = idx[::int(np.ceil(len(idx) / max_seeds))]
+    z, y, x = idx[:, 0], idx[:, 1], idx[:, 2]
     pos = [idx.astype(float)]
-    dirs = [field.vec1[:, idx[:, 0], idx[:, 1], idx[:, 2]].T]
+    dirs = [field.vec1[:, z, y, x].T]
 
     if second and field.n_multi:
-        m = n_dirs >= 2
-        if mask is not None:
-            m &= np.asarray(mask, bool)
-        j = _budget(np.argwhere(m))
-        if len(j):
-            pos.append(j.astype(float))
-            dirs.append(field.vec2[:, j[:, 0], j[:, 1], j[:, 2]].T)
+        # The SAME locations, not a separately strided set. `keep` already
+        # carried the mask, so no second masking is needed here.
+        m = n_dirs[z, y, x] >= 2
+        if m.any():
+            pos.append(idx[m].astype(float))
+            dirs.append(field.vec2[:, z[m], y[m], x[m]].T)
 
     p = np.concatenate(pos)
     d = np.concatenate(dirs)
