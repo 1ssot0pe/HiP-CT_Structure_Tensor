@@ -79,9 +79,22 @@ class Context:
     """
 
     def __init__(self, vol, dense, D_obs, support, rho, step=DT.STEP,
-                 l1=L1_WEIGHT):
+                 l1=L1_WEIGHT, sigma=1.0):
         self.vol, self.dense, self.support = vol, dense, support
         self.shape, self.rho, self.step, self.l1 = vol.shape, float(rho), step, l1
+        # Image gradient at the DERIVATIVE scale sigma, for `image_align`.
+        # Deliberately NOT the integration scale rho: rho is the smoothing that
+        # builds the structure tensor, and the whole point of that term is to
+        # test the tracts against the greyscale WITHOUT the processing that
+        # could have gone wrong. sigma is only "the scale at which a gradient
+        # is meaningful", which any gradient needs.
+        self.sigma = float(sigma)
+        v = np.asarray(vol, float)
+        self.grad = np.stack([
+            gaussian_filter(v, self.sigma, order=(1, 0, 0)),   # d/dz
+            gaussian_filter(v, self.sigma, order=(0, 1, 0)),   # d/dy
+            gaussian_filter(v, self.sigma, order=(0, 0, 1)),   # d/dx
+        ]).astype(np.float32)                                  # (3, Z, Y, X)
         self.d_obs = np.asarray(D_obs, float)[support]
         # D_obs smoothed the same way the TDI will be, so the scale-matched
         # comparison is symmetric. Smoothing only one side would trade one
@@ -159,6 +172,78 @@ def alignment_error(paths, ctx):
     return float(1.0 - a2.mean())
 
 
+def image_align_error(paths, ctx):
+    """(grad I . d)^2 / |grad I|^2 along the tracts. The GREYSCALE check.
+
+    Along a fibre the intensity does not change, so a correct step satisfies
+    grad I . d = 0. That is a statement about the raw image: no tensor, no rho,
+    no eigendecomposition, no HOST.
+
+    Why this is not circular where `alignment_error` is
+    ---------------------------------------------------
+    The tracker CHOOSES its direction from e3; this SCORES it against grad I.
+    In `alignment_error` the field appears on both sides, so a tract that
+    faithfully follows a WRONG e3 scores perfectly and the loss cannot object.
+    Here it can: if e3 is wrong at a voxel, a tract obeying it has
+    grad I . d != 0 and the term registers it.
+
+    The honest limit: grad I and the structure tensor come from the same data,
+    so this is not an independent MEASUREMENT. It is independent of the
+    PROCESSING that could have gone wrong -- the rho smoothing, the
+    eigendecomposition and its sign ambiguity, the eigen-degeneracy that makes
+    e3 report the bisector at a crossing, and HOST's patch grid. Those are
+    exactly the failure modes `alignment_error` is blind to.
+
+    Weighted by |grad I|^2 through the shared denominator, which is what makes
+    a magnitude threshold unnecessary: a flat voxel contributes nearly nothing
+    to the numerator AND nearly nothing to the denominator, instead of
+    contributing a ratio of noise to noise.
+
+    At a genuine crossing grad I carries both fibres, so this is non-zero even
+    for a correct tract. It therefore mildly penalises correct traversal and
+    cannot be the only term -- the same second-order limit as everything else
+    built from grad I grad I^T.
+    """
+    d, p = _steps(paths)
+    if not len(d):
+        return 1.0
+    G = np.stack([DT._sample(ctx.grad[c], p) for c in range(3)], axis=-1)
+    num = float((np.einsum("mc,mc->m", G, d) ** 2).sum())
+    den = float((G ** 2).sum())
+    return num / den if den > EPS else 1.0
+
+
+def image_mse(paths, ctx):
+    """MSE against the PREPROCESSED IMAGE, with a fitted intercept AND scale.
+
+        min over a, b of   mean( (a + b * TDI - I)^2 )   ==   var(I) * (1 - r^2)
+
+    The intercept is the whole point. Every other mse in this module fits only a
+    scale, which makes it an UNCENTRED cosine -- and an uncentred cosine between
+    two non-negative fields is dominated by their means, not their patterns. On
+    i74 that inflated a real agreement of r^2 = 0.10% into a reported "explains
+    18.9%". With `a` free, the image's mean is absorbed exactly and what is left
+    is pure pattern disagreement, which is what the number should have been
+    measuring all along.
+
+    The identity above is exact and is asserted in the sweep's output as a check.
+
+    NOTE this does not fix the DIRECTION of the loss, only its honesty: measured
+    across the cone ladder, the minimum still sits at 0 rings, because the HipCT
+    image is bright over ~98% of a tissue chunk and straight tracts cover more of
+    it than turning ones. See the module docstring's standing result.
+    """
+    D = paths if isinstance(paths, np.ndarray) else rasterise(
+        paths, ctx.shape, step=ctx.step)
+    d = np.asarray(D, float)[ctx.support]
+    I = np.asarray(ctx.vol, float)[ctx.support]
+    if d.size == 0 or float(d @ d) <= EPS:
+        return float(I.var())
+    A = np.stack([np.ones_like(d), d], axis=1)
+    coef, *_ = np.linalg.lstsq(A, I, rcond=None)
+    return float(np.mean((A @ coef - I) ** 2))
+
+
 def _mse_scalar(D, d_obs, support):
     """mse after the single best global scale. Removes the seed budget, and
     nothing else -- a TDI and a unit-mean target share no unit."""
@@ -216,19 +301,24 @@ def score_all(paths, ctx, align_weights=ALIGN_WEIGHTS):
         "mse_scalematched": data_mse_scalematched(paths, ctx),
         "mse_nnls": data_mse_nnls(paths, ctx),
         "align": alignment_error(paths, ctx),
+        "image_align": image_align_error(paths, ctx),
     }
     for w in align_weights:
         out[f"mse_raw+{w:g}align"] = out["mse_raw"] + w * out["align"]
         out[f"mse_scalematched+{w:g}align"] = (out["mse_scalematched"]
                                                + w * out["align"])
+    # The two orientation terms together: consistency with the field, plus
+    # agreement with the greyscale the field was derived from. Equal weight,
+    # not tuned -- both are dimensionless and both live in [0, 1].
+    out["align+image_align"] = out["align"] + out["image_align"]
     return out
 
 
 def names(align_weights=ALIGN_WEIGHTS):
-    base = ["mse_raw", "mse_scalematched", "mse_nnls", "align"]
+    base = ["mse_raw", "mse_scalematched", "mse_nnls", "align", "image_align"]
     for w in align_weights:
         base += [f"mse_raw+{w:g}align", f"mse_scalematched+{w:g}align"]
-    return base
+    return base + ["align+image_align"]
 
 
 # What each objective is, in one line, for the report and the figure.
@@ -237,4 +327,6 @@ BLURB = {
     "mse_scalematched": "TDI smoothed to rho before comparing",
     "mse_nnls": "current objective, full per-tract NNLS weights",
     "align": "tract vs e3 only -- no density term at all",
+    "image_align": "tract vs the raw image gradient -- bypasses Stages 1-2",
+    "align+image_align": "field consistency + greyscale validity",
 }

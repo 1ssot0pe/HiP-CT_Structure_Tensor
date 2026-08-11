@@ -101,15 +101,35 @@ def tissue_mask(vol, air_frac=AIR_FRAC):
     return vol > float(air_frac) * float(vol.max())
 
 
-def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float):
+def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float,
+                preprocess=True, clip_pct=(1.0, 99.0), mask_air=True,
+                verbose=False):
     """Load and stack the TIFF slice folder into a 3D volume.
 
     folder : directory of *.tif slices (one slice per file, sorted by name).
     crop   : (start, stop) applied identically to all three axes to carve a cube
              (RAM-bound: full volume is ~768^3). Pass None to keep the full stack.
-    dtype  : output dtype; the raw slices are uint8, cast for downstream math.
+    dtype  : output dtype for the RAW path. See the warning below -- it is
+             deliberately ignored when `preprocess` is on.
+    preprocess : clip to `clip_pct` of this volume's own histogram, then
+             rescale onto [0, 1]. See `preprocess.py` for what each step is for.
+    mask_air : compute the clip percentiles over FOREGROUND only, so the large
+             air peak at 0 does not drag p_lo down to a no-op. On lung data
+             this is the difference between the clip doing something and doing
+             nothing, which is why it defaults on here even though
+             `preprocess_volume` itself defaults it off.
 
     Returns the volume as an (Nz, Ny, Nx) array.
+
+    WHY `dtype` IS IGNORED WHEN PREPROCESSING
+    -----------------------------------------
+    Preprocessing outputs floats in [0, 1]. Callers in this repo ask for
+    `dtype=np.uint8` (a memory-efficient raw read) and then cast up to float32
+    themselves. Applying that uint8 cast to a [0, 1] float volume would collapse
+    every voxel to 0 or 1 and destroy the data silently -- the volume would still
+    have the right shape and the pipeline would still run. So the cast is skipped
+    on the preprocessed path and float64 is returned; a later `.astype(float32)`
+    by the caller is harmless.
     """
     import tifffile
 
@@ -121,6 +141,10 @@ def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float):
     if crop is not None:
         a, b = crop
         volume = volume[a:b, a:b, a:b]
+    if preprocess:
+        from preprocess import preprocess_volume
+        return preprocess_volume(volume, clip_pct=clip_pct, mask_air=mask_air,
+                                 normalise=True, verbose=verbose)
     return volume.astype(dtype)
 
 

@@ -75,10 +75,17 @@ class Problem:
         # only being read off a path that something else chose -- a passive
         # read-out says what MSE thought of the align descent's route, never
         # where MSE would have gone.
-        if objective not in ("align", "mse"):
-            raise ValueError(f"objective must be 'align' or 'mse', got "
-                             f"{objective!r}")
-        if objective == "mse" and ctx is None:
+        #
+        # A CALLABLE is also accepted, taking the smooth tractogram
+        # (pos, dirs, w) and returning a scalar. New objectives are a research
+        # question here, not a fixed menu, and each one added as a string
+        # literal is another branch in `f` that the descent machinery has to
+        # know about. `tdi_mse` is the first to use this.
+        if not callable(objective) and objective not in ("align", "mse",
+                                                         "image_mse"):
+            raise ValueError(f"objective must be 'align', 'mse', 'image_mse' or"
+                             f" a callable, got {objective!r}")
+        if objective in ("mse", "image_mse") and ctx is None:
             raise ValueError("objective='mse' needs a cone_objective.Context")
         self.objective, self.ctx = objective, ctx
 
@@ -94,11 +101,18 @@ class Problem:
         L, th, al = np.exp(u)
         pos, dirs, w = self.track(L, th, al)
         self.n_eval += 1
+        if callable(self.objective):
+            return float(self.objective(pos, dirs, w))
         if self.objective == "align":
             return ST.align_loss(pos, dirs, w, self.dense)
-        # Same tractogram, scored the old way. Each step becomes its own
-        # two-point segment so both objectives always see identical tracts.
+        # Same tractogram, scored a different way. Each step becomes its own
+        # two-point segment so every objective always sees identical tracts.
         import cone_objective as _CO
+        if self.objective == "image_mse":
+            # Rasterise directly -- image_mse only ever needs the TDI, and the
+            # per-step path list is the slow way to get it.
+            return _CO.image_mse(
+                ST.as_tdi(pos, dirs, w, self.vol.shape, n_keep=0.5), self.ctx)
         return _CO.data_mse(ST.as_paths(pos, dirs, w, n_keep=0.5), self.ctx)
 
     def both(self, u):

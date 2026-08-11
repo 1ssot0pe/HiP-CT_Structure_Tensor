@@ -127,7 +127,8 @@ def resolution_kernel(sep, alpha):
 
 def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
                tau=TAU, beta=BETA, step=STEP, max_steps=MAX_STEPS,
-               n_lookahead=N_LOOKAHEAD, quad=None, both_ways=True):
+               n_lookahead=N_LOOKAHEAD, quad=None, both_ways=True,
+               return_ids=False):
     """Smooth streamlines. Returns (positions, directions, weights).
 
     positions   (M, 3)  every step's midpoint, all walkers concatenated
@@ -138,6 +139,17 @@ def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
     weight expresses how confident the walk is that it is still on structure.
     Any loss reading these must weight by it, or a tract that has effectively
     ended still votes at full strength.
+
+    `return_ids` adds a fourth output, (M,) walker index, and exists for ONE
+    reason: every loss here is a sum over steps and does not care which walker a
+    step came from, but a tractogram written to disk does. Without an identity
+    the concatenated steps cannot be reassembled into polylines, and the file a
+    viewer opens would have to come from a SECOND tracking run -- which is not
+    the tractogram the loss scored. See `as_streamlines`.
+
+    Ids are assigned BEFORE the `both_ways` duplication is undone, so id < N is
+    the forward half of seed `id` and id >= N is the backward half of seed
+    `id - N`; `as_streamlines` uses that to rejoin the two halves into one tract.
     """
     vec1, vec2 = DT._fields(field)
     T1 = DT.dyadic(vec1)
@@ -147,20 +159,23 @@ def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
 
     s = np.asarray(seeds, float)
     d = DT._unit(np.asarray(seed_dirs, float), axis=1)
+    n_seed = len(s)
     if both_ways:
         s = np.concatenate([s, s])
         d = np.concatenate([d, -d])
     ok = np.isfinite(d).all(axis=1) & (np.linalg.norm(d, axis=1) > 0.5)
     x, v = s[ok].copy(), d[ok].copy()
+    wid = np.arange(len(s))[ok]
     if not len(x):
-        return (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0))
+        empty = (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0))
+        return empty + (np.zeros(0, np.int64), n_seed) if return_ids else empty
 
     surv = np.ones(len(x))
     shape = vol.shape
     # Angular prior in log space, so it adds to the softmax logits directly.
     logw = -(tilt ** 2) / (2.0 * max(float(theta), EPS) ** 2)
 
-    P, D, W = [], [], []
+    P, D, W, IDS = [], [], [], []
     for _ in range(max_steps):
         a, b = DT._basis(v)
         dirs = DT._unit(wv[None, :, None] * v[:, None, :]
@@ -197,15 +212,20 @@ def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
         P.append(x_mid[inside])
         D.append(v_new[inside])
         W.append(surv[inside])
+        IDS.append(wid[inside])
 
         live = inside & (surv > MIN_SURVIVAL)
         if not live.any():
             break
-        x, v, surv = x[live], v_new[live], surv[live]
+        x, v, surv, wid = x[live], v_new[live], surv[live], wid[live]
 
     if not P:
-        return (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0))
-    return np.concatenate(P), np.concatenate(D), np.concatenate(W)
+        empty = (np.zeros((0, 3)), np.zeros((0, 3)), np.zeros(0))
+        return empty + (np.zeros(0, np.int64), n_seed) if return_ids else empty
+    out = (np.concatenate(P), np.concatenate(D), np.concatenate(W))
+    if return_ids:
+        return out + (np.concatenate(IDS), n_seed)
+    return out
 
 
 def _sigmoid(z):
@@ -237,6 +257,81 @@ def _align2(T, pts, dirs):
     for (i, j, wt), comp in zip(DT._DYAD, T):
         out += wt * DT._sample(comp, pts) * dirs[:, i] * dirs[:, j]
     return np.clip(out, 0.0, 1.0)
+
+
+def as_tdi(pos, dirs, w, shape, step=STEP, n_keep=None):
+    """The smooth output rasterised DIRECTLY, without going via `as_paths`.
+
+    Each step is a chord of length `step`; splatting its two endpoints with half
+    the mass each is exactly what `rasterise` does to the two-point segment
+    `as_paths` would have built, but vectorised over all steps at once. Saves the
+    ~11,000-element Python loop that dominated every image-domain evaluation.
+    """
+    from tract_density import rasterise_points
+    keep = np.ones(len(pos), bool) if n_keep is None else (w >= float(n_keep))
+    p, d = pos[keep], dirs[keep]
+    if not len(p):
+        return np.zeros(tuple(shape))
+    pts = np.concatenate([p - 0.5 * d, p + 0.5 * d])
+    m = np.full(len(pts), 0.5 * float(step))
+    return rasterise_points(pts, shape, m)
+
+
+def as_streamlines(pos, dirs, w, ids, n_seed, n_keep=None, min_pts=4):
+    """The concatenated steps reassembled into POLYLINES, one per seed.
+
+    `as_paths` deliberately emits one two-point segment per step, because that is
+    the quantity every loss in this repo is defined on. A viewer needs the
+    opposite: connected curves. This is that reassembly, and it is only ever for
+    export -- nothing scores these.
+
+    Two halves, one tract. `track_soft(both_ways=True)` launches each seed
+    forward and backward, so seed i produces walkers i and i + n_seed. Written
+    out separately they appear as two tracts meeting end-to-end at every seed,
+    which doubles the apparent tract count and puts a spurious endpoint in the
+    middle of every fibre. The backward half is reversed and prepended instead,
+    so one seed yields one curve through it.
+
+    Steps are appended in time order by `track_soft` and walkers keep their
+    relative order within each append, so a STABLE sort on the id recovers each
+    walker's path in the order it was walked. An unstable sort would shuffle the
+    points of a tract into a tangle that still looks like a tractogram.
+
+    min_pts drops walkers that died almost immediately: a 2-point stub carries no
+    orientation a viewer can show and there are many of them.
+    Returns (streamlines, weights) with positions in (z, y, x) voxel units.
+    """
+    keep = np.ones(len(pos), bool) if n_keep is None else (w >= float(n_keep))
+    p, ww, ii = pos[keep], w[keep], np.asarray(ids)[keep]
+    if not len(p):
+        return [], np.zeros(0)
+    order = np.argsort(ii, kind="stable")
+    p, ww, ii = p[order], ww[order], ii[order]
+    bounds = np.flatnonzero(np.diff(ii)) + 1
+
+    halves = {}
+    for a, b in zip(np.r_[0, bounds], np.r_[bounds, len(ii)]):
+        halves[int(ii[a])] = (p[a:b], ww[a:b])
+
+    lines, weights = [], []
+    for sid in range(int(n_seed)):
+        fwd, bwd = halves.get(sid), halves.get(sid + int(n_seed))
+        chunks = ([bwd[0][::-1]] if bwd is not None else []) + \
+                 ([fwd[0]] if fwd is not None else [])
+        if not chunks:
+            continue
+        pts = np.concatenate(chunks)
+        if len(pts) < int(min_pts):
+            continue
+        lines.append(np.ascontiguousarray(pts, float))
+        # One weight per tract, from the survival it carried. The mean, not the
+        # final value: survival decays monotonically, so the last step's weight
+        # describes the tail rather than the tract.
+        weights.append(float(np.concatenate(
+            [c for c in ((bwd[1] if bwd is not None else None),
+                         (fwd[1] if fwd is not None else None))
+             if c is not None]).mean()))
+    return lines, np.asarray(weights, float)
 
 
 def as_paths(pos, dirs, w, n_keep=None):
