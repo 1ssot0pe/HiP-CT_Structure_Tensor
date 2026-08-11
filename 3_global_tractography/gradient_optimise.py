@@ -63,12 +63,24 @@ class Problem:
     """The loss, as a function of (L, theta), with everything else fixed."""
 
     def __init__(self, vol, dense, seeds, sdirs, floor, tau=ST.TAU,
-                 beta=ST.BETA, max_steps=ST.MAX_STEPS):
+                 beta=ST.BETA, max_steps=ST.MAX_STEPS, objective="align",
+                 ctx=None):
         self.vol, self.dense = vol, dense
         self.seeds, self.sdirs, self.floor = seeds, sdirs, floor
         self.tau, self.beta, self.max_steps = tau, beta, max_steps
         self.quad = ST.quadrature()
         self.n_eval = 0
+        # WHICH objective drives the descent. "align" is the validated one;
+        # "mse" exists so the old objective can be given the wheel rather than
+        # only being read off a path that something else chose -- a passive
+        # read-out says what MSE thought of the align descent's route, never
+        # where MSE would have gone.
+        if objective not in ("align", "mse"):
+            raise ValueError(f"objective must be 'align' or 'mse', got "
+                             f"{objective!r}")
+        if objective == "mse" and ctx is None:
+            raise ValueError("objective='mse' needs a cone_objective.Context")
+        self.objective, self.ctx = objective, ctx
 
     def track(self, L, theta, alpha):
         return ST.track_soft(self.vol, self.dense, self.seeds, self.sdirs,
@@ -78,11 +90,27 @@ class Problem:
                              max_steps=self.max_steps, quad=self.quad)
 
     def f(self, u):
-        """Loss at u = (log L, log theta, log alpha)."""
+        """Loss at u = (log L, log theta, log alpha), by the chosen objective."""
         L, th, al = np.exp(u)
         pos, dirs, w = self.track(L, th, al)
         self.n_eval += 1
-        return ST.align_loss(pos, dirs, w, self.dense)
+        if self.objective == "align":
+            return ST.align_loss(pos, dirs, w, self.dense)
+        # Same tractogram, scored the old way. Each step becomes its own
+        # two-point segment so both objectives always see identical tracts.
+        import cone_objective as _CO
+        return _CO.data_mse(ST.as_paths(pos, dirs, w, n_keep=0.5), self.ctx)
+
+    def both(self, u):
+        """(align, mse) at u -- for reporting a descent against the objective
+        it did NOT optimise, without re-tracking."""
+        import cone_objective as _CO
+        L, th, al = np.exp(u)
+        pos, dirs, w = self.track(L, th, al)
+        return (float(ST.align_loss(pos, dirs, w, self.dense)),
+                float(_CO.data_mse(ST.as_paths(pos, dirs, w, n_keep=0.5),
+                                   self.ctx)) if self.ctx is not None
+                else float("nan"))
 
     def grad(self, u, h=FD_STEP):
         """Central finite difference. Returns (gradient, f(u))."""
@@ -185,7 +213,7 @@ def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
 
 
 def temperature_check(prob, L, theta, alpha, taus=(0.04, 0.02, 0.01),
-                      max_iters=8):
+                      max_iters=5):
     """Does the ANSWER depend on the relaxation? Re-descend as tau falls.
 
     tau is not physics, so the question is whether it changes the conclusion.
@@ -202,7 +230,8 @@ def temperature_check(prob, L, theta, alpha, taus=(0.04, 0.02, 0.01),
     rows = []
     for i, t in enumerate(taus):
         p2 = Problem(prob.vol, prob.dense, prob.seeds, prob.sdirs, prob.floor,
-                     tau=t, beta=prob.beta, max_steps=prob.max_steps)
+                     tau=t, beta=prob.beta, max_steps=prob.max_steps,
+                     objective=prob.objective, ctx=prob.ctx)
         L2, th2, al2, _tr = descend(p2, L0=L, theta0=theta, alpha0=alpha,
                                     max_iters=max_iters, verbose=False)
         rows.append(dict(tau=float(t), L=L2, theta=th2, alpha=al2))
