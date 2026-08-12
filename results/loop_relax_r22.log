@@ -1,0 +1,50 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (44, 44, 44) at (384,384,384), mean 0.5
+  [setup] volume loaded in 1.2 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.1 min; 83676/85184 voxels oriented (98%), 0 with two directions | background 1508, disorganised 14925, dispersed 13849, unclassified 54902
+  5000 shared seeds (fa); 83676 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.2 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+    image already preprocessed: True; support 83676 voxels
+    one pass 54.15 s; start loss 0.136313; descent cap 12 iters (~94.2 min)
+    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.136313  [53.25 s]
+    [##----------------------]   8% it  0 L= 4.491 theta=0.1230 alpha=0.4122  loss 0.125979  |g| 0.0510  lr 0.3000  (10 passes, 462.2 s)
+    [####--------------------]  17% it  1 L= 4.444 theta=0.1012 alpha=0.3284  loss 0.112435  |g| 0.0506  lr 0.3000  (18 passes, 458.9 s)
+    [######------------------]  25% it  2 L= 4.399 theta=0.0821 alpha=0.2648  loss 0.103057  |g| 0.0377  lr 0.3000  (26 passes, 429.5 s)
+    [########----------------]  33% it  3 L= 4.863 theta=0.0678 alpha=0.2152  loss 0.100434  |g| 0.0260  lr 0.3000  (34 passes, 428.8 s)
+    [##########--------------]  42% it  4 L= 6.564 theta=0.0676 alpha=0.2153  loss 0.098115  |g| 0.0095  lr 0.3000  (42 passes, 431.6 s)
+    [############------------]  50% it  5 L= 8.543 theta=0.0610 alpha=0.1948  loss 0.095377  |g| 0.0076  lr 0.3000  (50 passes, 440.5 s)
+    [##############----------]  58% it  6 L= 9.825 theta=0.0589 alpha=0.1869  loss 0.095116  |g| 0.0070  lr 0.1500  (59 passes, 509.3 s)
+    [################--------]  67% it  7 L= 9.682 theta=0.0615 alpha=0.1940  loss 0.095064  |g| 0.0069  lr 0.0600  (69 passes, 571.0 s)
+    [##################------]  75% it  8 L=10.040 theta=0.0619 alpha=0.1881  loss 0.095035  |g| 0.0012  lr 0.0480  (78 passes, 514.5 s)
+    [####################----]  83% it  9 L=10.365 theta=0.0652 alpha=0.1971  loss 0.095018  |g| 0.0059  lr 0.0768  (86 passes, 459.0 s)
+    [######################--]  92% it 10 L= 9.869 theta=0.0642 alpha=0.1906  loss 0.094844  |g| 0.0026  lr 0.0614  (95 passes, 552.0 s)
+    [########################] 100% it 11 L= 9.925 theta=0.0643 alpha=0.1909  loss 0.094835  |g| 0.0056  lr 0.0061  (107 passes, 744.1 s)
+
+    start   loss 0.136313  offset 54.2%  r +0.0808  coverage 95.73%  4860 tracts
+    end     loss 0.094835  offset 22.2%  r +0.0954  coverage 98.70%  4898 tracts
+
+    [export]
+      image     ../results/loop_relax_r22\image_vec1.nii.gz
+      tdi       ../results/loop_relax_r22\tdi_vec1.nii.gz
+      residual  ../results/loop_relax_r22\residual_vec1.nii.gz
+      trk       ../results/loop_relax_r22\tracts_vec1.trk  (4898 tracts, 183900 points)
+      trk       ../results/loop_relax_r22\tracts_vec1_start.trk  (4860 tracts, 176079 points)
+      figure    ../results/loop_relax_r22\compare_vec1.png
+      html      ../results/loop_relax_r22\descent_vec1.html
+      timelog   ../results/loop_relax_r22\timelog_vec1.txt
+
+==============================================================================
+  turn=relax  (alpha  turn fraction [0,1])
+       variant       L     theta      alpha       loss   offset         r   cover  tracts
+          vec1    9.93     3.69d     0.1909   0.094835   22.2%   +0.0954 98.70%    4898
+
+  the descent moved L by vec1 148.1%
+==============================================================================
+  wrote ../results/loop_relax_r22\descent_loop.json
+  all outputs in ../results/loop_relax_r22

@@ -64,12 +64,19 @@ class Problem:
 
     def __init__(self, vol, dense, seeds, sdirs, floor, tau=ST.TAU,
                  beta=ST.BETA, max_steps=ST.MAX_STEPS, objective="align",
-                 ctx=None):
+                 ctx=None, turn="sample"):
         self.vol, self.dense = vol, dense
         self.seeds, self.sdirs, self.floor = seeds, sdirs, floor
         self.tau, self.beta, self.max_steps = tau, beta, max_steps
         self.quad = ST.quadrature()
         self.n_eval = 0
+        # WHAT alpha MEANS -- see `dense_tracker.track`. "sample" is the angular
+        # resolution (radians); "relax" is the fraction of the turn taken toward
+        # the cone's mean orientation, in [0, 1]. The descent works in LOG space
+        # on all three parameters, which is fine for both: a fraction in (0, 1]
+        # is still a positive scale parameter. But the two are not comparable
+        # numbers, so a run must record which one it used.
+        self.turn = turn
         # WHICH objective drives the descent. "align" is the validated one;
         # "mse" exists so the old objective can be given the wheel rather than
         # only being read off a path that something else chose -- a passive
@@ -94,7 +101,8 @@ class Problem:
                              lookahead=float(L), theta=float(theta),
                              alpha=float(alpha), floor=self.floor,
                              tau=self.tau, beta=self.beta,
-                             max_steps=self.max_steps, quad=self.quad)
+                             max_steps=self.max_steps, quad=self.quad,
+                             turn=self.turn)
 
     def f(self, u):
         """Loss at u = (log L, log theta, log alpha), by the chosen objective."""

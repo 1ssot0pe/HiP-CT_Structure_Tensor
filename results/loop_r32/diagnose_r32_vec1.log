@@ -1,0 +1,21 @@
+==============================================================================
+DESCENT DIAGNOSIS -- ../results/loop_r32  variant vec1
+  converged at L=3.9106 theta=8.754d alpha=9.086d after 6 of 12 iterations
+  optimiser floors: LR_MIN=0.001  TOL=1e-06  FD_STEP=0.05
+==============================================================================
+  i74 chunk (64, 64, 64) at (384,384,384), mean 0.5
+
+  reproduce converged loss: 0.322152955 vs saved 0.321770057  -> DIFFERS by +3.829e-04
+  (a mismatch means the setup here is not the run's; everything below describes a different problem)
+
+  [h-convergence] is the finite difference a derivative?
+              h     d/dlogL    d/dlogth    d/dlogal       |g|  angle vs h=0.05
+        0.05000    +0.00012    -0.00456    -0.00109   0.00470             0.0d
+        0.02500    +0.00166    -0.00218    -0.00300   0.00407            45.2d
+        0.01250    +0.00555    -0.00152    -0.00529   0.00782            68.6d
+        0.00625    +0.00600    -0.00344    -0.00279   0.00746            56.3d
+        0.00313    +0.00420    -0.00426    -0.00275   0.00659            42.1d
+      -> direction swings up to 68.6 deg, |g| spreads 61% across the ladder
+      -> the gradient is NOT CONVERGED in h: FD_STEP is measuring a different neighbourhood from the step
+
+  [line scan] loss along -g, 34 lengths from 1e-04 to 0.3 (LR_MIN = 0.001)

@@ -67,6 +67,14 @@ from reconstruction import VOXEL_SIZE_UM                      # noqa: E402
 
 VARIANTS = ("vec1", "vec1+vec2")
 
+# alpha's range depends on WHAT ALPHA MEANS -- see `dense_tracker.track`.
+# "sample": an angular resolution in radians, so its ceiling is a cost choice.
+# "relax": a FRACTION of the turn, so 1.0 is a hard ceiling by definition and a
+# sweep must not leave [0, 1]. Using the sample range for a relax run would put
+# the whole grid below alpha = 0.4 and never test a full turn.
+ALPHA_RANGE_BY_TURN = dict(sample=ALPHA_RANGE, relax=(0.05, 1.0))
+ALPHA0_BY_TURN = dict(sample=0.15, relax=0.5)
+
 # The localized crossing phantom, at the parameters `cone_descent` validates on.
 # Separation is wide because that is where Phase 1 is closed; a narrow crossing
 # is a stated open limit and would confound "the loop cannot see the second
@@ -113,6 +121,24 @@ def _bar(done, total, t0, width=26):
             f"{el / 60:.1f}m elapsed, ~{eta / 60:.1f}m left")
 
 
+def fmt_alpha(alpha, turn):
+    """alpha as a string, in ITS OWN UNITS.
+
+    "sample" alpha is an angle and reads naturally in degrees. "relax" alpha is
+    a dimensionless FRACTION of the turn, and printing it in degrees is not a
+    unit conversion but a category error -- it silently reports 0.587 as
+    "33.64 deg", a number that looks like an angle, sits in a plausible range
+    for one, and means nothing. Every alpha shown to a reader goes through here.
+    """
+    return f"{np.degrees(alpha):.2f}d" if turn == "sample" else f"{alpha:.4f}"
+
+
+def alpha_axis_label(turn):
+    """Axis/column label matching `fmt_alpha`'s units."""
+    return ("alpha  resolution (deg)" if turn == "sample"
+            else "alpha  turn fraction [0,1]")
+
+
 def field_for_variant(dense, variant):
     """The field the tracker is handed.
 
@@ -127,7 +153,7 @@ def field_for_variant(dense, variant):
     return dense
 
 
-def write_timelog(trace, path, variant, header=()):
+def write_timelog(trace, path, variant, header=(), turn="sample"):
     """The descent's wall clock, one row per step, as a plain-text table.
 
     Written per STEP rather than as a total because the per-iteration cost is
@@ -166,7 +192,7 @@ def write_timelog(trace, path, variant, header=()):
             f"  {t['iter']:2d} | {t['seconds']:9.2f} {t['t_cum']:9.2f} | "
             f"{t['passes']:6d} {sp:7.2f} | {t['loss']:13.6f} {d:>12} | "
             f"{t['L']:6.3f} {np.degrees(t['theta']):7.2f}d "
-            f"{np.degrees(t['alpha']):7.2f}d | {gn} {lr}")
+            f"{fmt_alpha(t['alpha'], turn):>8} | {gn} {lr}")
         prev = t["loss"]
 
     tot = tr[-1]["t_cum"]
@@ -193,7 +219,8 @@ def sweep(prob, n, verbose=True):
     """The loss on a log-spaced (L, theta, alpha) grid -- the descent's terrain."""
     Ls = np.exp(np.linspace(*np.log(L_RANGE), n))
     ths = np.exp(np.linspace(*np.log(THETA_RANGE), n))
-    als = np.exp(np.linspace(*np.log(ALPHA_RANGE), n))
+    als = np.exp(np.linspace(
+        *np.log(ALPHA_RANGE_BY_TURN[getattr(prob, "turn", "sample")]), n))
     Z = np.zeros((n, n, n), np.float32)
     tot, t0, done = n ** 3, time.time(), 0
     for i, L in enumerate(Ls):
@@ -210,15 +237,16 @@ def sweep(prob, n, verbose=True):
 
 def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
                 L0, theta0, alpha0, max_iters, smooth, sweep_n, tag,
-                voxel_um=VOXEL_SIZE_UM, label="i74"):
+                voxel_um=VOXEL_SIZE_UM, label="i74", turn="sample"):
     """One descent, plus everything written out for it."""
     print("\n" + "-" * 78)
-    print(f"  VARIANT: {variant}")
+    print(f"  VARIANT: {variant}   (turn={turn}, alpha is "
+          f"{'a fraction in [0,1]' if turn == 'relax' else 'a resolution in radians'})")
     print("-" * 78)
 
     field = field_for_variant(dense, variant)
     obj = TM.TdiMse(vol, tissue, smooth=smooth)
-    prob = Problem(vol, field, s, sd, floor, objective=obj)
+    prob = Problem(vol, field, s, sd, floor, objective=obj, turn=turn)
 
     t0 = time.time()
     f_start = prob.f(np.log([L0, theta0, alpha0]))
@@ -236,7 +264,7 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
     # ---- the tractogram the loss actually scored, at the converged point ---
     pos, dirs, w, ids, n_seed = ST.track_soft(
         vol, field, s, sd, lookahead=L, theta=th, alpha=al, floor=floor,
-        quad=prob.quad, return_ids=True)
+        quad=prob.quad, return_ids=True, turn=turn)
     lines, wts = ST.as_streamlines(pos, dirs, w, ids, n_seed, n_keep=obj.n_keep)
     rep_end = obj.report(pos, dirs, w)
     tdi_norm = obj.normalised(pos, dirs, w)
@@ -244,7 +272,7 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
     # the same, at the START, so the pictures show what the descent changed
     p0, d0, w0, i0, n0 = ST.track_soft(
         vol, field, s, sd, lookahead=L0, theta=theta0, alpha=alpha0,
-        floor=floor, quad=prob.quad, return_ids=True)
+        floor=floor, quad=prob.quad, return_ids=True, turn=turn)
     rep_start = obj.report(p0, d0, w0)
     lines0, wts0 = ST.as_streamlines(p0, d0, w0, i0, n0, n_keep=obj.n_keep)
 
@@ -272,13 +300,13 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
         os.path.join(outdir, f"compare_{tag}.png"),
         title=f"{label} -- {variant} field, converged cone "
               f"(L={L:.2f} vox, theta={np.degrees(th):.1f} deg, "
-              f"alpha={np.degrees(al):.1f} deg)",
+              f"alpha={fmt_alpha(al, turn)}, turn={turn})",
         info=rep_end)
     print(f"      figure    {paths['figure']}")
     paths["html"] = VE.descent_3d_html(
         trace, os.path.join(outdir, f"descent_{tag}.html"),
-        title=f"{label} {variant}: descent on MSE(preprocessed image, "
-              f"normalised TDI)")
+        title=f"{label} {variant} (turn={turn}): descent on "
+              f"MSE(preprocessed image, normalised TDI)")
     print(f"      html      {paths['html']}")
     paths["timelog"] = write_timelog(
         trace, os.path.join(outdir, f"timelog_{tag}.txt"), variant,
@@ -287,12 +315,19 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
                 f"smoothing {smooth:g} vox",
                 f"objective: MSE(preprocessed image, normalised TDI); "
                 f"start L={L0:g} theta={np.degrees(theta0):.2f}d "
-                f"alpha={np.degrees(alpha0):.2f}d, cap {max_iters} iters"])
+                f"alpha={fmt_alpha(alpha0, turn)}, cap {max_iters} iters",
+                f"turn={turn}: {alpha_axis_label(turn)}"])
     print(f"      timelog   {paths['timelog']}")
 
-    out = dict(variant=variant, L=L, theta=th, alpha=al,
+    out = dict(variant=variant, turn=turn, L=L, theta=th, alpha=al,
                theta_deg=float(np.degrees(th)),
-               alpha_deg=float(np.degrees(al)),
+               # alpha in DISPLAY units for this mode -- degrees for "sample",
+               # the bare fraction for "relax". alpha_deg is kept only where it
+               # is meaningful, so a reader cannot pick it up from a relax run.
+               alpha_axis=(float(np.degrees(al)) if turn == "sample"
+                           else float(al)),
+               alpha_units=("deg" if turn == "sample" else "fraction"),
+               alpha_deg=(float(np.degrees(al)) if turn == "sample" else None),
                L0=L0, theta0=theta0, alpha0=alpha0,
                trace=trace, n_passes=prob.n_eval, seconds_per_pass=per,
                start=rep_start, end=rep_end,
@@ -306,24 +341,34 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
         k = np.unravel_index(int(np.argmin(Z)), Z.shape)
         pv = VE.save_param_volume(
             Ls, ths, als, Z, os.path.join(outdir, f"lossvol_{tag}.nii.gz"),
-            descrip=b"MSE(preprocessed image, normalised TDI); "
-                    b"x=log10(L vox) y=log10(theta deg) z=log10(alpha deg)")
+            alpha_in_degrees=(turn == "sample"),
+            descrip=(b"MSE(preprocessed image, normalised TDI); "
+                     b"x=log10(L vox) y=log10(theta deg) z=log10(alpha deg)"
+                     if turn == "sample" else
+                     b"MSE(preprocessed image, normalised TDI); "
+                     b"x=log10(L vox) y=log10(theta deg) "
+                     b"z=log10(alpha turn fraction)"))
         print(f"      lossvol   {pv}")
         print(f"      grid min {Z[k]:.6f} at L={Ls[k[0]]:.3f} "
               f"theta={np.degrees(ths[k[1]]):.2f}d "
-              f"alpha={np.degrees(als[k[2]]):.2f}d")
+              f"alpha={fmt_alpha(als[k[2]], turn)}")
         edge = (k[0] in (0, sweep_n - 1) or k[1] in (0, sweep_n - 1)
                 or k[2] in (0, sweep_n - 1))
         if edge:
             print("      -> the grid minimum is ON A BOUNDARY: the loss has no "
                   "interior optimum in at least one parameter here.")
+        _adisp = (np.degrees(als) if turn == "sample" else np.asarray(als))
         out["sweep"] = dict(
-            n=sweep_n, L=[float(v) for v in Ls],
+            n=sweep_n, turn=turn, L=[float(v) for v in Ls],
             theta_deg=[float(v) for v in np.degrees(ths)],
-            alpha_deg=[float(v) for v in np.degrees(als)],
+            alpha_axis=[float(v) for v in _adisp],
+            alpha_units=("deg" if turn == "sample" else "fraction"),
+            alpha_deg=([float(v) for v in _adisp] if turn == "sample" else None),
             grid_min=dict(loss=float(Z[k]), L=float(Ls[k[0]]),
                           theta_deg=float(np.degrees(ths[k[1]])),
-                          alpha_deg=float(np.degrees(als[k[2]])),
+                          alpha_axis=float(_adisp[k[2]]),
+                          alpha_deg=(float(_adisp[k[2]]) if turn == "sample"
+                                     else None),
                           on_boundary=bool(edge)),
             loss_min=float(Z.min()), loss_max=float(Z.max()))
         out["paths"]["lossvol"] = os.path.basename(pv)
@@ -333,9 +378,11 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
 
 # ---------------------------------------------------------------------------
 
-def main(centre=384, radius=24, n_seeds=150, seeding="fa", L0=4.0,
-         theta0=0.15, alpha0=0.15, max_iters=12, smooth=0.0, sweep_n=0,
-         variants=VARIANTS, dataset="i74", outdir=None):
+def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
+         theta0=0.15, alpha0=None, max_iters=12, smooth=0.0, sweep_n=0,
+         variants=VARIANTS, dataset="i74", turn="sample", outdir=None):
+    # alpha's sensible start depends on what it means; see ALPHA0_BY_TURN.
+    alpha0 = ALPHA0_BY_TURN[turn] if alpha0 is None else alpha0
     outdir = outdir or os.path.join(_ROOT, "results",
                                     "loop" if dataset == "i74"
                                     else f"loop_{dataset}")
@@ -386,16 +433,17 @@ def main(centre=384, radius=24, n_seeds=150, seeding="fa", L0=4.0,
         tag = v.replace("+", "_")
         runs[v] = run_variant(v, vol, dense, s, sd, floor, tissue, outdir,
                               origin, L0, theta0, alpha0, max_iters, smooth,
-                              sweep_n, tag, label=label)
+                              sweep_n, tag, label=label, turn=turn)
 
     # ---- the comparison ----------------------------------------------------
     print("\n" + "=" * 78)
-    print(f"  {'variant':>12} {'L':>7} {'theta':>9} {'alpha':>9} "
+    print(f"  turn={turn}  ({alpha_axis_label(turn)})")
+    print(f"  {'variant':>12} {'L':>7} {'theta':>9} {'alpha':>10} "
           f"{'loss':>10} {'offset':>8} {'r':>9} {'cover':>7} {'tracts':>7}")
     for v, r in runs.items():
         e = r["end"]
         print(f"  {v:>12} {r['L']:7.2f} {r['theta_deg']:8.2f}d "
-              f"{r['alpha_deg']:8.2f}d {e['mse']:10.6f} "
+              f"{fmt_alpha(r['alpha'], turn):>10} {e['mse']:10.6f} "
               f"{e['offset_frac']:7.1%} {e['pearson_r']:+9.4f} "
               f"{e['coverage']:6.2%} {r['n_tracts']:7d}")
 
@@ -411,10 +459,17 @@ def main(centre=384, radius=24, n_seeds=150, seeding="fa", L0=4.0,
               f"tdi_mse.decompose and the standing result in cone_objective.")
     print("=" * 78)
 
-    out = dict(dataset=dataset, label=label, centre=centre, radius=radius,
+    out = dict(dataset=dataset, label=label, turn=turn,
+               centre=centre, radius=radius,
                shape=list(vol.shape),
                crop_origin=list(origin), voxel_um=VOXEL_SIZE_UM,
-               n_seeds=int(len(s)), seeding=seeding, smooth=smooth,
+               # BOTH counts. n_seeds is what came back; n_seeds_requested is
+               # what `seed()` was asked for, and they differ whenever a sampled
+               # voxel carried a vec2 (`_dirs_at` adds a second seed there).
+               # Rebuilding a run needs the REQUESTED one -- see
+               # `descent_diagnose.rebuild`.
+               n_seeds=int(len(s)), n_seeds_requested=int(n_seeds),
+               seeding=seeding, smooth=smooth,
                floor=floor, n_two_dir_voxels=n2,
                tissue_voxels=int(tissue.sum()),
                start=dict(L=L0, theta=theta0, alpha=alpha0),
@@ -431,11 +486,21 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[1])
     ap.add_argument("--centre", type=int, default=384)
     ap.add_argument("--radius", type=int, default=24)
-    ap.add_argument("--seeds", type=int, default=150)
+
+    # Seed number derives tract count, instead of manual input 'n'
+    ap.add_argument("--seeds", type=int, default=5000)
+
     ap.add_argument("--seeding", choices=("fa", "random"), default="fa")
     ap.add_argument("--L0", type=float, default=4.0)
     ap.add_argument("--theta0", type=float, default=0.15)
-    ap.add_argument("--alpha0", type=float, default=0.15)
+    ap.add_argument("--alpha0", type=float, default=None,
+                    help="default depends on --turn: 0.15 rad for 'sample', "
+                         "0.5 (a fraction) for 'relax'")
+    ap.add_argument("--turn", choices=("sample", "relax"), default="sample",
+                    help="what alpha MEANS. 'sample': angular resolution in "
+                         "radians, cone enumerated then argmax-ed. 'relax': "
+                         "fraction in [0,1] of the turn toward the cone's mean "
+                         "orientation, clamped to theta")
     ap.add_argument("--max-iters", type=int, default=12)
     ap.add_argument("--smooth", type=float, default=0.0,
                     help="Gaussian on the TDI before log10, in voxels "
@@ -453,4 +518,4 @@ if __name__ == "__main__":
          L0=a.L0, theta0=a.theta0, alpha0=a.alpha0, max_iters=a.max_iters,
          smooth=a.smooth, sweep_n=a.sweep_n,
          variants=VARIANTS if a.variant == "both" else (a.variant,),
-         dataset=a.dataset, outdir=a.outdir)
+         dataset=a.dataset, turn=a.turn, outdir=a.outdir)

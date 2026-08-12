@@ -1,6 +1,0 @@
-==============================================================================
-DESCENT DIAGNOSIS -- ../results/loop_r32  variant vec1
-  converged at L=3.9106 theta=8.754d alpha=9.086d after 6 of 12 iterations
-  optimiser floors: LR_MIN=0.001  TOL=1e-06  FD_STEP=0.05
-==============================================================================
-  i74 chunk (64, 64, 64) at (384,384,384), mean 0.5

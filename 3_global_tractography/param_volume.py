@@ -145,7 +145,7 @@ def save_volume(Ls, ths, als, Z, outdir, tag="i74"):
     return p, ps
 
 
-def main(centre=384, radius=24, n=8, n_seeds=150, seeding="fa",
+def main(centre=384, radius=24, n=8, n_seeds=5000, seeding="fa",
          do_descent=True, L0=4.0, theta0=0.15, alpha0=0.15, max_iters=40,
          objective="align", outdir=None):
     outdir = outdir or os.path.join(_ROOT, "results")
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     ap.add_argument("--centre", type=int, default=384)
     ap.add_argument("--radius", type=int, default=24)
     ap.add_argument("--n", type=int, default=8, help="grid points per axis")
-    ap.add_argument("--seeds", type=int, default=150)
+    ap.add_argument("--seeds", type=int, default=5000)
     ap.add_argument("--seeding", choices=("fa", "random"), default="fa")
     ap.add_argument("--no-descent", action="store_true")
     ap.add_argument("--L0", type=float, default=4.0)

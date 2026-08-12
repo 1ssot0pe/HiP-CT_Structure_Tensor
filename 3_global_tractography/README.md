@@ -229,6 +229,38 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    > `vec2` in transit, but a small variant difference is partly a seeding
    > effect and not evidence that `vec2` is inert.
 
+   > **Two meanings of α, selected by `turn`** (`dense_tracker.track`,
+   > `smooth_tracker.track_soft`, `descent_loop --turn`).
+   >
+   > `turn="sample"` *(default, unchanged)* — α is the **angular step** in
+   > radians. The cone is enumerated at that resolution and the walker jumps to
+   > the single best-supported candidate. θ is then quantised in units of α
+   > (`round(θ/α)` rings), so the two are not independent.
+   >
+   > `turn="relax"` — α is a **fraction in [0,1]**. The cone is sampled at a
+   > fixed resolution (`RELAX_RINGS`, *not* α), the mean orientation of the
+   > field inside it is taken, and the walker rotates from its current heading
+   > toward that mean, stopping at fraction α of the way. α=0 never turns; α=1
+   > turns by `min(angle-to-mean, θ)`. This removes the θ/α ring degeneracy
+   > entirely and has no argmax, so it is smooth in all three parameters by
+   > construction rather than by relaxation.
+   >
+   > *The mean is over outer products, not vectors.* e3 is a director, and 13.2%
+   > of adjacent voxel pairs are sign-opposed, so a componentwise mean cancels
+   > v against −v. `_mean_director` sums `v vᵀ` and takes the principal
+   > eigenvector — the standard mean for axial data — then signs it against the
+   > current heading.
+   >
+   > *The θ clamp is load-bearing.* It is tempting to argue a mean of vectors
+   > sampled inside a θ cone must lie within θ. **That is false and measurably
+   > so:** the cone bounds *where the field is read*, not *what is found there*.
+   > Unclamped, the turn reached **89.87° at θ = 17.19°** on the curved phantom.
+   > With the clamp the turn is exactly `α·θ` — verified in both trackers.
+   >
+   > *α is reported in its own units.* `descent_loop.fmt_alpha` prints degrees
+   > for `sample` and a bare fraction for `relax`; printing a fraction in degrees
+   > reports 0.587 as "33.64 deg", which looks like an angle and is not one.
+
    > **The tractogram written out is the one the loss scored.** `track_soft`
    > concatenates every walker's steps, because every loss here is a sum over
    > steps and does not care which walker a step came from — but a polyline
@@ -261,22 +293,32 @@ Phantom-based scripts need no real data; the i74 ones need the volume.
 | **`descent_loop.py`** | i74 volume | **the 3d loop**: gradient descent on (L, θ, α) against MSE(preprocessed image, normalised TDI), both field variants, all viewer exports. `--sweep-n 5` adds the loss volume, `--smooth` the scale-matched variant |
 | `tdi_mse.py` | nothing | self-test: the loss decomposition is exact, `log10` normalisation keeps zeros at zero and is monotone, the image transform is a no-op on an already-[0,1] volume |
 | `viz_export.py` | — | library: NIfTI / `.trk` / comparison figure / parameter volume / interactive HTML, all on one affine |
-| `test_frame_convention.py` | nothing | the `(x,y,z)`→`(z,y,x)` reversal, at the tensor, in `DenseField`, and end-to-end |
+| `descent_diagnose.py` | i74 volume | why a descent stopped early: h-convergence of the finite difference, and a line scan through the converged point |
+| `param_volume.py` | i74 volume | the (L, θ, α) loss volume as NIfTI, on the `align` objective |
+| `tract_density.py` | nothing | self-test: a tract crossing a voxel edge-to-edge deposits 1.0 regardless of step size; a crossing reads 2.0 |
+| `test_frame_convention.py` | nothing | **standing gate**: the `(x,y,z)`→`(z,y,x)` reversal, at the tensor, in `DenseField`, and end-to-end |
 | `dense_tracker.py` | nothing | self-test: the vectorised tracker is bit-identical to `cone_search.track`, 15–171× faster |
 | `single_fibre_check.py` | phantom | **standing gate**: tracts follow e3 where e3 is the only direction on offer |
-| `phase1_kissing_crossing.py` | phantom | tracker separates kissing from crossing |
-| `phase2_i74_demote.py` | i74 volume | straightness demotes ~76% of HOST crossings |
-| `phase3_i74.py` | i74 volume | joint global tractography on real tissue |
-| `phase3_realnoise.py` | phantom + `lung_A/B.npy` | the 89%→57% real-noise degradation |
-| `phase3_generative.py` | phantom | noise-calibrated model selection |
-| `kissing_gap_sweep.py` | phantom | the ~5× fibre-radius resolution limit |
-| `brain_phantom_pipeline.py` | phantom | whole-pipeline capstone (5/5 at realistic SNR) |
 
-Deleted in the `simple` pass (findings recorded above and in
-`BAYES_TRACTOGRAPHY.md`): `phase1b_global`, `phase1c_directional`,
-`phase1d_generalize` (superseded Phase-1 extensions), `phase2b_validate`,
-`phase3_calibrated` (the scalar-gate negative), and the figure-only scripts
-`*_arrows.py` / `phantom_overview.py`.
+`peak_straightness.py` and `fibre_continuity.py` are here for `mass_conservation/`,
+not for this stage — see the reach-in note below.
+
+## Archived
+
+`archive/` holds the Stage 3 scripts that are not part of the descent loop —
+`objective_search`, `phase3`, `kissing_gap_sweep`, `brain_phantom_pipeline`,
+`gradient_surface`, `descent_mse`, `descent_curve`, `s_calibration`,
+`loss_surface`, `loss_sensitivity`, `param_volume_figure`, `field_before_after`,
+`test_kissing_phantom`, `toy_demo`. **The findings are recorded above; only the
+code moved.** `archive/README.md` says what each one established and how to
+re-run it. Nothing outside `archive/` imports anything inside it.
+
+Deleted in an earlier `simple` pass (findings recorded above and in
+`BAYES_TRACTOGRAPHY.md`): `phase1_kissing_crossing`, `phase2_i74_demote`,
+`phase3_i74`, `phase3_realnoise`, `phase3_generative`, `phase1b_global`,
+`phase1c_directional`, `phase1d_generalize`, `phase2b_validate`,
+`phase3_calibrated`, and the figure-only scripts `*_arrows.py` /
+`phantom_overview.py`.
 
 # Shared at repo root, and the one downstream reach-in
 
