@@ -69,7 +69,7 @@ from localized_phantoms import (raw_localized_crossing,  # noqa: E402
 EPS = 1e-12
 FLOOR_FRAC = 0.05        # support below this fraction of vol.max() ends a walk
 FA_THRESHOLD = 0.7
-N_SEEDS = 1500           # a compute budget, held fixed across every evaluation
+N_SEEDS = 5000           # a compute budget, held fixed across every evaluation
 
 # The three ladders the descent moves on. alpha's lower end is set by runtime:
 # cost scales as (theta / alpha)^2.

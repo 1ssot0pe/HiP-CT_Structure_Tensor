@@ -60,7 +60,7 @@ LADDER = dict(lookahead=[2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0],
               theta=[0.10, 0.15, 0.20, 0.25, 0.30, 0.45, 0.60])
 
 ALPHA = 0.20             # cone angular sampling -- a budget, see the docstring
-MAX_SEEDS = 2000         # likewise
+MAX_SEEDS = 5000         # likewise
 FLOOR_FRAC = 0.05        # support below this fraction of vol.max() ends a walk
 L1_WEIGHT = 1e-3         # price per unit of tract weight; see fit_weights
 

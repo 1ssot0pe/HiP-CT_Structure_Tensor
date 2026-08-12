@@ -66,16 +66,49 @@ SCAN = np.concatenate([-np.geomspace(0.3, 1e-4, 9),
 
 
 def rebuild(run, variant, verbose=True):
-    """The exact Problem the run descended on, from its saved settings."""
+    """The exact Problem the run descended on, from its saved settings.
+
+    THE SEED COUNT MUST BE THE REQUESTED ONE, NOT THE RESULTING ONE. `seed(n=k)`
+    samples k VOXELS, then `_dirs_at` adds a second seed at every voxel carrying
+    a vec2 -- so a run asking for 150 reports 153, and rebuilding with 153 makes
+    `seed` draw a DIFFERENT 153 voxels. The loss then fails to reproduce (it came
+    out +3.8e-4 off on the r32 run) and every measurement below describes a
+    neighbouring problem rather than the one that was descended.
+
+    `n_seeds_requested` is written by `descent_loop`; older JSONs only have
+    `n_seeds`, and for those the count is inverted from the two-direction voxel
+    count when it was recorded. The reproduction check in `main` is what
+    actually decides whether the rebuild succeeded, so a wrong guess here is
+    reported rather than hidden.
+    """
     vol, origin, label = load_setup(run.get("dataset", "i74"), run["centre"],
                                     run["radius"], verbose=verbose)
     dense, _D, tissue, FA, _sc = stage2(vol, verbose=False)
-    s, sd = seed(dense, tissue, FA, run["seeding"], n=run["n_seeds"]
-                 if run["n_seeds"] <= 1500 else 1500)
+    n = run.get("n_seeds_requested")
+    if n is None:
+        # Older run: recover the request by SEARCH rather than by arithmetic.
+        # The obvious estimate -- divide out the two-direction fraction over all
+        # tissue -- is biased, because `seeding="fa"` samples only FA > 0.7
+        # voxels and vec2 is not distributed the same way there: it returned 148
+        # where the truth was 150 on the r32 run. `seed` does no tracking, so
+        # simply trying candidates until the resulting count matches is both
+        # exact and cheap.
+        target = int(run["n_seeds"])
+        n = target
+        for cand in range(target, max(target // 2, 1) - 1, -1):
+            if len(seed(dense, tissue, FA, run["seeding"], n=cand)[0]) == target:
+                n = cand          # smallest request giving this count
+        if verbose:
+            print(f"  recovered seed request {n} -> {target} seeds "
+                  f"(run recorded only the resulting count)")
+    s, sd = seed(dense, tissue, FA, run["seeding"], n=int(n))
     floor = FLOOR_FRAC * float(vol.max())
     obj = TM.TdiMse(vol, tissue, smooth=run.get("smooth", 0.0))
+    if verbose:
+        print(f"  rebuilt with n={n} requested -> {len(s)} seeds "
+              f"(run recorded {run['n_seeds']})")
     return Problem(vol, field_for_variant(dense, variant), s, sd, floor,
-                   objective=obj), label
+                   objective=obj, turn=run.get("turn", "sample")), label
 
 
 def main(outdir, variant="vec1", json_name="descent_loop.json", verbose=True):

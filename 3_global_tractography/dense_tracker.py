@@ -81,6 +81,124 @@ def cone_weights(theta, alpha):
     return (np.asarray(wv, float), np.asarray(wa, float), np.asarray(wb, float))
 
 
+RELAX_RINGS = 3          # tilt rings used to SAMPLE the cone in "relax" mode
+
+
+def cone_sample_weights(theta, rings=RELAX_RINGS):
+    """Cone sampling directions for `turn="relax"`, at a FIXED resolution.
+
+    In "sample" mode alpha is the angular step, so `cone_weights` derives its
+    ring count from it. In "relax" mode alpha means something else entirely --
+    how far along the turn the walker stops -- so the cone still has to be
+    sampled, but by something that is NOT alpha. That is this: a fixed number of
+    rings spanning theta, so the sampling density is a cost constant rather than
+    a model parameter, and two different alphas sample the identical cone.
+
+    Keeping it fixed is the point. If the sampling tracked alpha, then changing
+    alpha would change both the turn fraction AND which vectors were averaged,
+    and no measurement could separate the two.
+    """
+    return cone_weights(theta, theta / max(int(rings), 1))
+
+
+def _mean_director(vec1, vec2, x, dirs, lookahead, n, v_now, dyadic_fields):
+    """The mean orientation of the field inside the cone, as a unit director.
+
+    THE AVERAGE IS OVER OUTER PRODUCTS, NOT VECTORS. e3 is a director -- v and
+    -v are the same fibre and the eigensolver's sign is arbitrary per voxel --
+    so a componentwise mean cancels v against -v wherever two samples disagree.
+    On the crossing phantom 13.2% of adjacent voxel pairs are sign-opposed, so a
+    naive mean would not be a small error, it would be near zero on a third of
+    the field. `v v^T` has no sign to cancel, so summing it and taking the
+    principal eigenvector is the correct mean of axial data. See `dyadic`.
+
+    Where the field carries TWO directions the better-aligned one is taken per
+    sample, by the same `max` the tracker's support uses: averaging both would
+    return their bisector at every crossing, which is the one direction no fibre
+    actually goes.
+
+    Returns (N, 3) unit vectors, signed to agree with the current heading
+    `v_now` -- an axis has no sign, and reversing the walker is not a turn.
+    """
+    N, K = dirs.shape[0], dirs.shape[1]
+    s = np.linspace(lookahead / n, lookahead, n)
+    pts = (x[:, None, None, :] + s[None, None, :, None]
+           * dirs[:, :, None, :]).reshape(-1, 3)
+
+    def _accum(T):
+        return np.stack([_sample(c, pts).reshape(N, K * n) for c in T], axis=-1)
+
+    if not dyadic_fields:
+        vec1 = dyadic(vec1)
+        vec2 = None if vec2 is None else dyadic(vec2)
+    D1 = _accum(vec1)                                   # (N, K*n, 6)
+    if vec2 is not None:
+        D2 = _accum(vec2)
+        # (d . v)^2 against the CURRENT heading picks which fibre each sample
+        # belongs to; ties and empty vec2 fall to family 1.
+        def _a2(D):
+            out = np.zeros(D.shape[:2])
+            for k, (i, j, w) in enumerate(_DYAD):
+                out += w * D[:, :, k] * (v_now[:, i] * v_now[:, j])[:, None]
+            return out
+        take2 = (_a2(D2) > _a2(D1))[:, :, None]
+        D1 = np.where(take2, D2, D1)
+
+    M6 = D1.mean(axis=1)                                # (N, 6) mean v v^T
+    T = np.empty((len(M6), 3, 3))
+    for k, (i, j, _w) in enumerate(_DYAD):
+        T[:, i, j] = M6[:, k]
+        T[:, j, i] = M6[:, k]
+    w_eig, V = np.linalg.eigh(T)                        # ascending
+    m = V[:, :, -1]                                     # principal axis
+    flip = np.einsum("ij,ij->i", m, v_now) < 0.0
+    m[flip] *= -1.0
+    return _unit(m, axis=1)
+
+
+def _slerp(v, m, alpha, max_angle=None):
+    """Rotate from v toward m along the great circle, stopping at fraction alpha.
+
+    alpha = 0 keeps the current heading, alpha = 1 goes the whole way, and the
+    path between is the geodesic on the sphere -- a linear blend would cut the
+    chord and arrive off the unit sphere, which after renormalising is a
+    DIFFERENT angle from the fraction requested.
+
+    WHY max_angle EXISTS. It is tempting to argue the clamp is unnecessary --
+    that a mean of vectors sampled inside a theta cone must itself lie within
+    theta. That argument is false, and measurably so: the cone bounds WHERE the
+    field is read, not WHAT is found there. The sampled directors are whatever
+    the field holds at those positions and are under no angular constraint at
+    all. Measured on the curved phantom at theta = 17.19 deg, the unclamped turn
+    reached 89.87 deg -- an outright reversal, five times the supposed bound.
+
+    Since theta is defined as "the widest turn allowed in one step", the target
+    is first pulled back onto the theta cone, then alpha interpolates toward it.
+    So alpha = 1 turns by min(angle-to-mean, theta), never more.
+    """
+    c = np.clip(np.einsum("ij,ij->i", v, m), -1.0, 1.0)
+    ang = np.arccos(c)
+    tgt = m.copy()
+    if max_angle is not None:
+        over = ang > float(max_angle)
+        if over.any():
+            # Pull the target back to exactly max_angle along the same geodesic.
+            f = (float(max_angle) / ang[over])[:, None]
+            s = np.sin(ang[over])[:, None]
+            tgt[over] = (np.sin((1.0 - f) * ang[over][:, None]) * v[over]
+                         + np.sin(f * ang[over][:, None]) * m[over]) / s
+            tgt[over] = _unit(tgt[over], axis=1)
+            ang[over] = float(max_angle)
+    out = v.copy()
+    move = ang > 1e-9
+    if move.any():
+        a = float(np.clip(alpha, 0.0, 1.0))
+        s = np.sin(ang[move])
+        out[move] = (np.sin((1.0 - a) * ang[move])[:, None] * v[move]
+                     + np.sin(a * ang[move])[:, None] * tgt[move]) / s[:, None]
+    return _unit(out, axis=1)
+
+
 def _unit(v, axis=-1):
     """Normalise WITHOUT the `norm + EPS` idiom used elsewhere in the repo.
 
@@ -238,7 +356,7 @@ def support(vol, vec1, vec2, x, dirs, lookahead, n=N_LOOKAHEAD,
 def track(vol, field, seeds, seed_dirs, alpha, lookahead, theta, floor,
           step=STEP, max_steps=MAX_STEPS, n_lookahead=N_LOOKAHEAD,
           both_ways=True, align_exp=1.0, dyadic_fields=True,
-          intensity_exp=INTENSITY_EXP):
+          intensity_exp=INTENSITY_EXP, turn="sample", rings=RELAX_RINGS):
     """Walk cone-search streamlines from `seeds` along `seed_dirs`.
 
     vol        (Z, Y, X) image the support is read from
@@ -250,8 +368,40 @@ def track(vol, field, seeds, seed_dirs, alpha, lookahead, theta, floor,
                and -e3 are the same fibre, so a seed has no intrinsic direction
                and taking only one would sample half of each tract.
 
+    TWO MEANINGS OF alpha, selected by `turn`
+    -----------------------------------------
+    "sample"  (default, unchanged) alpha is the ANGULAR STEP in radians. The
+              cone is enumerated at that resolution and the walker jumps to the
+              single best-supported candidate. theta is then quantised in units
+              of alpha -- `cone_weights` builds round(theta/alpha) rings -- so
+              the two parameters are not independent and settings sharing a ring
+              count are the identical cone.
+
+    "relax"   alpha is a FRACTION in [0, 1]. The cone is sampled at a fixed
+              resolution (`rings`, not alpha), the mean orientation of the field
+              inside it is computed, that mean is clamped onto the theta cone,
+              and the walker rotates from its current heading toward it,
+              stopping at fraction alpha of the way. alpha = 0 never turns;
+              alpha = 1 turns by min(angle-to-mean, theta).
+
+              The clamp is load-bearing, not defensive: the cone bounds where
+              the field is READ, not what is found there, so an unclamped mean
+              turned by 89.87 deg at theta = 17.19 deg on the curved phantom.
+              See `_slerp`.
+
+    The difference is not cosmetic. "sample" picks ONE direction by argmax, so
+    it is as sharp as its discretisation and no sharper, and its derivative in
+    theta is exactly zero. "relax" uses EVERY vector in the cone and is smooth
+    in all three parameters by construction, and it removes the theta/alpha ring
+    degeneracy entirely because alpha no longer controls the sampling.
+
     Returns a list of (M, 3) paths.
     """
+    if turn not in ("sample", "relax"):
+        raise ValueError(f"turn must be 'sample' or 'relax', got {turn!r}")
+    if turn == "relax" and not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"turn='relax' needs alpha in [0, 1], got {alpha}; "
+                         f"it is a fraction of the turn, not an angle")
     vec1, vec2 = _fields(field)
     if dyadic_fields:
         vec1 = dyadic(vec1)
@@ -268,7 +418,8 @@ def track(vol, field, seeds, seed_dirs, alpha, lookahead, theta, floor,
     if N == 0:
         return []
 
-    wv, wa, wb = cone_weights(theta, alpha)
+    wv, wa, wb = (cone_sample_weights(theta, rings) if turn == "relax"
+                  else cone_weights(theta, alpha))
     hist = np.full((max_steps + 1, N, 3), np.nan)
     hist[0] = s
     nstep = np.zeros(N, int)
@@ -280,20 +431,38 @@ def track(vol, field, seeds, seed_dirs, alpha, lookahead, theta, floor,
         dirs = _unit(wv[None, :, None] * v[:, None, :]
                      + wa[None, :, None] * a[:, None, :]
                      + wb[None, :, None] * b[:, None, :], axis=2)
-        sup, gate = support(vol, vec1, vec2, x, dirs, lookahead,
-                            n=n_lookahead, align_exp=align_exp,
-                            dyadic_fields=dyadic_fields,
-                            intensity_exp=intensity_exp)
+        if turn == "relax":
+            # Every vector in the cone votes, then the heading moves a fraction
+            # alpha of the way there. No argmax, so nothing depends on which
+            # candidate happened to be enumerated.
+            m = _mean_director(vec1, vec2, x, dirs, lookahead, n_lookahead,
+                               v, dyadic_fields)
+            v_new = _slerp(v, m, alpha, max_angle=theta)
+            _sup, gate = support(vol, vec1, vec2, x, v_new[:, None, :],
+                                 lookahead, n=n_lookahead,
+                                 align_exp=align_exp,
+                                 dyadic_fields=dyadic_fields,
+                                 intensity_exp=intensity_exp)
+            # Gated on the direction actually taken, exactly as below.
+            alive = gate[:, 0] >= floor
+            if not alive.any():
+                break
+            v = v_new
+        else:
+            sup, gate = support(vol, vec1, vec2, x, dirs, lookahead,
+                                n=n_lookahead, align_exp=align_exp,
+                                dyadic_fields=dyadic_fields,
+                                intensity_exp=intensity_exp)
 
-        k = np.argmax(sup, axis=1)
-        rows = np.arange(len(k))
-        # The walk ends on the brightness-coupled gate at the direction it
-        # actually chose, never on the score -- otherwise `intensity_exp` would
-        # silently change what "off the end of a fibre" means as well.
-        alive = gate[rows, k] >= floor
-        if not alive.any():
-            break
-        v = dirs[rows, k]
+            k = np.argmax(sup, axis=1)
+            rows = np.arange(len(k))
+            # The walk ends on the brightness-coupled gate at the direction it
+            # actually chose, never on the score -- otherwise `intensity_exp`
+            # would silently change what "off the end of a fibre" means too.
+            alive = gate[rows, k] >= floor
+            if not alive.any():
+                break
+            v = dirs[rows, k]
         x = x + step * v
         inside = np.ones(len(x), bool)
         for c in range(3):
@@ -325,7 +494,7 @@ def _fields(field):
 # seeding
 # ---------------------------------------------------------------------------
 
-def seeds_from(field, max_seeds=2000, mask=None, second=True, jitter=0.0,
+def seeds_from(field, max_seeds=5000, mask=None, second=True, jitter=0.0,
                rng=None):
     """Seed positions and directions from a DenseField.
 

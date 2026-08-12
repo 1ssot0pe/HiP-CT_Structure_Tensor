@@ -128,7 +128,7 @@ def resolution_kernel(sep, alpha):
 def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
                tau=TAU, beta=BETA, step=STEP, max_steps=MAX_STEPS,
                n_lookahead=N_LOOKAHEAD, quad=None, both_ways=True,
-               return_ids=False):
+               return_ids=False, turn="sample"):
     """Smooth streamlines. Returns (positions, directions, weights).
 
     positions   (M, 3)  every step's midpoint, all walkers concatenated
@@ -151,11 +151,20 @@ def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
     the forward half of seed `id` and id >= N is the backward half of seed
     `id - N`; `as_streamlines` uses that to rejoin the two halves into one tract.
     """
+    if turn not in ("sample", "relax"):
+        raise ValueError(f"turn must be 'sample' or 'relax', got {turn!r}")
+    if turn == "relax" and not 0.0 <= alpha <= 1.0:
+        raise ValueError(f"turn='relax' needs alpha in [0, 1], got {alpha}; "
+                         f"it is a fraction of the turn, not an angle")
+
     vec1, vec2 = DT._fields(field)
     T1 = DT.dyadic(vec1)
     T2 = None if vec2 is None else DT.dyadic(vec2)
     wv, wa, wb, tilt, sep = quad if quad is not None else quadrature()
-    Kres = resolution_kernel(sep, alpha)
+    # In "relax" mode alpha is a turn fraction, not an angular resolution, so
+    # there is no resolution kernel to build -- the evidence is averaged over
+    # the whole cone instead of being blurred and then argmax-ed.
+    Kres = None if turn == "relax" else resolution_kernel(sep, alpha)
 
     s = np.asarray(seeds, float)
     d = DT._unit(np.asarray(seed_dirs, float), axis=1)
@@ -181,25 +190,39 @@ def track_soft(vol, field, seeds, seed_dirs, lookahead, theta, alpha, floor,
         dirs = DT._unit(wv[None, :, None] * v[:, None, :]
                         + wa[None, :, None] * a[:, None, :]
                         + wb[None, :, None] * b[:, None, :], axis=2)
-        score, gate = DT.support(vol, T1, T2, x, dirs, float(lookahead),
-                                 n=n_lookahead, dyadic_fields=True,
-                                 intensity_exp=0.0)
+        if turn == "relax":
+            # Every vector in the cone votes through the dyadic mean, then the
+            # heading moves a fraction alpha of the way there, clamped to theta.
+            # This path has no softmax and no argmax at all -- it is smooth in
+            # (L, theta, alpha) by construction rather than by relaxation, so
+            # tau does not enter it.
+            m = DT._mean_director(T1, T2, x, dirs, float(lookahead),
+                                  n_lookahead, v, True)
+            v_new = DT._slerp(v, m, alpha, max_angle=float(theta))
+            _s, gate = DT.support(vol, T1, T2, x, v_new[:, None, :],
+                                  float(lookahead), n=n_lookahead,
+                                  dyadic_fields=True, intensity_exp=0.0)
+            g_bar = gate[:, 0]
+        else:
+            score, gate = DT.support(vol, T1, T2, x, dirs, float(lookahead),
+                                     n=n_lookahead, dyadic_fields=True,
+                                     intensity_exp=0.0)
 
-        # alpha first: blur the evidence to the tracker's angular resolution,
-        # BEFORE any choice is made. Applied to the score and to the gate alike,
-        # since both are readings of the same evidence.
-        score = score @ Kres.T
-        gate = gate @ Kres.T
+            # alpha first: blur the evidence to the tracker's angular
+            # resolution, BEFORE any choice is made. Applied to the score and
+            # the gate alike, since both read the same evidence.
+            score = score @ Kres.T
+            gate = gate @ Kres.T
 
-        # softmax over candidates, with the angular prior. Subtracting the row
-        # max is the standard overflow guard and changes nothing.
-        logits = score / max(float(tau), EPS) + logw[None, :]
-        logits -= logits.max(axis=1, keepdims=True)
-        p = np.exp(logits)
-        p /= p.sum(axis=1, keepdims=True) + EPS
+            # softmax over candidates, with the angular prior. Subtracting the
+            # row max is the standard overflow guard and changes nothing.
+            logits = score / max(float(tau), EPS) + logw[None, :]
+            logits -= logits.max(axis=1, keepdims=True)
+            p = np.exp(logits)
+            p /= p.sum(axis=1, keepdims=True) + EPS
 
-        v_new = DT._unit(np.einsum("nk,nkc->nc", p, dirs), axis=1)
-        g_bar = np.einsum("nk,nk->n", p, gate)
+            v_new = DT._unit(np.einsum("nk,nkc->nc", p, dirs), axis=1)
+            g_bar = np.einsum("nk,nk->n", p, gate)
 
         x_mid = x + 0.5 * step * v_new
         x = x + step * v_new

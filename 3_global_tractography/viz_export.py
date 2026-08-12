@@ -271,7 +271,8 @@ def comparison_figure(image, tdi_norm, support, path, title="", info=None,
 # the loss volume over (L, theta, alpha)
 # ---------------------------------------------------------------------------
 
-def save_param_volume(Ls, thetas, alphas, Z, path, descrip=b"tdi_mse"):
+def save_param_volume(Ls, thetas, alphas, Z, path, descrip=b"tdi_mse",
+                      alpha_in_degrees=True):
     """The sweep as a NIfTI whose three axes are the three parameters.
 
     Identical convention to `param_volume.save_volume`, repeated here rather
@@ -279,10 +280,17 @@ def save_param_volume(Ls, thetas, alphas, Z, path, descrip=b"tdi_mse"):
     index -> log10(parameter), angles in DEGREES, units marked unknown because
     they are not spatial and a viewer printing millimetres for a cone width
     would be worse than printing nothing.
+
+    `alpha_in_degrees=False` for a `turn="relax"` sweep, where alpha is a
+    dimensionless turn FRACTION and not an angle. Converting a fraction to
+    degrees would put a plausible-looking angle on the axis of a quantity that
+    is not one -- see `descent_loop.fmt_alpha`.
     """
     import nibabel as nib
 
-    thd, ald = np.degrees(np.asarray(thetas)), np.degrees(np.asarray(alphas))
+    thd = np.degrees(np.asarray(thetas))
+    ald = (np.degrees(np.asarray(alphas)) if alpha_in_degrees
+           else np.asarray(alphas, float))
 
     def _step(v):
         lg = np.log10(np.asarray(v, float))
@@ -692,11 +700,17 @@ def regenerate_figure(outdir, variant="vec1", tdi_cmap="gray", suffix="_gray",
     image, tdi = _load("image"), _load("tdi")
     support = tissue_mask(image)
     path = os.path.join(outdir, f"compare_{tag}{suffix}.png")
+    # alpha in ITS OWN units: degrees for turn="sample", a bare fraction for
+    # turn="relax". `alpha_deg` is deliberately None on a relax run so it cannot
+    # be picked up and printed as an angle -- see `descent_loop.fmt_alpha`.
+    turn = r.get("turn", run.get("turn", "sample"))
+    a_str = (f"{r['alpha_deg']:.1f} deg" if turn == "sample"
+             else f"{r['alpha']:.4f} (turn fraction)")
     p = comparison_figure(
         image, tdi, support, path, info=r["end"], tdi_cmap=tdi_cmap,
         title=f"{run.get('label', 'i74')} -- {variant} field, converged cone "
               f"(L={r['L']:.2f} vox, theta={r['theta_deg']:.1f} deg, "
-              f"alpha={r['alpha_deg']:.1f} deg)   [TDI in {tdi_cmap}]")
+              f"alpha={a_str}, turn={turn})   [TDI in {tdi_cmap}]")
     if verbose:
         n_orig, n_new = run["tissue_voxels"], int(support.sum())
         print(f"  {variant:>10}: support {n_new} voxels "
