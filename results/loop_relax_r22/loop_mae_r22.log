@@ -1,0 +1,15 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (44, 44, 44) at (384,384,384), mean 0.5
+  [setup] volume loaded in 1.6 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.1 min; 83676/85184 voxels oriented (98%), 0 with two directions | background 1508, disorganised 14925, dispersed 13849, unclassified 54902
+  5000 shared seeds (fa); 83676 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.2 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (metric=mae, turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+      pass    1/~104  [------------------------]  1.0%    0.9m elapsed, ~ 92.1m left (53.6s/pass)    image already preprocessed: True; support 83676 voxels
+    one pass 53.76 s; start loss 0.307549; descent cap 12 iters (~93.5 min)
+      pass    2/~104  [------------------------]  1.9%    1.8m elapsed, ~ 93.4m left (54.9s/pass)    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.307549  [56.24 s]

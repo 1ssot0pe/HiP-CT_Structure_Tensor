@@ -1,0 +1,11 @@
+
+                           GRID MIN  descent end descent start
+  MSE                      0.092969     0.094835     0.136313
+  offset                   0.021844     0.021073     0.073831
+  pattern                  0.071125     0.073762     0.062482
+  offset_frac                 23.5%        22.2%        54.2%
+  pearson_r                 +0.0929      +0.0954      +0.0808
+  coverage                   98.90%       98.70%       95.73%
+  n_tracts                     4899         4898         4860
+
+reproduce check: grid-min MSE recomputed 0.092969 vs swept 0.092969  -> MATCH

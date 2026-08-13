@@ -35,6 +35,8 @@ import json
 import os
 import sys
 
+import itertools
+
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -70,6 +72,12 @@ class Problem:
         self.tau, self.beta, self.max_steps = tau, beta, max_steps
         self.quad = ST.quadrature()
         self.n_eval = 0
+        self.progress = None        # set by the caller; see `f`
+        # Optional FIELD OPERATOR: (L, theta, alpha) -> a refined field to track
+        # through. When set, the parameters are scored by the field they
+        # produce, not only by how a walker steps, and the refined field becomes
+        # the run's deliverable. See `cone_field_smooth`.
+        self.field_op = None
         # WHAT alpha MEANS -- see `dense_tracker.track`. "sample" is the angular
         # resolution (radians); "relax" is the fraction of the turn taken toward
         # the cone's mean orientation, in [0, 1]. The descent works in LOG space
@@ -96,8 +104,20 @@ class Problem:
             raise ValueError("objective='mse' needs a cone_objective.Context")
         self.objective, self.ctx = objective, ctx
 
+    def field_at(self, L, theta, alpha):
+        """The field to track through at these parameters.
+
+        Identity unless `field_op` is set. Kept separate from `track` so the
+        refined field can be recovered for the optimum WITHOUT re-running the
+        descent -- the whole point of smoothing from the original field every
+        time is that this is a pure function of the parameters.
+        """
+        return self.dense if self.field_op is None else self.field_op(
+            float(L), float(theta), float(alpha))
+
     def track(self, L, theta, alpha):
-        return ST.track_soft(self.vol, self.dense, self.seeds, self.sdirs,
+        return ST.track_soft(self.vol, self.field_at(L, theta, alpha),
+                             self.seeds, self.sdirs,
                              lookahead=float(L), theta=float(theta),
                              alpha=float(alpha), floor=self.floor,
                              tau=self.tau, beta=self.beta,
@@ -109,6 +129,13 @@ class Problem:
         L, th, al = np.exp(u)
         pos, dirs, w = self.track(L, th, al)
         self.n_eval += 1
+        # A tracking pass at 5000 seeds costs ~55 s, and an iteration is 8-12 of
+        # them, so without this the run is silent for eight minutes at a stretch
+        # and cannot be distinguished from a hang. Reported per PASS because the
+        # pass is the unit of work; the iteration bar in `descend` is too coarse
+        # to show anything is alive.
+        if self.progress is not None:
+            self.progress(self)
         if callable(self.objective):
             return float(self.objective(pos, dirs, w))
         if self.objective == "align":
@@ -216,7 +243,14 @@ def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
               f"alpha={np.exp(u[2]):6.4f}  loss {f0:.6f}"
               f"  [{trace[0]['seconds']:.2f} s]")
 
-    for it in range(max_iters):
+    # max_iters falsy (0 or None) = NO CAP: run until the descent stops itself,
+    # which it does on a zero gradient or an exhausted line search. Both are
+    # properties of the surface, not of a budget, so an uncapped run is the only
+    # one whose endpoint is a statement about the loss rather than about when we
+    # ran out of patience. The r22 MSE run hit its cap of 12 while still
+    # improving, so its endpoint was the cap.
+    _iters = itertools.count() if not max_iters else range(max_iters)
+    for it in _iters:
         t_it, n_prev = _time.time(), prob.n_eval
         g, f_here = prob.grad(u)
         gn = float(np.linalg.norm(g))
@@ -244,7 +278,7 @@ def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
                           n_eval=int(prob.n_eval),
                           passes=int(prob.n_eval - n_prev)))
         if verbose:
-            print(f"    {_bar(it + 1, max_iters)} it {it:2d} "
+            print(f"    {_bar(it + 1, max_iters) if max_iters else f'[it {it + 1:3d}]'} it {it:2d} "
                   f"L={np.exp(u[0]):6.3f} theta={np.exp(u[1]):6.4f} "
                   f"alpha={np.exp(u[2]):6.4f}  loss {f0:.6f}  "
                   f"|g| {gn:.4f}  lr {lr_try:.4f}  ({prob.n_eval} passes, "

@@ -1,6 +1,0 @@
-sweep-only: c:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop_relax_r22  variant=vec1  turn=relax  n=5
-  setup 0.2 min | 5000 seeds (run had 5000)
-  reproduce start loss: 0.136312830 vs 0.136312830  -> EXACT
-      [#-------------------------]  4.0% 5/125  6.1m elapsed, ~146.7m left
-      [##------------------------]  8.0% 10/125  13.2m elapsed, ~152.2m left
-      [###-----------------------] 12.0% 15/125  20.0m elapsed, ~146.4m left

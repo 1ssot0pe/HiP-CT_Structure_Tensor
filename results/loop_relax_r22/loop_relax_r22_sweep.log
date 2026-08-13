@@ -1,0 +1,35 @@
+sweep-only: c:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop_relax_r22  variant=vec1  turn=relax  n=5
+  setup 0.2 min | 5000 seeds (run had 5000)
+  reproduce start loss: 0.136312830 vs 0.136312830  -> EXACT
+      [#-------------------------]  4.0% 5/125  6.1m elapsed, ~146.7m left
+      [##------------------------]  8.0% 10/125  13.2m elapsed, ~152.2m left
+      [###-----------------------] 12.0% 15/125  20.0m elapsed, ~146.4m left
+      [####----------------------] 16.0% 20/125  38.5m elapsed, ~202.0m left
+      [#####---------------------] 20.0% 25/125  45.0m elapsed, ~180.1m left
+      [######--------------------] 24.0% 30/125  90.0m elapsed, ~284.9m left
+      [#######-------------------] 28.0% 35/125  96.2m elapsed, ~247.3m left
+      [########------------------] 32.0% 40/125  101.7m elapsed, ~216.2m left
+      [#########-----------------] 36.0% 45/125  107.4m elapsed, ~191.0m left
+      [##########----------------] 40.0% 50/125  113.4m elapsed, ~170.0m left
+      [###########---------------] 44.0% 55/125  119.1m elapsed, ~151.6m left
+      [############--------------] 48.0% 60/125  126.5m elapsed, ~137.1m left
+      [##############------------] 52.0% 65/125  132.6m elapsed, ~122.4m left
+      [###############-----------] 56.0% 70/125  137.6m elapsed, ~108.1m left
+      [################----------] 60.0% 75/125  142.6m elapsed, ~95.1m left
+      [#################---------] 64.0% 80/125  148.7m elapsed, ~83.6m left
+      [##################--------] 68.0% 85/125  155.8m elapsed, ~73.3m left
+      [###################-------] 72.0% 90/125  162.4m elapsed, ~63.1m left
+      [####################------] 76.0% 95/125  168.7m elapsed, ~53.3m left
+      [#####################-----] 80.0% 100/125  174.8m elapsed, ~43.7m left
+      [######################----] 84.0% 105/125  181.9m elapsed, ~34.6m left
+      [#######################---] 88.0% 110/125  189.7m elapsed, ~25.9m left
+      [########################--] 92.0% 115/125  196.8m elapsed, ~17.1m left
+      [#########################-] 96.0% 120/125  203.9m elapsed, ~8.5m left
+      [##########################] 100.0% 125/125  210.0m elapsed, ~0.0m left
+
+  grid min 0.092969 at L=12.000 theta=3.63d alpha=0.0500   ON A BOUNDARY
+  loss range over the grid: 0.092969 .. 0.170115
+  descent ended at 0.094835 (+0.001866 vs grid min)
+
+  wrote c:\Users\issyh\OneDrive\Documents\hipct-structure-tensor\results\loop_relax_r22\lossvol_vec1.nii.gz
+  patched descent_loop.json (211.3 min total)

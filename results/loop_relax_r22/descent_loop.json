@@ -253,7 +253,45 @@
         "trk_start": "tracts_vec1_start.trk",
         "figure": "compare_vec1.png",
         "html": "descent_vec1.html",
-        "timelog": "timelog_vec1.txt"
+        "timelog": "timelog_vec1.txt",
+        "lossvol": "lossvol_vec1.nii.gz"
+      },
+      "sweep": {
+        "n": 5,
+        "turn": "relax",
+        "L": [
+          2.0,
+          3.1301691601465746,
+          4.898979485566356,
+          7.667317250955271,
+          12.0
+        ],
+        "theta_deg": [
+          1.7188733853924694,
+          3.6349746464135895,
+          7.687035468905513,
+          16.256100811738108,
+          34.37746770784939
+        ],
+        "alpha_axis": [
+          0.05000000000000001,
+          0.10573712634405641,
+          0.223606797749979,
+          0.47287080450158797,
+          1.0
+        ],
+        "alpha_units": "fraction",
+        "alpha_deg": null,
+        "grid_min": {
+          "loss": 0.09296852350234985,
+          "L": 12.0,
+          "theta_deg": 3.6349746464135895,
+          "alpha_axis": 0.05000000000000001,
+          "alpha_deg": null,
+          "on_boundary": true
+        },
+        "loss_min": 0.09296852350234985,
+        "loss_max": 0.17011494934558868
       }
     }
   }

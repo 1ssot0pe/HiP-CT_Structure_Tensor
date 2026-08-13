@@ -1,0 +1,46 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MAE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (24, 24, 24) at (384,384,384), mean 0.5
+  [setup] volume loaded in 1.8 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.0 min; 13577/13824 voxels oriented (98%), 0 with two directions | background 247, unclassified 13577
+  800 shared seeds (fa); 13577 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.0 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (metric=mae, turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+      pass    1 (no cap)     0.1m elapsed  ( 4.9s/pass)    image already preprocessed: True; support 13577 voxels
+    one pass 4.87 s; start loss 0.348985; descent cap 0 iters (~0.0 min)
+      pass    2 (no cap)     0.2m elapsed  ( 4.6s/pass)    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.348985  [4.30 s]
+      pass    3 (no cap)     0.2m elapsed  ( 4.5s/pass)      pass    4 (no cap)     0.3m elapsed  ( 4.4s/pass)      pass    5 (no cap)     0.4m elapsed  ( 4.4s/pass)      pass    6 (no cap)     0.4m elapsed  ( 4.4s/pass)      pass    7 (no cap)     0.5m elapsed  ( 4.3s/pass)      pass    8 (no cap)     0.6m elapsed  ( 4.3s/pass)      pass    9 (no cap)     0.6m elapsed  ( 4.3s/pass)      pass   10 (no cap)     0.7m elapsed  ( 4.3s/pass)    [it   1] it  0 L= 4.045 theta=0.1226 alpha=0.4005  loss 0.332931  |g| 0.0812  lr 0.3000  (10 passes,  34.0 s)
+      pass   11 (no cap)     0.8m elapsed  ( 4.3s/pass)      pass   12 (no cap)     0.9m elapsed  ( 4.4s/pass)      pass   13 (no cap)     0.9m elapsed  ( 4.4s/pass)      pass   14 (no cap)     1.0m elapsed  ( 4.4s/pass)      pass   15 (no cap)     1.1m elapsed  ( 4.4s/pass)      pass   16 (no cap)     1.2m elapsed  ( 4.4s/pass)      pass   17 (no cap)     1.2m elapsed  ( 4.4s/pass)      pass   18 (no cap)     1.3m elapsed  ( 4.4s/pass)      pass   19 (no cap)     1.4m elapsed  ( 4.4s/pass)      pass   20 (no cap)     1.5m elapsed  ( 4.4s/pass)    [it   2] it  1 L= 4.306 theta=0.1191 alpha=0.3890  loss 0.332580  |g| 0.0235  lr 0.0750  (20 passes,  44.7 s)
+      pass   21 (no cap)     1.5m elapsed  ( 4.4s/pass)      pass   22 (no cap)     1.6m elapsed  ( 4.4s/pass)      pass   23 (no cap)     1.7m elapsed  ( 4.4s/pass)      pass   24 (no cap)     1.8m elapsed  ( 4.4s/pass)      pass   25 (no cap)     1.9m elapsed  ( 4.5s/pass)      pass   26 (no cap)     1.9m elapsed  ( 4.5s/pass)      pass   27 (no cap)     2.0m elapsed  ( 4.5s/pass)      pass   28 (no cap)     2.1m elapsed  ( 4.5s/pass)      pass   29 (no cap)     2.2m elapsed  ( 4.5s/pass)    [it   3] it  2 L= 4.091 theta=0.1170 alpha=0.3790  loss 0.332513  |g| 0.0113  lr 0.0600  (29 passes,  41.5 s)
+      pass   30 (no cap)     2.2m elapsed  ( 4.5s/pass)      pass   31 (no cap)     2.3m elapsed  ( 4.5s/pass)      pass   32 (no cap)     2.4m elapsed  ( 4.5s/pass)      pass   33 (no cap)     2.4m elapsed  ( 4.4s/pass)      pass   34 (no cap)     2.5m elapsed  ( 4.4s/pass)      pass   35 (no cap)     2.6m elapsed  ( 4.4s/pass)      pass   36 (no cap)     2.7m elapsed  ( 4.4s/pass)      pass   37 (no cap)     2.7m elapsed  ( 4.4s/pass)      pass   38 (no cap)     2.8m elapsed  ( 4.4s/pass)    [it   4] it  3 L= 4.269 theta=0.1188 alpha=0.3852  loss 0.332224  |g| 0.0379  lr 0.0480  (38 passes,  39.0 s)
+      pass   39 (no cap)     2.9m elapsed  ( 4.4s/pass)      pass   40 (no cap)     3.0m elapsed  ( 4.4s/pass)      pass   41 (no cap)     3.0m elapsed  ( 4.4s/pass)      pass   42 (no cap)     3.1m elapsed  ( 4.4s/pass)      pass   43 (no cap)     3.2m elapsed  ( 4.4s/pass)      pass   44 (no cap)     3.2m elapsed  ( 4.4s/pass)      pass   45 (no cap)     3.3m elapsed  ( 4.4s/pass)      pass   46 (no cap)     3.4m elapsed  ( 4.4s/pass)      pass   47 (no cap)     3.5m elapsed  ( 4.4s/pass)    [it   5] it  4 L= 4.155 theta=0.1167 alpha=0.3773  loss 0.331939  |g| 0.0104  lr 0.0384  (47 passes,  39.3 s)
+      pass   48 (no cap)     3.5m elapsed  ( 4.4s/pass)      pass   49 (no cap)     3.6m elapsed  ( 4.4s/pass)      pass   50 (no cap)     3.7m elapsed  ( 4.4s/pass)      pass   51 (no cap)     3.7m elapsed  ( 4.4s/pass)      pass   52 (no cap)     3.8m elapsed  ( 4.4s/pass)      pass   53 (no cap)     3.9m elapsed  ( 4.4s/pass)      pass   54 (no cap)     3.9m elapsed  ( 4.4s/pass)      pass   55 (no cap)     4.0m elapsed  ( 4.4s/pass)      pass   56 (no cap)     4.1m elapsed  ( 4.4s/pass)      pass   57 (no cap)     4.2m elapsed  ( 4.4s/pass)      pass   58 (no cap)     4.2m elapsed  ( 4.4s/pass)    [it   6] it  5 L= 4.186 theta=0.1169 alpha=0.3774  loss 0.331933  |g| 0.0278  lr 0.0077  (58 passes,  46.3 s)
+      pass   59 (no cap)     4.3m elapsed  ( 4.4s/pass)      pass   60 (no cap)     4.4m elapsed  ( 4.4s/pass)      pass   61 (no cap)     4.4m elapsed  ( 4.4s/pass)      pass   62 (no cap)     4.5m elapsed  ( 4.4s/pass)      pass   63 (no cap)     4.6m elapsed  ( 4.4s/pass)      pass   64 (no cap)     4.7m elapsed  ( 4.4s/pass)      pass   65 (no cap)     4.7m elapsed  ( 4.4s/pass)      pass   66 (no cap)     4.8m elapsed  ( 4.4s/pass)      pass   67 (no cap)     4.9m elapsed  ( 4.4s/pass)      pass   68 (no cap)     4.9m elapsed  ( 4.4s/pass)      pass   69 (no cap)     5.0m elapsed  ( 4.4s/pass)    [it   7] it  6 L= 4.186 theta=0.1169 alpha=0.3774  loss 0.331933  |g| 0.0236  lr 0.0008  (69 passes,  47.0 s)
+    line search exhausted -- converged
+
+    start   loss 0.170248  offset 53.2%  r -0.0016  coverage 86.02%  735 tracts
+    end     loss 0.157082  offset 45.2%  r -0.0097  coverage 89.54%  737 tracts
+
+    [export]
+      image     ../results/small_mae\image_vec1.nii.gz
+      tdi       ../results/small_mae\tdi_vec1.nii.gz
+      residual  ../results/small_mae\residual_vec1.nii.gz
+      trk       ../results/small_mae\tracts_vec1.trk  (737 tracts, 13130 points)
+      trk       ../results/small_mae\tracts_vec1_start.trk  (735 tracts, 12741 points)
+      figure    ../results/small_mae\compare_vec1.png
+      html      ../results/small_mae\descent_vec1.html
+      timelog   ../results/small_mae\timelog_vec1.txt
+
+==============================================================================
+  turn=relax  (alpha  turn fraction [0,1])
+       variant       L     theta      alpha       loss   offset         r   cover  tracts
+          vec1    4.19     6.70d     0.3774   0.157082   45.2%   -0.0097 89.54%     737
+
+  the descent moved L by vec1 4.7%
+==============================================================================
+  wrote ../results/small_mae\descent_loop.json
+  all outputs in ../results/small_mae
