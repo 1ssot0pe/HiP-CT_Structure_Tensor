@@ -119,9 +119,12 @@ def normalise_tdi(tdi, support=None, smooth=0.0):
     so it is a switch that gets reported, not a default that gets hidden.
     """
     d = np.asarray(tdi, float)
+
     if smooth and smooth > 0:
         d = gaussian_filter(d, float(smooth))
+    
     d = np.log10(1.0 + np.maximum(d, 0.0))
+
     inside = d if support is None else d[support]
     if not inside.size:
         return np.zeros_like(d)
@@ -134,6 +137,34 @@ def normalise_tdi(tdi, support=None, smooth=0.0):
 # ---------------------------------------------------------------------------
 # the loss
 # ---------------------------------------------------------------------------
+
+def decompose_abs(a, b):
+    """The MAE analogue of `decompose` -- and NOT an identity, unlike that one.
+
+        MAE      = mean |a - b|
+        level    = |mean a - mean b|          how far apart the two LEVELS are
+        shape    = mean |(a - a_bar) - (b - b_bar)|   disagreement after centring
+
+    `level + shape >= MAE` by the triangle inequality, with equality only when
+    the centred residual never changes sign. So the two parts BOUND the error
+    rather than partitioning it, and `level/MAE` is not a fraction-of-loss the
+    way `offset_frac` is. Reported anyway because the question it answers -- is
+    this a level gap or a shape gap -- is the same question, and refusing to
+    answer it because the algebra is less tidy would be worse than answering it
+    with the caveat attached.
+    """
+    a = np.asarray(a, float).ravel()
+    b = np.asarray(b, float).ravel()
+    if not a.size:
+        return dict(mae=float("nan"), level=float("nan"), shape=float("nan"),
+                    level_frac=float("nan"))
+    ma, mb = a.mean(), b.mean()
+    mae = float(np.mean(np.abs(a - b)))
+    level = float(abs(ma - mb))
+    shape = float(np.mean(np.abs((a - ma) - (b - mb))))
+    return dict(mae=mae, level=level, shape=shape,
+                level_frac=float(level / mae) if mae > EPS else float("nan"))
+
 
 def decompose(a, b):
     """Split mean((a - b)^2) into its offset and pattern halves.
@@ -174,7 +205,7 @@ class TdiMse:
     """
 
     def __init__(self, vol, support, smooth=0.0, n_keep=N_KEEP,
-                 clip_pct=CLIP_PCT):
+                 clip_pct=CLIP_PCT, metric="mse"):
         self.image, self.was_preprocessed = prepare_image(vol, clip_pct=clip_pct)
         self.shape = self.image.shape
         self.support = (np.ones(self.shape, bool) if support is None
@@ -182,13 +213,27 @@ class TdiMse:
         self.smooth, self.n_keep = float(smooth), n_keep
         self.img_s = self.image[self.support]
         self.n_calls = 0
+        # WHICH residual is descended on. Both are reported either way; this
+        # only picks the one the optimiser sees.
+        #
+        # They differ in how the residual weights the gradient. d/dp of the
+        # squared error carries a factor of the residual itself, so voxels that
+        # are already badly wrong dominate the step; d/dp of the absolute error
+        # carries only sign(residual), so every voxel contributes equally
+        # regardless of how wrong it is. On this data the residual distribution
+        # is near-Gaussian (RMSE/MAE = 1.24 against 1.25 for a normal), so there
+        # is no heavy tail for MAE to be robust AGAINST -- the expected effect is
+        # a change in which voxels steer, not a change in outlier handling.
+        if metric not in ("mse", "mae"):
+            raise ValueError(f"metric must be 'mse' or 'mae', got {metric!r}")
+        self.metric = metric
 
     # -- the two steps, separately, so either can be inspected ---------------
 
     def tdi(self, pos, dirs, w):
         """The raw (un-normalised) TDI of a smooth tractogram."""
         return ST.as_tdi(pos, dirs, w, self.shape, n_keep=self.n_keep)
-
+    
     def normalised(self, pos, dirs, w):
         return normalise_tdi(self.tdi(pos, dirs, w), support=self.support,
                              smooth=self.smooth)
@@ -198,15 +243,26 @@ class TdiMse:
     def __call__(self, pos, dirs, w):
         self.n_calls += 1
         d = self.normalised(pos, dirs, w)[self.support]
-        return float(np.mean((d - self.img_s) ** 2))
+        e = d - self.img_s
+        return float(np.mean(e ** 2) if self.metric == "mse"
+                     else np.mean(np.abs(e)))
 
     def report(self, pos, dirs, w):
-        """The loss plus everything needed to judge whether to believe it."""
+        """The loss plus everything needed to judge whether to believe it.
+
+        BOTH residuals are always reported, whichever one is being descended
+        on, so an mae run and an mse run can be compared without re-tracking
+        either. `loss` is the one the optimiser saw.
+        """
         raw = self.tdi(pos, dirs, w)
         norm = normalise_tdi(raw, support=self.support, smooth=self.smooth)
         d, r = norm[self.support], raw[self.support]
         out = decompose(d, self.img_s)
+        out.update(decompose_abs(d, self.img_s))
         out.update(
+            metric=self.metric,
+            loss=float(out["mse"] if self.metric == "mse" else out["mae"]),
+            rmse=float(np.sqrt(out["mse"])),
             coverage=float((r > 0).mean()),          # support voxels a tract touched
             tdi_mean_raw=float(r.mean()), tdi_max_raw=float(r.max()),
             tdi_mean_norm=float(d.mean()), image_mean=float(self.img_s.mean()),

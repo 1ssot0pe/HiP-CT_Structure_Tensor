@@ -60,6 +60,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
 import smooth_tracker as ST                                   # noqa: E402
 import tdi_mse as TM                                          # noqa: E402
 import viz_export as VE                                       # noqa: E402
+import cone_field_smooth as CFS                              # noqa: E402
 from cone_descent import stage2, seed, FLOOR_FRAC             # noqa: E402
 from gradient_optimise import Problem, descend                # noqa: E402
 from param_volume import load_chunk, L_RANGE, THETA_RANGE, ALPHA_RANGE  # noqa: E402
@@ -237,16 +238,52 @@ def sweep(prob, n, verbose=True):
 
 def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
                 L0, theta0, alpha0, max_iters, smooth, sweep_n, tag,
-                voxel_um=VOXEL_SIZE_UM, label="i74", turn="sample"):
+                voxel_um=VOXEL_SIZE_UM, label="i74", turn="sample",
+                metric="mse", refine_field=False):
     """One descent, plus everything written out for it."""
     print("\n" + "-" * 78)
-    print(f"  VARIANT: {variant}   (turn={turn}, alpha is "
+    print(f"  VARIANT: {variant}   (metric={metric}, turn={turn}, alpha is "
           f"{'a fraction in [0,1]' if turn == 'relax' else 'a resolution in radians'})")
     print("-" * 78)
 
     field = field_for_variant(dense, variant)
-    obj = TM.TdiMse(vol, tissue, smooth=smooth)
+    obj = TM.TdiMse(vol, tissue, smooth=smooth, metric=metric)
     prob = Problem(vol, field, s, sd, floor, objective=obj, turn=turn)
+    if refine_field:
+        # THE FIELD BECOMES THE PRODUCT. Every evaluation re-smooths the
+        # ORIGINAL field with the current (L, theta, alpha) and tracks through
+        # the result, so the parameters are scored by the field they generate
+        # rather than only by how a walker steps. Smoothing from field_0 each
+        # time (never from the previous iterate) keeps params -> field a pure
+        # function; see cone_field_smooth's module docstring.
+        prob.field_op = lambda L, th, al: CFS.smooth_field(field, L, th, al)
+
+    # Per-pass progress. An iteration is 8-12 tracking passes at ~55 s each, so
+    # the iteration bar alone leaves eight-minute silences that look identical
+    # to a hang. `\r` keeps it on one line in a terminal; a redirected log gets
+    # one line per pass, which is what makes `tail -f` useful on a long run.
+    t_run = time.time()
+    # With no cap there is no budget to show a fraction of, so the bar falls
+    # back to a pass counter rather than inventing a denominator.
+    budget = ((max(int(round(8.7 * max_iters)), 1) if max_iters else 0)
+              + (sweep_n ** 3 if sweep_n else 0))
+
+    def _pass_progress(p):
+        el = time.time() - t_run
+        sp = el / max(p.n_eval, 1)
+        if budget:
+            frac = min(p.n_eval / budget, 1.0)
+            n = int(round(frac * 24))
+            left = sp * max(budget - p.n_eval, 0) / 60.0
+            msg = (f"pass {p.n_eval:4d}/~{budget} "
+                   f"[{'#' * n}{'-' * (24 - n)}] {frac:5.1%}  "
+                   f"{el / 60:5.1f}m elapsed, ~{left:5.1f}m left")
+        else:
+            # No cap: there is no denominator to show a fraction of, so the bar
+            # becomes a counter. Inventing a total here would be a fake ETA.
+            msg = f"pass {p.n_eval:4d} (no cap)  {el / 60:6.1f}m elapsed"
+        print(f"\r      {msg}  ({sp:4.1f}s/pass)", end="", flush=True)
+    prob.progress = _pass_progress
 
     t0 = time.time()
     f_start = prob.f(np.log([L0, theta0, alpha0]))
@@ -319,7 +356,8 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
                 f"turn={turn}: {alpha_axis_label(turn)}"])
     print(f"      timelog   {paths['timelog']}")
 
-    out = dict(variant=variant, turn=turn, L=L, theta=th, alpha=al,
+    out = dict(variant=variant, turn=turn, metric=metric,
+               L=L, theta=th, alpha=al,
                theta_deg=float(np.degrees(th)),
                # alpha in DISPLAY units for this mode -- degrees for "sample",
                # the bare fraction for "relax". alpha_deg is kept only where it
@@ -380,7 +418,8 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
 
 def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
          theta0=0.15, alpha0=None, max_iters=12, smooth=0.0, sweep_n=0,
-         variants=VARIANTS, dataset="i74", turn="sample", outdir=None):
+         variants=VARIANTS, dataset="i74", turn="sample", metric="mse",
+         outdir=None):
     # alpha's sensible start depends on what it means; see ALPHA0_BY_TURN.
     alpha0 = ALPHA0_BY_TURN[turn] if alpha0 is None else alpha0
     outdir = outdir or os.path.join(_ROOT, "results",
@@ -389,8 +428,8 @@ def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
     os.makedirs(outdir, exist_ok=True)
 
     print("=" * 78)
-    print("STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, "
-          "normalised TDI)")
+    print(f"STAGE 3 LOOP -- descend the cone on "
+          f"{metric.upper()}(preprocessed image, normalised TDI)")
     print("=" * 78)
 
     t_setup = time.time()
@@ -433,7 +472,8 @@ def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
         tag = v.replace("+", "_")
         runs[v] = run_variant(v, vol, dense, s, sd, floor, tissue, outdir,
                               origin, L0, theta0, alpha0, max_iters, smooth,
-                              sweep_n, tag, label=label, turn=turn)
+                              sweep_n, tag, label=label, turn=turn,
+                              metric=metric)
 
     # ---- the comparison ----------------------------------------------------
     print("\n" + "=" * 78)
@@ -459,7 +499,7 @@ def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
               f"tdi_mse.decompose and the standing result in cone_objective.")
     print("=" * 78)
 
-    out = dict(dataset=dataset, label=label, turn=turn,
+    out = dict(dataset=dataset, label=label, turn=turn, metric=metric,
                centre=centre, radius=radius,
                shape=list(vol.shape),
                crop_origin=list(origin), voxel_um=VOXEL_SIZE_UM,
@@ -501,7 +541,8 @@ if __name__ == "__main__":
                          "radians, cone enumerated then argmax-ed. 'relax': "
                          "fraction in [0,1] of the turn toward the cone's mean "
                          "orientation, clamped to theta")
-    ap.add_argument("--max-iters", type=int, default=12)
+    ap.add_argument("--max-iters", type=int, default=12,
+                    help="0 = NO CAP: descend until the line search exhausts")
     ap.add_argument("--smooth", type=float, default=0.0,
                     help="Gaussian on the TDI before log10, in voxels "
                          "(scale matching; 0 = off)")
@@ -512,10 +553,13 @@ if __name__ == "__main__":
     ap.add_argument("--dataset", choices=("i74", "crossing"), default="i74",
                     help="'crossing' is the localized crossing phantom, the "
                          "only setup where vec2 exists at all")
+    ap.add_argument("--metric", choices=("mse", "mae"), default="mse",
+                    help="residual the descent minimises. Both are reported "
+                         "either way; this picks the one the optimiser sees")
     ap.add_argument("--outdir", default=None)
     a = ap.parse_args()
     main(centre=a.centre, radius=a.radius, n_seeds=a.seeds, seeding=a.seeding,
          L0=a.L0, theta0=a.theta0, alpha0=a.alpha0, max_iters=a.max_iters,
          smooth=a.smooth, sweep_n=a.sweep_n,
          variants=VARIANTS if a.variant == "both" else (a.variant,),
-         dataset=a.dataset, turn=a.turn, outdir=a.outdir)
+         dataset=a.dataset, turn=a.turn, metric=a.metric, outdir=a.outdir)

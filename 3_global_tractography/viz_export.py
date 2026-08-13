@@ -346,27 +346,81 @@ def _read_sweep(outdir, variant, json_name="descent_loop.json", up=1):
         float)
     if up > 1:
         Z = zoom(Z, up, order=3)
-    ax = [_upsample_axis(np.array(sw[k], float), Z.shape[i])
-          for i, k in enumerate(("L", "theta_deg", "alpha_deg"))]
+    # alpha's axis is in DISPLAY units, which depend on the mode: degrees for
+    # turn="sample", a bare fraction for turn="relax". `alpha_axis` carries it
+    # for both; `alpha_deg` is None on a relax run precisely so it cannot be
+    # read and plotted as an angle. Older sweeps have only `alpha_deg`.
+    a_vals = sw.get("alpha_axis") or sw.get("alpha_deg")
+    ax = [_upsample_axis(np.array(v, float), Z.shape[i]) for i, v in
+          enumerate((sw["L"], sw["theta_deg"], a_vals))]
     lg = [np.log10(a) for a in ax]
 
     tr = d["trace"]
+    # The PATH's alpha must be converted the same way the AXIS was. The trace
+    # stores alpha in its native form -- radians for turn="sample", a bare
+    # fraction for turn="relax" -- so applying np.degrees() unconditionally put
+    # a relax path at log10(degrees(0.5)) = 1.46 on an axis running -1.30..0.
+    # The path was then drawn entirely ABOVE the volume, which is what it looked
+    # like: a descent floating outside its own loss surface.
+    a_deg = sw.get("alpha_units", "deg") == "deg"
     P = np.array([[np.log10(t["L"]), np.log10(np.degrees(t["theta"])),
-                   np.log10(np.degrees(t["alpha"]))] for t in tr])
+                   np.log10(np.degrees(t["alpha"]) if a_deg else t["alpha"])]
+                  for t in tr])
     loss = np.array([t["loss"] for t in tr], float)
     gm = sw["grid_min"]
-    g = np.log10([gm["L"], gm["theta_deg"], gm["alpha_deg"]])
+    g = np.log10([gm["L"], gm["theta_deg"],
+                  gm.get("alpha_axis", gm.get("alpha_deg"))])
     return Z, lg, P, loss, g, d, run
 
 
 def _log_ticks(lo, hi):
     """Tick positions in log10 with labels in the real parameter, so the axis
-    reads in voxels/degrees even though the coordinate is a logarithm."""
-    cand = np.array([1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30, 40], float)
+    reads in voxels/degrees/fractions even though the coordinate is a logarithm.
+
+    The candidate list spans BELOW 1 as well as above, because a `turn="relax"`
+    alpha axis lives entirely in (0, 1] -- with only the >=1 candidates the
+    fallback produced raw floats like 0.472871 on an axis whose natural marks
+    are 0.05, 0.1, 0.2, 0.5, 1.
+    """
+    cand = np.array([0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.5, 0.7, 1, 1.5, 2, 3,
+                     4, 5, 6, 8, 10, 15, 20, 30, 40], float)
     v = cand[(cand >= 10 ** lo * 0.999) & (cand <= 10 ** hi * 1.001)]
     if len(v) < 3:
         v = 10 ** np.linspace(lo, hi, 5)
     return np.log10(v), [f"{x:g}" for x in v]
+
+
+def _alpha_label(sw):
+    """Axis label for alpha in the units that sweep actually used."""
+    return ("alpha  resolution (deg)"
+            if sw.get("alpha_units", "deg") == "deg"
+            else "alpha  turn fraction [0,1]")
+
+
+def _boundary_note(sw):
+    """Which parameters sit on the swept box's edge, named rather than assumed.
+
+    `on_boundary` is a single flag over three axes, so a figure that says which
+    one has to work it out from the grid. Hardcoding "theta at the range floor"
+    was wrong on the first relax sweep, where the boundary hits were L at its
+    CEILING and alpha at its FLOOR while theta was interior.
+    """
+    gm = sw["grid_min"]
+    axes = (("L", sw["L"], gm["L"], ""),
+            ("theta", sw["theta_deg"], gm["theta_deg"], " deg"),
+            ("alpha", sw.get("alpha_axis") or sw.get("alpha_deg"),
+             gm.get("alpha_axis", gm.get("alpha_deg")),
+             " deg" if sw.get("alpha_units", "deg") == "deg" else ""))
+    hits = []
+    for name, vals, got, unit in axes:
+        v = np.asarray(vals, float)
+        if abs(got - v[0]) <= 1e-9 * max(abs(v[0]), 1):
+            hits.append(f"{name} at its FLOOR ({got:g}{unit})")
+        elif abs(got - v[-1]) <= 1e-9 * max(abs(v[-1]), 1):
+            hits.append(f"{name} at its CEILING ({got:g}{unit})")
+    if not hits:
+        return "grid min is interior in all three parameters"
+    return "grid min ON A BOUNDARY -- " + ", ".join(hits)
 
 
 def descent_volume_3d(outdir, path, variants=None, up=5, opacity=0.10,
@@ -432,8 +486,10 @@ def descent_volume_3d(outdir, path, variants=None, up=5, opacity=0.10,
             name=f"{v} loss", hoverinfo="skip"), row=1, col=c)
 
         # the 125 points that were actually measured
-        m0 = [np.log10(np.array(d["sweep"][k], float))
-              for k in ("L", "theta_deg", "alpha_deg")]
+        _sw = d["sweep"]
+        m0 = [np.log10(np.array(vals, float)) for vals in
+              (_sw["L"], _sw["theta_deg"],
+               _sw.get("alpha_axis") or _sw.get("alpha_deg"))]
         MX, MY, MW = np.meshgrid(*m0, indexing="ij")
         fig.add_trace(go.Scatter3d(
             x=MX.ravel(), y=MY.ravel(), z=MW.ravel(), mode="markers",
@@ -476,7 +532,7 @@ def descent_volume_3d(outdir, path, variants=None, up=5, opacity=0.10,
                        ticktext=tl[1]),
             yaxis=dict(title="theta  half-width (deg)", tickvals=tt[0],
                        ticktext=tt[1]),
-            zaxis=dict(title="alpha  resolution (deg)", tickvals=ta[0],
+            zaxis=dict(title=_alpha_label(d["sweep"]), tickvals=ta[0],
                        ticktext=ta[1]),
             aspectmode="cube",
             camera=dict(eye=dict(x=1.6, y=1.5, z=1.1)))
@@ -593,22 +649,20 @@ def descent_volume_3d_png(outdir, path, variants=None, up=7,
                 (ax.set_yticks, ax.set_yticklabels, lg[1],
                  "theta  half-width (deg)"),
                 (ax.set_zticks, ax.set_zticklabels, lg[2],
-                 "alpha  resolution (deg)")):
+                 _alpha_label(d["sweep"]))):
             tv, tt = _log_ticks(lim[0], lim[-1])
             setter(tv)
             lab_setter(tt, fontsize=8)
         ax.set_xlabel("L  lookahead (vox)", fontsize=9, labelpad=2)
         ax.set_ylabel("theta  half-width (deg)", fontsize=9, labelpad=2)
-        ax.set_zlabel("alpha  resolution (deg)", fontsize=9, labelpad=2)
+        ax.set_zlabel(_alpha_label(d["sweep"]), fontsize=9, labelpad=2)
 
         gm = d["sweep"]["grid_min"]
         gap = d["end"]["mse"] - gm["loss"]
         ax.set_title(
             f"{v}\ndescent end {d['end']['mse']:.6f}    grid min "
             f"{gm['loss']:.6f}    ({gap:+.6f})\n"
-            + (f"grid min ON A BOUNDARY -- theta at the range floor "
-               f"({gm['theta_deg']:.2f} deg)" if gm.get("on_boundary")
-               else "grid min is interior"),
+            + _boundary_note(d["sweep"]),
             fontsize=9.5, pad=2)
         ax.view_init(elev=22, azim=-60)
 
@@ -617,11 +671,20 @@ def descent_volume_3d_png(outdir, path, variants=None, up=7,
         # renderer failed to draw -- and here it really did barely move.
         span = [(P[:, i].max() - P[:, i].min()) / (lg[i][-1] - lg[i][0])
                 for i in range(3)]
+        # How much of the box the LOWEST shell occupies, measured rather than
+        # asserted. A shell filling most of the box means the loss barely
+        # distinguishes settings; a compact one means there is a real basin.
+        # Hardcoding either claim was wrong once already (see `_boundary_note`).
+        lo_v, hi_v = float(Zf.min()), float(Zf.max())
+        iso0 = float(np.quantile(Zf.ravel(), quantiles[0]))
+        occ = float((np.abs(Zf.ravel() - iso0)
+                     <= band * (hi_v - lo_v)).mean())
         ax.text2D(0.02, 0.02,
                   f"path spans {span[0]:.1%} of L, {span[1]:.1%} of theta, "
-                  f"{span[2]:.1%} of alpha\n"
-                  f"({len(P)} iterates; the low-loss shell fills most of the "
-                  f"box, so there is no basin to fall into)",
+                  f"{span[2]:.1%} of alpha  ({len(P)} iterates)\n"
+                  f"lowest shell occupies {occ:.1%} of the swept box; "
+                  f"loss range {lo_v:.4f}-{hi_v:.4f} "
+                  f"({100 * (hi_v - lo_v) / max(abs(hi_v), 1e-12):.1f}% of max)",
                   transform=ax.transAxes, fontsize=8, color="#444444")
 
         if c == 1:
@@ -642,11 +705,13 @@ def descent_volume_3d_png(outdir, path, variants=None, up=7,
                       bbox_to_anchor=(-0.14, 1.02), frameon=False)
 
     fig.suptitle(title or
-                 f"{run.get('label', 'i74')} {tuple(run['shape'])} -- "
-                 f"loss VOLUME over (L, theta, alpha) with the descent path   "
-                 f"[5x5x5 measured, {up}x spline-upsampled for display]",
-                 fontsize=12)
-    fig.subplots_adjust(left=0.06, right=0.98, top=0.86, bottom=0.03,
+                 f"{run.get('label', 'i74')} {tuple(run['shape'])} "
+                 f"turn={run.get('turn', 'sample')} -- loss VOLUME over "
+                 f"(L, theta, alpha) with the descent path\n"
+                 f"{run['runs'][keep[0]]['sweep'].get('n', '?')}^3 measured, "
+                 f"{up}x spline-upsampled for display",
+                 fontsize=11)
+    fig.subplots_adjust(left=0.04, right=0.99, top=0.84, bottom=0.03,
                         wspace=0.06)
     fig.savefig(path, dpi=150, facecolor="white")
     plt.close(fig)
