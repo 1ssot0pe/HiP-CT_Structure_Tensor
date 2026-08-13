@@ -209,7 +209,7 @@ def _bar(done, total, width=24):
 
 
 def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
-            lr0=LR0, verbose=True):
+            lr0=LR0, verbose=True, on_accept=None):
     """Gradient descent with backtracking. Returns (L, theta, alpha, trace).
 
     Every trace entry carries WALL-CLOCK TIMING as well as parameters:
@@ -269,6 +269,16 @@ def descend(prob, L0=4.0, theta0=0.30, alpha0=0.15, max_iters=MAX_ITERS,
                 u, f0, acc = u_try, f_try, True
                 break
             lr_try *= 0.5
+
+        # ONE side effect per ACCEPTED iteration, never per evaluation.
+        # `prob.f` is called ~6 times for the central difference and once per
+        # line-search trial, so a hook that fired on every evaluation would act
+        # a variable number of times per iteration -- a backtracking search that
+        # halved four times would apply it four extra times, making the result
+        # depend on the optimiser's internals rather than on the data. Firing
+        # only here means exactly one update per step the descent actually took.
+        if acc and on_accept is not None:
+            on_accept(u, it)
         dt = float(_time.time() - t_it)
         trace.append(dict(iter=it, L=float(np.exp(u[0])),
                           theta=float(np.exp(u[1])),

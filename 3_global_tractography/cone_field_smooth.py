@@ -158,6 +158,32 @@ def smooth_field(dense, L, theta, alpha, n=N_SAMPLE, rings=RINGS,
     return out
 
 
+def smooth_array(vec, mask, L, theta, alpha, n=N_SAMPLE, rings=RINGS,
+                 clamp_to_theta=False):
+    """`smooth_field` for a BARE (3, Z, Y, X) direction array.
+
+    `descent_loop.field_for_variant` hands the tracker `dense.vec1` directly for
+    the vec1-only variant -- a plain array, not a DenseField -- so the refinement
+    needs a path that does not require the carrier object. Smoothing the full
+    DenseField and then taking its vec1 would NOT be equivalent: inside
+    `_mean_director` the presence of vec2 changes which family each sample is
+    assigned to, so the vec1-only variant would be quietly refined using the
+    second direction it is supposed to be doing without.
+    """
+    v_in = np.asarray(vec, float)
+    T1 = DT.dyadic(v_in)
+    idx = np.argwhere(np.asarray(mask, bool)).astype(float)
+    out = np.array(v_in, copy=True)
+    if len(idx):
+        z, y, x = (idx[:, 0].astype(int), idx[:, 1].astype(int),
+                   idx[:, 2].astype(int))
+        v = v_in[:, z, y, x].T
+        nv = smooth_directions(T1, None, idx, v, L, theta, alpha, n, rings,
+                               clamp_to_theta=clamp_to_theta)
+        out[:, z, y, x] = nv.T
+    return out.astype(np.asarray(vec).dtype)
+
+
 def angular_change(a, b, mask=None, degrees=True):
     """Median and mean angle between two director fields, (3, Z, Y, X) each.
 

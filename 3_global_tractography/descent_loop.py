@@ -249,14 +249,45 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
     field = field_for_variant(dense, variant)
     obj = TM.TdiMse(vol, tissue, smooth=smooth, metric=metric)
     prob = Problem(vol, field, s, sd, floor, objective=obj, turn=turn)
+
+    # THE FIELD IS CARRIED FORWARD. The descent itself is unchanged -- it still
+    # optimises (L, theta, alpha) against the TDI objective -- but after each
+    # ACCEPTED iteration the current field is cone-relaxed with the accepted
+    # parameters and kept. So the field accumulates across iterations and the
+    # converged field is the run's product.
+    #
+    # `state` holds it because `Problem` binds its field at construction, and
+    # every evaluation must see the SAME field within an iteration: the six
+    # central-difference probes and the line-search trials have to differ only
+    # in the parameters, or the measured gradient would include the field's
+    # own drift. Hence the update fires from `on_accept`, once per step taken,
+    # never from `f`. See `gradient_optimise.descend`.
+    state = dict(field=field, n_updates=0, moved=[])
     if refine_field:
-        # THE FIELD BECOMES THE PRODUCT. Every evaluation re-smooths the
-        # ORIGINAL field with the current (L, theta, alpha) and tracks through
-        # the result, so the parameters are scored by the field they generate
-        # rather than only by how a walker steps. Smoothing from field_0 each
-        # time (never from the previous iterate) keeps params -> field a pure
-        # function; see cone_field_smooth's module docstring.
-        prob.field_op = lambda L, th, al: CFS.smooth_field(field, L, th, al)
+        prob.field_op = lambda L, th, al: state["field"]
+
+        oriented = np.asarray(dense.n_dirs) >= 1
+
+        def _commit(u, it):
+            Lc, thc, alc = float(np.exp(u[0])), float(np.exp(u[1])), \
+                min(float(np.exp(u[2])), 1.0)
+            prev = state["field"]
+            # `field_for_variant` returns a bare array for "vec1" and the
+            # DenseField for "vec1+vec2"; both have to be refinable.
+            nxt = (CFS.smooth_field(prev, Lc, thc, alc)
+                   if hasattr(prev, "vec1") else
+                   CFS.smooth_array(prev, oriented, Lc, thc, alc))
+            ch = CFS.angular_change(
+                nxt.vec1 if hasattr(nxt, "vec1") else nxt,
+                prev.vec1 if hasattr(prev, "vec1") else prev,
+                mask=oriented)
+            state["field"], state["n_updates"] = nxt, state["n_updates"] + 1
+            state["moved"].append(ch)
+            print(f"\n      [field] iteration {it}: cone-relaxed, moved "
+                  f"median {ch['median']:.4f} deg "
+                  f"(mean {ch['mean']:.4f}, p95 {ch['p95']:.4f})", flush=True)
+    else:
+        _commit = None
 
     # Per-pass progress. An iteration is 8-12 tracking passes at ~55 s each, so
     # the iteration bar alone leaves eight-minute silences that look identical
@@ -296,7 +327,8 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
              f"(~{sweep_n ** 3 * per / 60:.1f} min)" if sweep_n else ""))
 
     L, th, al, trace = descend(prob, L0=L0, theta0=theta0, alpha0=alpha0,
-                               max_iters=max_iters)
+                               max_iters=max_iters, on_accept=_commit)
+    field = state["field"]          # the ACCUMULATED field is now the product
 
     # ---- the tractogram the loss actually scored, at the converged point ---
     pos, dirs, w, ids, n_seed = ST.track_soft(
@@ -345,6 +377,29 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
         title=f"{label} {variant} (turn={turn}): descent on "
               f"MSE(preprocessed image, normalised TDI)")
     print(f"      html      {paths['html']}")
+    if refine_field:
+        # SAVE THE ACCUMULATED FIELD. Stage 4 must read this rather than
+        # recompute it: the field is now the product of a SEQUENCE of relaxations
+        # applied to each other, so `smooth_field(field_0, L*, theta*, alpha*)`
+        # would reproduce only the last step, not the accumulation.
+        fld = state["field"]
+        v1 = fld.vec1 if hasattr(fld, "vec1") else fld
+        paths["refined_vec1"] = VE.save_nifti(
+            np.moveaxis(np.asarray(v1, float), 0, -1),
+            os.path.join(outdir, f"refined_vec1_{tag}.nii.gz"),
+            VE.nifti_affine(origin, voxel_um), vector=True, dtype=np.float32)
+        if hasattr(fld, "save"):
+            fld.save(os.path.join(outdir, f"refined_field_{tag}.npz"))
+            paths["refined_npz"] = os.path.join(outdir,
+                                                f"refined_field_{tag}.npz")
+        else:
+            np.savez_compressed(os.path.join(outdir,
+                                             f"refined_field_{tag}.npz"),
+                                vec1=np.asarray(v1, np.float32))
+            paths["refined_npz"] = os.path.join(outdir,
+                                                f"refined_field_{tag}.npz")
+        print(f"      refined   {paths['refined_vec1']}")
+
     paths["timelog"] = write_timelog(
         trace, os.path.join(outdir, f"timelog_{tag}.txt"), variant,
         header=[f"{label} {tuple(vol.shape)}  |  {len(s)} seeds  |  "
@@ -357,6 +412,9 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
     print(f"      timelog   {paths['timelog']}")
 
     out = dict(variant=variant, turn=turn, metric=metric,
+               refine_field=bool(refine_field),
+               field_updates=int(state["n_updates"]),
+               field_moved=state["moved"],
                L=L, theta=th, alpha=al,
                theta_deg=float(np.degrees(th)),
                # alpha in DISPLAY units for this mode -- degrees for "sample",
@@ -419,7 +477,7 @@ def run_variant(variant, vol, dense, s, sd, floor, tissue, outdir, origin,
 def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
          theta0=0.15, alpha0=None, max_iters=12, smooth=0.0, sweep_n=0,
          variants=VARIANTS, dataset="i74", turn="sample", metric="mse",
-         outdir=None):
+         refine_field=False, outdir=None):
     # alpha's sensible start depends on what it means; see ALPHA0_BY_TURN.
     alpha0 = ALPHA0_BY_TURN[turn] if alpha0 is None else alpha0
     outdir = outdir or os.path.join(_ROOT, "results",
@@ -473,7 +531,7 @@ def main(centre=384, radius=24, n_seeds=5000, seeding="fa", L0=4.0,
         runs[v] = run_variant(v, vol, dense, s, sd, floor, tissue, outdir,
                               origin, L0, theta0, alpha0, max_iters, smooth,
                               sweep_n, tag, label=label, turn=turn,
-                              metric=metric)
+                              metric=metric, refine_field=refine_field)
 
     # ---- the comparison ----------------------------------------------------
     print("\n" + "=" * 78)
@@ -553,6 +611,9 @@ if __name__ == "__main__":
     ap.add_argument("--dataset", choices=("i74", "crossing"), default="i74",
                     help="'crossing' is the localized crossing phantom, the "
                          "only setup where vec2 exists at all")
+    ap.add_argument("--refine-field", action="store_true",
+                    help="cone-relax the field after each accepted descent "
+                         "iteration and output the accumulated field")
     ap.add_argument("--metric", choices=("mse", "mae"), default="mse",
                     help="residual the descent minimises. Both are reported "
                          "either way; this picks the one the optimiser sees")
@@ -562,4 +623,5 @@ if __name__ == "__main__":
          L0=a.L0, theta0=a.theta0, alpha0=a.alpha0, max_iters=a.max_iters,
          smooth=a.smooth, sweep_n=a.sweep_n,
          variants=VARIANTS if a.variant == "both" else (a.variant,),
-         dataset=a.dataset, turn=a.turn, metric=a.metric, outdir=a.outdir)
+         dataset=a.dataset, turn=a.turn, metric=a.metric,
+         refine_field=a.refine_field, outdir=a.outdir)
