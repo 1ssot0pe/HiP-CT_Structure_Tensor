@@ -1,0 +1,159 @@
+{
+  "dataset": "i74",
+  "label": "i74",
+  "turn": "relax",
+  "metric": "mae",
+  "centre": 450,
+  "radius": 12,
+  "shape": [
+    24,
+    24,
+    24
+  ],
+  "crop_origin": [
+    438,
+    438,
+    438
+  ],
+  "voxel_um": 20.0,
+  "n_seeds": 77,
+  "n_seeds_requested": 800,
+  "seeding": "fa",
+  "smooth": 0.0,
+  "floor": 0.05,
+  "n_two_dir_voxels": 0,
+  "tissue_voxels": 13597,
+  "start": {
+    "L": 4.0,
+    "theta": 0.15,
+    "alpha": 0.5
+  },
+  "runs": {
+    "vec1": {
+      "variant": "vec1",
+      "turn": "relax",
+      "metric": "mae",
+      "refine_field": true,
+      "field_updates": 1,
+      "field_moved": [
+        {
+          "median": 4.706278085624753,
+          "mean": 6.877585205102131,
+          "p95": 20.841420711246226,
+          "n": 13597
+        }
+      ],
+      "L": 3.452011057889101,
+      "theta": 0.12948883623282678,
+      "alpha": 0.40285389676629335,
+      "theta_deg": 7.419163810201669,
+      "alpha_axis": 0.40285389676629335,
+      "alpha_units": "fraction",
+      "alpha_deg": null,
+      "L0": 4.0,
+      "theta0": 0.15,
+      "alpha0": 0.5,
+      "trace": [
+        {
+          "iter": -1,
+          "L": 4.0,
+          "theta": 0.15,
+          "alpha": 0.5,
+          "loss": 0.508625569624608,
+          "grad_norm": null,
+          "lr": null,
+          "seconds": 0.2821822166442871,
+          "t_cum": 0.2821826934814453,
+          "n_eval": 2,
+          "passes": 1
+        },
+        {
+          "iter": 0,
+          "L": 3.452011057889101,
+          "theta": 0.12948883623282678,
+          "alpha": 0.40285389676629335,
+          "loss": 0.5083349831835623,
+          "grad_norm": 0.0030955011119378696,
+          "lr": 0.3,
+          "seconds": 2.4844441413879395,
+          "t_cum": 2.766691207885742,
+          "n_eval": 10,
+          "passes": 8
+        },
+        {
+          "iter": 1,
+          "L": 3.452011057889101,
+          "theta": 0.12948883623282678,
+          "alpha": 0.40285389676629335,
+          "loss": 0.5083349831835623,
+          "grad_norm": 0.0039231751471953975,
+          "lr": 0.0005859375,
+          "seconds": 4.213362693786621,
+          "t_cum": 6.980092287063599,
+          "n_eval": 26,
+          "passes": 16
+        }
+      ],
+      "n_passes": 26,
+      "seconds_per_pass": 0.330136775970459,
+      "start": {
+        "mse": 0.30174702850064156,
+        "offset": 0.25151816991044346,
+        "pattern": 0.05022885859019809,
+        "offset_frac": 0.8335398401774442,
+        "pearson_r": -0.0135535332014973,
+        "mae": 0.5081890837152153,
+        "level": 0.5015158720423946,
+        "shape": 0.1757294571251063,
+        "level_frac": 0.9868686441982678,
+        "metric": "mae",
+        "loss": 0.5081890837152153,
+        "rmse": 0.5493150539541417,
+        "coverage": 0.10928881370890638,
+        "tdi_mean_raw": 0.04130359634446659,
+        "tdi_max_raw": 2.347090656992655,
+        "tdi_mean_norm": 0.025924392231796184,
+        "image_mean": 0.5274402642741908,
+        "image_var": 0.03941188702498013,
+        "n_support": 13597,
+        "smooth": 0.0
+      },
+      "end": {
+        "mse": 0.30173211113012977,
+        "offset": 0.25082663503844516,
+        "pattern": 0.05090547609168463,
+        "offset_frac": 0.8312891660717864,
+        "pearson_r": -0.01823164957146088,
+        "mae": 0.5076345361895764,
+        "level": 0.5008259528403507,
+        "shape": 0.17721561302058897,
+        "level_frac": 0.9865876277836955,
+        "metric": "mae",
+        "loss": 0.5076345361895764,
+        "rmse": 0.5493014756307594,
+        "coverage": 0.10833272045304111,
+        "tdi_mean_raw": 0.04278900346596647,
+        "tdi_max_raw": 2.359257677982436,
+        "tdi_mean_norm": 0.02661431143384002,
+        "image_mean": 0.5274402642741908,
+        "image_var": 0.03941188702498013,
+        "n_support": 13597,
+        "smooth": 0.0
+      },
+      "n_tracts": 44,
+      "n_tracts_start": 42,
+      "paths": {
+        "image": "image_vec1.nii.gz",
+        "tdi": "tdi_vec1.nii.gz",
+        "residual": "residual_vec1.nii.gz",
+        "trk": "tracts_vec1.trk",
+        "trk_start": "tracts_vec1_start.trk",
+        "figure": "compare_vec1.png",
+        "html": "descent_vec1.html",
+        "refined_vec1": "refined_vec1_vec1.nii.gz",
+        "refined_npz": "refined_field_vec1.npz",
+        "timelog": "timelog_vec1.txt"
+      }
+    }
+  }
+}

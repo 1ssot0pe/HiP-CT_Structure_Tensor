@@ -1,0 +1,15 @@
+r24 48^3 centre 384, 5000 seeds, rho fixed at 3.792 (the measured optimum)
+  sigma 0.400: MSE med 25.89 | MAE med 25.80
+  sigma 0.489: MSE med 23.97 | MAE med 23.89
+  sigma 0.599: MSE med 22.41 | MAE med 22.35
+  sigma 0.732: MSE med 21.17 | MAE med 21.13
+  sigma 0.896: MSE med 20.28 | MAE med 20.22
+  sigma 1.095: MSE med 20.48 | MAE med 20.42
+  sigma 1.340: MSE med 22.45 | MAE med 22.38
+  sigma 1.639: MSE med 26.65 | MAE med 26.59
+  sigma 2.005: MSE med 33.05 | MAE med 33.04
+  sigma 2.453: MSE med 40.15 | MAE med 40.15
+  sigma 3.000: MSE med 45.79 | MAE med 45.76
+
+MSE: min median 20.278 at sigma=0.896 (INTERIOR) | sign changes 1 | spread 25.51 deg
+MAE: min median 20.217 at sigma=0.896 (INTERIOR) | sign changes 1 | spread 25.54 deg

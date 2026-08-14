@@ -1,0 +1,22 @@
+r24 centre 384, sigma=1.00, rho 0.707..8.0 (14 pts), 5 MSE seed runs
+  rho 0.707 done (1/14)
+  rho 0.852 done (2/14)
+  rho 1.027 done (3/14)
+  rho 1.238 done (4/14)
+  rho 1.492 done (5/14)
+  rho 1.798 done (6/14)
+  rho 2.167 done (7/14)
+  rho 2.611 done (8/14)
+  rho 3.147 done (9/14)
+  rho 3.792 done (10/14)
+  rho 4.570 done (11/14)
+  rho 5.508 done (12/14)
+  rho 6.638 done (13/14)
+  rho 8.000 done (14/14)
+
+ seeds   min(med)     at rho  min(mean)     at rho   sign changes
+  1000     19.409      3.792     25.981      3.792              1
+  2000     19.739      3.792     26.373      3.792              1
+  3000     19.904      3.792     26.518      3.792              1
+  4000     20.134      3.792     26.790      3.792              1
+  5000     20.184      3.792     26.858      3.792              1

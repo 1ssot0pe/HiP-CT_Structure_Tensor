@@ -1,0 +1,57 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MSE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (48, 48, 48) at (384,384,384), mean 0.5
+  [setup] volume loaded in 2.3 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.2 min; 108643/110592 voxels oriented (98%), 0 with two directions | background 1949, disorganised 14952, dispersed 13859, unclassified 79832
+  5000 shared seeds (fa); 108643 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.2 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (metric=mse, turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+      pass    1/~52 [------------------------]  1.9%    1.6m elapsed, ~ 79.4m left  (93.4s/pass)    image already preprocessed: True; support 108643 voxels
+    one pass 93.61 s; start loss 0.150517; descent cap 6 iters (~81.4 min)
+      pass    2/~52 [#-----------------------]  3.8%    3.1m elapsed, ~ 77.6m left  (93.2s/pass)    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.150517  [92.87 s]
+      pass    3/~52 [#-----------------------]  5.8%    4.6m elapsed, ~ 75.1m left  (91.9s/pass)      pass    4/~52 [##----------------------]  7.7%    6.1m elapsed, ~ 73.2m left  (91.5s/pass)      pass    5/~52 [##----------------------]  9.6%    7.6m elapsed, ~ 71.6m left  (91.4s/pass)      pass    6/~52 [###---------------------] 11.5%    9.1m elapsed, ~ 70.1m left  (91.4s/pass)      pass    7/~52 [###---------------------] 13.5%   10.6m elapsed, ~ 68.1m left  (90.8s/pass)      pass    8/~52 [####--------------------] 15.4%   12.2m elapsed, ~ 66.9m left  (91.2s/pass)      pass    9/~52 [####--------------------] 17.3%   13.6m elapsed, ~ 65.2m left  (91.0s/pass)      pass   10/~52 [#####-------------------] 19.2%   15.2m elapsed, ~ 63.8m left  (91.2s/pass)
+      [field] iteration 0: cone-relaxed, moved median 7.8368 deg (mean 10.2523, p95 30.4913)
+    [####--------------------]  17% it  0 L= 4.441 theta=0.1237 alpha=0.4075  loss 0.140202  |g| 0.0332  lr 0.3000  (10 passes, 731.1 s)
+      pass   11/~52 [#####-------------------] 21.2%   16.9m elapsed, ~ 62.9m left  (92.1s/pass)      pass   12/~52 [######------------------] 23.1%   18.4m elapsed, ~ 61.5m left  (92.2s/pass)      pass   13/~52 [######------------------] 25.0%   20.1m elapsed, ~ 60.3m left  (92.7s/pass)      pass   14/~52 [######------------------] 26.9%   21.6m elapsed, ~ 58.7m left  (92.7s/pass)      pass   15/~52 [#######-----------------] 28.8%   23.0m elapsed, ~ 56.8m left  (92.1s/pass)      pass   16/~52 [#######-----------------] 30.8%   24.3m elapsed, ~ 54.7m left  (91.2s/pass)      pass   17/~52 [########----------------] 32.7%   25.6m elapsed, ~ 52.8m left  (90.4s/pass)      pass   18/~52 [########----------------] 34.6%   27.0m elapsed, ~ 51.0m left  (90.0s/pass)
+      [field] iteration 1: cone-relaxed, moved median 4.1189 deg (mean 5.7539, p95 17.8092)
+    [########----------------]  33% it  1 L= 4.544 theta=0.0974 alpha=0.3402  loss 0.130581  |g| 0.0510  lr 0.3000  (18 passes, 706.7 s)
+      pass   19/~52 [#########---------------] 36.5%   28.4m elapsed, ~ 49.3m left  (89.6s/pass)      pass   20/~52 [#########---------------] 38.5%   29.7m elapsed, ~ 47.6m left  (89.2s/pass)      pass   21/~52 [##########--------------] 40.4%   31.1m elapsed, ~ 45.9m left  (88.8s/pass)      pass   22/~52 [##########--------------] 42.3%   32.4m elapsed, ~ 44.1m left  (88.3s/pass)      pass   23/~52 [###########-------------] 44.2%   33.7m elapsed, ~ 42.5m left  (87.9s/pass)      pass   24/~52 [###########-------------] 46.2%   35.0m elapsed, ~ 40.9m left  (87.6s/pass)      pass   25/~52 [############------------] 48.1%   36.3m elapsed, ~ 39.2m left  (87.2s/pass)      pass   26/~52 [############------------] 50.0%   37.6m elapsed, ~ 37.6m left  (86.8s/pass)
+      [field] iteration 2: cone-relaxed, moved median 2.6967 deg (mean 4.0864, p95 13.6030)
+    [############------------]  50% it  2 L= 5.091 theta=0.0806 alpha=0.2779  loss 0.119274  |g| 0.0617  lr 0.3000  (26 passes, 638.5 s)
+      pass   27/~52 [############------------] 51.9%   39.1m elapsed, ~ 36.2m left  (86.8s/pass)      pass   28/~52 [#############-----------] 53.8%   40.4m elapsed, ~ 34.6m left  (86.6s/pass)      pass   29/~52 [#############-----------] 55.8%   41.7m elapsed, ~ 33.1m left  (86.4s/pass)      pass   30/~52 [##############----------] 57.7%   43.1m elapsed, ~ 31.6m left  (86.2s/pass)      pass   31/~52 [##############----------] 59.6%   44.4m elapsed, ~ 30.1m left  (86.0s/pass)      pass   32/~52 [###############---------] 61.5%   45.8m elapsed, ~ 28.6m left  (85.8s/pass)      pass   33/~52 [###############---------] 63.5%   47.1m elapsed, ~ 27.1m left  (85.6s/pass)      pass   34/~52 [################--------] 65.4%   48.4m elapsed, ~ 25.6m left  (85.4s/pass)
+      [field] iteration 3: cone-relaxed, moved median 3.0798 deg (mean 4.5379, p95 14.8406)
+    [################--------]  67% it  3 L= 6.821 theta=0.0754 alpha=0.2778  loss 0.106610  |g| 0.0491  lr 0.3000  (34 passes, 646.5 s)
+      pass   35/~52 [################--------] 67.3%   49.9m elapsed, ~ 24.2m left  (85.5s/pass)      pass   36/~52 [#################-------] 69.2%   51.5m elapsed, ~ 22.9m left  (85.8s/pass)      pass   37/~52 [#################-------] 71.2%   53.1m elapsed, ~ 21.5m left  (86.1s/pass)      pass   38/~52 [##################------] 73.1%   54.8m elapsed, ~ 20.2m left  (86.5s/pass)      pass   39/~52 [##################------] 75.0%   56.5m elapsed, ~ 18.8m left  (86.9s/pass)      pass   40/~52 [##################------] 76.9%   58.1m elapsed, ~ 17.4m left  (87.2s/pass)      pass   41/~52 [###################-----] 78.8%   59.8m elapsed, ~ 16.0m left  (87.5s/pass)      pass   42/~52 [###################-----] 80.8%   61.5m elapsed, ~ 14.6m left  (87.8s/pass)
+      [field] iteration 4: cone-relaxed, moved median 2.4994 deg (mean 3.7913, p95 12.6960)
+    [####################----]  83% it  4 L= 8.277 theta=0.0651 alpha=0.2331  loss 0.102276  |g| 0.0251  lr 0.3000  (42 passes, 786.0 s)
+      pass   43/~52 [####################----] 82.7%   63.2m elapsed, ~ 13.2m left  (88.1s/pass)      pass   44/~52 [####################----] 84.6%   64.5m elapsed, ~ 11.7m left  (88.0s/pass)      pass   45/~52 [#####################---] 86.5%   66.2m elapsed, ~ 10.3m left  (88.2s/pass)      pass   46/~52 [#####################---] 88.5%   67.8m elapsed, ~  8.8m left  (88.5s/pass)      pass   47/~52 [######################--] 90.4%   69.5m elapsed, ~  7.4m left  (88.7s/pass)      pass   48/~52 [######################--] 92.3%   71.6m elapsed, ~  6.0m left  (89.4s/pass)      pass   49/~52 [#######################-] 94.2%   73.7m elapsed, ~  4.5m left  (90.2s/pass)      pass   50/~52 [#######################-] 96.2%   75.6m elapsed, ~  3.0m left  (90.8s/pass)
+      [field] iteration 5: cone-relaxed, moved median 1.6728 deg (mean 2.7203, p95 9.5669)
+    [########################] 100% it  5 L= 8.572 theta=0.0528 alpha=0.1886  loss 0.098961  |g| 0.0218  lr 0.3000  (50 passes, 849.8 s)
+
+    start   loss 0.154702  offset 63.7%  r +0.0904  coverage 94.03%  4860 tracts
+    end     loss 0.098938  offset 27.9%  r +0.1134  coverage 98.07%  4888 tracts
+
+    [export]
+      image     ../results/seed_5000\image_vec1.nii.gz
+      tdi       ../results/seed_5000\tdi_vec1.nii.gz
+      residual  ../results/seed_5000\residual_vec1.nii.gz
+      trk       ../results/seed_5000\tracts_vec1.trk  (4888 tracts, 196296 points)
+      trk       ../results/seed_5000\tracts_vec1_start.trk  (4860 tracts, 187819 points)
+      figure    ../results/seed_5000\compare_vec1.png
+      html      ../results/seed_5000\descent_vec1.html
+      refined   ../results/seed_5000\refined_vec1_vec1.nii.gz
+      timelog   ../results/seed_5000\timelog_vec1.txt
+
+==============================================================================
+  turn=relax  (alpha  turn fraction [0,1])
+       variant       L     theta      alpha       loss   offset         r   cover  tracts
+          vec1    8.57     3.02d     0.1886   0.098938   27.9%   +0.1134 98.07%    4888
+
+  the descent moved L by vec1 114.3%
+==============================================================================
+  wrote ../results/seed_5000\descent_loop.json
+  all outputs in ../results/seed_5000

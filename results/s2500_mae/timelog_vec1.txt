@@ -1,5 +1,5 @@
 i74 (24, 24, 24)  |  2193 seeds  |  support 13577 voxels  |  smoothing 0 vox
-objective: MSE(preprocessed image, normalised TDI); start L=4 theta=8.59d alpha=0.5000, cap 0 iters
+objective: MAE(preprocessed image, normalised TDI); start L=4 theta=8.59d alpha=0.5000, cap 0 iters
 turn=relax: alpha  turn fraction [0,1]
 DESCENT TIME LOG -- vec1
 generated 2026-08-13 14:32:03

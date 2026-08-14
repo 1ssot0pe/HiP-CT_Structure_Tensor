@@ -1,0 +1,89 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MAE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (24, 24, 24) at (384,384,384), mean 0.5
+  [setup] volume loaded in 0.9 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.0 min; 13577/13824 voxels oriented (98%), 0 with two directions | background 247, unclassified 13577
+  800 shared seeds (fa); 13577 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.0 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (metric=mae, turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+      pass    1 (no cap)     0.1m elapsed  ( 4.2s/pass)    image already preprocessed: True; support 13577 voxels
+    one pass 4.25 s; start loss 0.348985; descent cap 0 iters (~0.0 min)
+      pass    2 (no cap)     0.1m elapsed  ( 4.5s/pass)    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.348985  [4.69 s]
+      pass    3 (no cap)     0.2m elapsed  ( 4.4s/pass)      pass    4 (no cap)     0.3m elapsed  ( 4.4s/pass)      pass    5 (no cap)     0.4m elapsed  ( 4.4s/pass)      pass    6 (no cap)     0.4m elapsed  ( 4.3s/pass)      pass    7 (no cap)     0.5m elapsed  ( 4.3s/pass)      pass    8 (no cap)     0.6m elapsed  ( 4.3s/pass)      pass    9 (no cap)     0.7m elapsed  ( 4.3s/pass)      pass   10 (no cap)     0.7m elapsed  ( 4.3s/pass)
+      [field] iteration 0: cone-relaxed, moved median 9.1499 deg (mean 11.3947, p95 29.5132)
+    [it   1] it  0 L= 4.045 theta=0.1226 alpha=0.4005  loss 0.332931  |g| 0.0812  lr 0.3000  (10 passes,  34.9 s)
+      pass   11 (no cap)     0.8m elapsed  ( 4.4s/pass)      pass   12 (no cap)     0.9m elapsed  ( 4.4s/pass)      pass   13 (no cap)     0.9m elapsed  ( 4.4s/pass)      pass   14 (no cap)     1.0m elapsed  ( 4.4s/pass)      pass   15 (no cap)     1.1m elapsed  ( 4.4s/pass)      pass   16 (no cap)     1.2m elapsed  ( 4.4s/pass)      pass   17 (no cap)     1.2m elapsed  ( 4.4s/pass)      pass   18 (no cap)     1.3m elapsed  ( 4.4s/pass)
+      [field] iteration 1: cone-relaxed, moved median 5.0933 deg (mean 6.6333, p95 18.0946)
+    [it   2] it  1 L= 4.593 theta=0.1031 alpha=0.3249  loss 0.331330  |g| 0.0065  lr 0.3000  (18 passes,  35.7 s)
+      pass   19 (no cap)     1.4m elapsed  ( 4.4s/pass)      pass   20 (no cap)     1.5m elapsed  ( 4.4s/pass)      pass   21 (no cap)     1.5m elapsed  ( 4.4s/pass)      pass   22 (no cap)     1.6m elapsed  ( 4.4s/pass)      pass   23 (no cap)     1.7m elapsed  ( 4.4s/pass)      pass   24 (no cap)     1.8m elapsed  ( 4.4s/pass)      pass   25 (no cap)     1.8m elapsed  ( 4.4s/pass)      pass   26 (no cap)     1.9m elapsed  ( 4.4s/pass)      pass   27 (no cap)     2.0m elapsed  ( 4.4s/pass)      pass   28 (no cap)     2.1m elapsed  ( 4.4s/pass)      pass   29 (no cap)     2.1m elapsed  ( 4.4s/pass)
+      [field] iteration 2: cone-relaxed, moved median 3.5665 deg (mean 5.1920, p95 15.9120)
+    [it   3] it  2 L= 4.552 theta=0.1058 alpha=0.3334  loss 0.331471  |g| 0.0168  lr 0.0375  (29 passes,  49.2 s)
+      pass   30 (no cap)     2.2m elapsed  ( 4.4s/pass)      pass   31 (no cap)     2.3m elapsed  ( 4.4s/pass)      pass   32 (no cap)     2.4m elapsed  ( 4.4s/pass)      pass   33 (no cap)     2.4m elapsed  ( 4.4s/pass)      pass   34 (no cap)     2.5m elapsed  ( 4.4s/pass)      pass   35 (no cap)     2.6m elapsed  ( 4.4s/pass)      pass   36 (no cap)     2.7m elapsed  ( 4.4s/pass)      pass   37 (no cap)     2.7m elapsed  ( 4.4s/pass)      pass   38 (no cap)     2.8m elapsed  ( 4.4s/pass)
+      [field] iteration 3: cone-relaxed, moved median 2.5976 deg (mean 4.2551, p95 14.6260)
+    [it   4] it  3 L= 4.547 theta=0.1036 alpha=0.3263  loss 0.331792  |g| 0.0089  lr 0.0300  (38 passes,  39.7 s)
+      pass   39 (no cap)     2.9m elapsed  ( 4.4s/pass)      pass   40 (no cap)     3.0m elapsed  ( 4.4s/pass)      pass   41 (no cap)     3.0m elapsed  ( 4.4s/pass)      pass   42 (no cap)     3.1m elapsed  ( 4.4s/pass)      pass   43 (no cap)     3.2m elapsed  ( 4.4s/pass)      pass   44 (no cap)     3.2m elapsed  ( 4.4s/pass)      pass   45 (no cap)     3.3m elapsed  ( 4.4s/pass)      pass   46 (no cap)     3.4m elapsed  ( 4.4s/pass)
+      [field] iteration 4: cone-relaxed, moved median 2.0345 deg (mean 3.6193, p95 13.1066)
+    [it   5] it  4 L= 4.510 theta=0.0991 alpha=0.3204  loss 0.332619  |g| 0.0050  lr 0.0480  (46 passes,  35.9 s)
+      pass   47 (no cap)     3.5m elapsed  ( 4.5s/pass)      pass   48 (no cap)     3.6m elapsed  ( 4.5s/pass)      pass   49 (no cap)     3.7m elapsed  ( 4.5s/pass)      pass   50 (no cap)     3.7m elapsed  ( 4.5s/pass)      pass   51 (no cap)     3.8m elapsed  ( 4.5s/pass)      pass   52 (no cap)     3.9m elapsed  ( 4.5s/pass)      pass   53 (no cap)     4.0m elapsed  ( 4.5s/pass)      pass   54 (no cap)     4.0m elapsed  ( 4.5s/pass)
+      [field] iteration 5: cone-relaxed, moved median 1.6433 deg (mean 3.0725, p95 11.2508)
+    [it   6] it  5 L= 4.177 theta=0.0987 alpha=0.3200  loss 0.333652  |g| 0.0054  lr 0.0768  (54 passes,  37.8 s)
+      pass   55 (no cap)     4.1m elapsed  ( 4.5s/pass)      pass   56 (no cap)     4.2m elapsed  ( 4.5s/pass)      pass   57 (no cap)     4.3m elapsed  ( 4.5s/pass)      pass   58 (no cap)     4.4m elapsed  ( 4.5s/pass)      pass   59 (no cap)     4.5m elapsed  ( 4.5s/pass)      pass   60 (no cap)     4.5m elapsed  ( 4.5s/pass)      pass   61 (no cap)     4.6m elapsed  ( 4.5s/pass)      pass   62 (no cap)     4.7m elapsed  ( 4.5s/pass)      pass   63 (no cap)     4.7m elapsed  ( 4.5s/pass)
+      [field] iteration 6: cone-relaxed, moved median 1.4243 deg (mean 2.8115, p95 10.7056)
+    [it   7] it  6 L= 4.145 theta=0.1026 alpha=0.3355  loss 0.332936  |g| 0.0049  lr 0.0614  (63 passes,  42.7 s)
+      pass   64 (no cap)     4.8m elapsed  ( 4.5s/pass)      pass   65 (no cap)     4.9m elapsed  ( 4.5s/pass)      pass   66 (no cap)     5.0m elapsed  ( 4.5s/pass)      pass   67 (no cap)     5.0m elapsed  ( 4.5s/pass)      pass   68 (no cap)     5.1m elapsed  ( 4.5s/pass)      pass   69 (no cap)     5.2m elapsed  ( 4.5s/pass)      pass   70 (no cap)     5.2m elapsed  ( 4.5s/pass)      pass   71 (no cap)     5.3m elapsed  ( 4.5s/pass)      pass   72 (no cap)     5.4m elapsed  ( 4.5s/pass)
+      [field] iteration 7: cone-relaxed, moved median 1.2307 deg (mean 2.4944, p95 9.2733)
+    [it   8] it  7 L= 4.327 theta=0.1012 alpha=0.3289  loss 0.333572  |g| 0.0027  lr 0.0492  (72 passes,  38.9 s)
+      pass   73 (no cap)     5.5m elapsed  ( 4.5s/pass)      pass   74 (no cap)     5.5m elapsed  ( 4.5s/pass)      pass   75 (no cap)     5.6m elapsed  ( 4.5s/pass)      pass   76 (no cap)     5.7m elapsed  ( 4.5s/pass)      pass   77 (no cap)     5.8m elapsed  ( 4.5s/pass)      pass   78 (no cap)     5.8m elapsed  ( 4.5s/pass)      pass   79 (no cap)     5.9m elapsed  ( 4.5s/pass)      pass   80 (no cap)     6.0m elapsed  ( 4.5s/pass)
+      [field] iteration 8: cone-relaxed, moved median 1.0957 deg (mean 2.2670, p95 8.3261)
+    [it   9] it  8 L= 4.104 theta=0.1056 alpha=0.3422  loss 0.333342  |g| 0.0190  lr 0.0786  (80 passes,  34.6 s)
+      pass   81 (no cap)     6.0m elapsed  ( 4.5s/pass)      pass   82 (no cap)     6.1m elapsed  ( 4.5s/pass)      pass   83 (no cap)     6.2m elapsed  ( 4.5s/pass)      pass   84 (no cap)     6.3m elapsed  ( 4.5s/pass)      pass   85 (no cap)     6.3m elapsed  ( 4.5s/pass)      pass   86 (no cap)     6.4m elapsed  ( 4.5s/pass)      pass   87 (no cap)     6.5m elapsed  ( 4.5s/pass)      pass   88 (no cap)     6.6m elapsed  ( 4.5s/pass)      pass   89 (no cap)     6.6m elapsed  ( 4.5s/pass)      pass   90 (no cap)     6.7m elapsed  ( 4.5s/pass)
+      [field] iteration 9: cone-relaxed, moved median 0.9383 deg (mean 2.0180, p95 7.3875)
+    [it  10] it  9 L= 4.139 theta=0.1034 alpha=0.3350  loss 0.332993  |g| 0.0156  lr 0.0315  (90 passes,  45.0 s)
+      pass   91 (no cap)     6.8m elapsed  ( 4.5s/pass)      pass   92 (no cap)     6.9m elapsed  ( 4.5s/pass)      pass   93 (no cap)     6.9m elapsed  ( 4.5s/pass)      pass   94 (no cap)     7.0m elapsed  ( 4.5s/pass)      pass   95 (no cap)     7.1m elapsed  ( 4.5s/pass)      pass   96 (no cap)     7.1m elapsed  ( 4.5s/pass)      pass   97 (no cap)     7.2m elapsed  ( 4.5s/pass)      pass   98 (no cap)     7.3m elapsed  ( 4.5s/pass)      pass   99 (no cap)     7.4m elapsed  ( 4.5s/pass)
+      [field] iteration 10: cone-relaxed, moved median 0.8252 deg (mean 1.7996, p95 6.5792)
+    [it  11] it 10 L= 4.129 theta=0.1015 alpha=0.3294  loss 0.332434  |g| 0.0075  lr 0.0252  (99 passes,  38.1 s)
+      pass  100 (no cap)     7.4m elapsed  ( 4.5s/pass)      pass  101 (no cap)     7.5m elapsed  ( 4.5s/pass)      pass  102 (no cap)     7.6m elapsed  ( 4.5s/pass)      pass  103 (no cap)     7.6m elapsed  ( 4.5s/pass)      pass  104 (no cap)     7.7m elapsed  ( 4.5s/pass)      pass  105 (no cap)     7.8m elapsed  ( 4.5s/pass)      pass  106 (no cap)     7.9m elapsed  ( 4.5s/pass)      pass  107 (no cap)     7.9m elapsed  ( 4.5s/pass)      pass  108 (no cap)     8.0m elapsed  ( 4.4s/pass)
+      [field] iteration 11: cone-relaxed, moved median 0.7436 deg (mean 1.6339, p95 6.0221)
+    [it  12] it 11 L= 4.047 theta=0.1016 alpha=0.3291  loss 0.332178  |g| 0.0053  lr 0.0201  (108 passes,  39.3 s)
+      pass  109 (no cap)     8.1m elapsed  ( 4.4s/pass)      pass  110 (no cap)     8.2m elapsed  ( 4.4s/pass)      pass  111 (no cap)     8.2m elapsed  ( 4.4s/pass)      pass  112 (no cap)     8.3m elapsed  ( 4.4s/pass)      pass  113 (no cap)     8.4m elapsed  ( 4.4s/pass)      pass  114 (no cap)     8.4m elapsed  ( 4.4s/pass)      pass  115 (no cap)     8.5m elapsed  ( 4.4s/pass)      pass  116 (no cap)     8.6m elapsed  ( 4.4s/pass)      pass  117 (no cap)     8.7m elapsed  ( 4.4s/pass)      pass  118 (no cap)     8.7m elapsed  ( 4.4s/pass)      pass  119 (no cap)     8.8m elapsed  ( 4.4s/pass)      pass  120 (no cap)     8.9m elapsed  ( 4.4s/pass)      pass  121 (no cap)     8.9m elapsed  ( 4.4s/pass)
+      [field] iteration 12: cone-relaxed, moved median 0.6862 deg (mean 1.4958, p95 5.5562)
+    [it  13] it 12 L= 4.049 theta=0.1016 alpha=0.3289  loss 0.332415  |g| 0.0016  lr 0.0010  (121 passes,  56.0 s)
+      pass  122 (no cap)     9.0m elapsed  ( 4.4s/pass)      pass  123 (no cap)     9.1m elapsed  ( 4.4s/pass)      pass  124 (no cap)     9.2m elapsed  ( 4.4s/pass)      pass  125 (no cap)     9.2m elapsed  ( 4.4s/pass)      pass  126 (no cap)     9.3m elapsed  ( 4.4s/pass)      pass  127 (no cap)     9.4m elapsed  ( 4.4s/pass)      pass  128 (no cap)     9.5m elapsed  ( 4.4s/pass)      pass  129 (no cap)     9.5m elapsed  ( 4.4s/pass)
+      [field] iteration 13: cone-relaxed, moved median 0.6305 deg (mean 1.3753, p95 5.0857)
+    [it  14] it 13 L= 4.042 theta=0.1016 alpha=0.3290  loss 0.332004  |g| 0.0056  lr 0.0016  (129 passes,  36.4 s)
+      pass  130 (no cap)     9.6m elapsed  ( 4.4s/pass)      pass  131 (no cap)     9.7m elapsed  ( 4.4s/pass)      pass  132 (no cap)     9.8m elapsed  ( 4.4s/pass)      pass  133 (no cap)     9.8m elapsed  ( 4.4s/pass)      pass  134 (no cap)     9.9m elapsed  ( 4.4s/pass)      pass  135 (no cap)    10.0m elapsed  ( 4.4s/pass)      pass  136 (no cap)    10.0m elapsed  ( 4.4s/pass)      pass  137 (no cap)    10.1m elapsed  ( 4.4s/pass)
+      [field] iteration 14: cone-relaxed, moved median 0.5916 deg (mean 1.2742, p95 4.5312)
+    [it  15] it 14 L= 4.032 theta=0.1016 alpha=0.3289  loss 0.331031  |g| 0.0062  lr 0.0026  (137 passes,  34.9 s)
+      pass  138 (no cap)    10.2m elapsed  ( 4.4s/pass)      pass  139 (no cap)    10.3m elapsed  ( 4.4s/pass)      pass  140 (no cap)    10.4m elapsed  ( 4.4s/pass)      pass  141 (no cap)    10.4m elapsed  ( 4.4s/pass)      pass  142 (no cap)    10.5m elapsed  ( 4.4s/pass)      pass  143 (no cap)    10.6m elapsed  ( 4.4s/pass)      pass  144 (no cap)    10.6m elapsed  ( 4.4s/pass)      pass  145 (no cap)    10.7m elapsed  ( 4.4s/pass)
+      [field] iteration 15: cone-relaxed, moved median 0.5554 deg (mean 1.2043, p95 4.1417)
+    [it  16] it 15 L= 4.019 theta=0.1018 alpha=0.3293  loss 0.330566  |g| 0.0040  lr 0.0041  (145 passes,  35.5 s)
+      pass  146 (no cap)    10.8m elapsed  ( 4.4s/pass)      pass  147 (no cap)    10.9m elapsed  ( 4.4s/pass)      pass  148 (no cap)    10.9m elapsed  ( 4.4s/pass)      pass  149 (no cap)    11.0m elapsed  ( 4.4s/pass)      pass  150 (no cap)    11.1m elapsed  ( 4.4s/pass)      pass  151 (no cap)    11.2m elapsed  ( 4.4s/pass)      pass  152 (no cap)    11.2m elapsed  ( 4.4s/pass)      pass  153 (no cap)    11.3m elapsed  ( 4.4s/pass)      pass  154 (no cap)    11.4m elapsed  ( 4.4s/pass)      pass  155 (no cap)    11.5m elapsed  ( 4.4s/pass)    [it  17] it 16 L= 4.019 theta=0.1018 alpha=0.3293  loss 0.330566  |g| 0.0082  lr 0.0008  (155 passes,  43.9 s)
+    line search exhausted -- converged
+
+    start   loss 0.168845  offset 50.8%  r -0.0137  coverage 86.09%  732 tracts
+    end     loss 0.154962  offset 46.8%  r +0.0086  coverage 89.75%  735 tracts
+
+    [export]
+      image     ../results/acc_r12_mae\image_vec1.nii.gz
+      tdi       ../results/acc_r12_mae\tdi_vec1.nii.gz
+      residual  ../results/acc_r12_mae\residual_vec1.nii.gz
+      trk       ../results/acc_r12_mae\tracts_vec1.trk  (735 tracts, 12872 points)
+      trk       ../results/acc_r12_mae\tracts_vec1_start.trk  (732 tracts, 11988 points)
+      figure    ../results/acc_r12_mae\compare_vec1.png
+      html      ../results/acc_r12_mae\descent_vec1.html
+      refined   ../results/acc_r12_mae\refined_vec1_vec1.nii.gz
+      timelog   ../results/acc_r12_mae\timelog_vec1.txt
+
+==============================================================================
+  turn=relax  (alpha  turn fraction [0,1])
+       variant       L     theta      alpha       loss   offset         r   cover  tracts
+          vec1    4.02     5.83d     0.3293   0.154962   46.8%   +0.0086 89.75%     735
+
+  the descent moved L by vec1 0.5%
+==============================================================================
+  wrote ../results/acc_r12_mae\descent_loop.json
+  all outputs in ../results/acc_r12_mae

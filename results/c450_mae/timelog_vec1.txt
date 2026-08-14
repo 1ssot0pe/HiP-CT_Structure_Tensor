@@ -1,0 +1,16 @@
+i74 (24, 24, 24)  |  77 seeds  |  support 13597 voxels  |  smoothing 0 vox
+objective: MSE(preprocessed image, normalised TDI); start L=4 theta=8.59d alpha=0.5000, cap 0 iters
+turn=relax: alpha  turn fraction [0,1]
+DESCENT TIME LOG -- vec1
+generated 2026-08-13 17:00:05
+
+  it |    seconds     t_cum | passes  s/pass |          loss      d(loss) |      L    theta    alpha |     |g|      lr
+  ----------------------------------------------------------------------------------------------------------------------
+  -1 |      0.28      0.28 |      1    0.28 |      0.508626              |  4.000    8.59d   28.65d |       -       -
+   0 |      2.48      2.77 |      8    0.31 |      0.508335    -0.000291 |  3.452    7.42d   23.08d |  0.0031  0.3000
+   1 |      4.21      6.98 |     16    0.26 |      0.508335    +0.000000 |  3.452    7.42d   23.08d |  0.0039  0.0006
+  ----------------------------------------------------------------------------------------------------------------------
+  total 7.0 s (0.12 min) over 2 iterations and 26 tracking passes
+  per iteration: min 2.5 s, median 3.3 s, max 4.2 s
+  per pass: 0.27 s mean
+  loss 0.508626 -> 0.508335 (-0.000291, -0.057%)

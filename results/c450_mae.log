@@ -1,0 +1,47 @@
+==============================================================================
+STAGE 3 LOOP -- descend the cone on MAE(preprocessed image, normalised TDI)
+==============================================================================
+  i74 chunk (24, 24, 24) at (450,450,450), mean 0.5
+  [setup] volume loaded in 0.8 s; range [0.000, 1.000]
+  [setup] stage 1-2 in 0.0 min; 13597/13824 voxels oriented (98%), 0 with two directions | background 227, unclassified 13597
+  77 shared seeds (fa); 13597 tissue voxels; 0 two-direction voxels; floor 0.0500
+  setup total 0.0 min
+
+------------------------------------------------------------------------------
+  VARIANT: vec1   (metric=mae, turn=relax, alpha is a fraction in [0,1])
+------------------------------------------------------------------------------
+      pass    1 (no cap)     0.0m elapsed  ( 0.3s/pass)    image already preprocessed: True; support 13597 voxels
+    one pass 0.33 s; start loss 0.508626; descent cap 0 iters (~0.0 min)
+      pass    2 (no cap)     0.0m elapsed  ( 0.3s/pass)    start  L= 4.000 theta=0.1500 alpha=0.5000  loss 0.508626  [0.28 s]
+      pass    3 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    4 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    5 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    6 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    7 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    8 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass    9 (no cap)     0.0m elapsed  ( 0.3s/pass)      pass   10 (no cap)     0.0m elapsed  ( 0.3s/pass)
+      [field] iteration 0: cone-relaxed, moved median 4.7063 deg (mean 6.8776, p95 20.8414)
+    [it   1] it  0 L= 3.452 theta=0.1295 alpha=0.4029  loss 0.508335  |g| 0.0031  lr 0.3000  (10 passes,   2.5 s)
+      pass   11 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   12 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   13 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   14 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   15 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   16 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   17 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   18 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   19 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   20 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   21 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   22 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   23 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   24 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   25 (no cap)     0.1m elapsed  ( 0.3s/pass)      pass   26 (no cap)     0.1m elapsed  ( 0.3s/pass)    [it   2] it  1 L= 3.452 theta=0.1295 alpha=0.4029  loss 0.508335  |g| 0.0039  lr 0.0006  (26 passes,   4.2 s)
+    line search exhausted -- converged
+
+    start   loss 0.301747  offset 83.4%  r -0.0136  coverage 10.93%  42 tracts
+    end     loss 0.301732  offset 83.1%  r -0.0182  coverage 10.83%  44 tracts
+
+    [export]
+      image     ../results/c450_mae\image_vec1.nii.gz
+      tdi       ../results/c450_mae\tdi_vec1.nii.gz
+      residual  ../results/c450_mae\residual_vec1.nii.gz
+      trk       ../results/c450_mae\tracts_vec1.trk  (44 tracts, 585 points)
+      trk       ../results/c450_mae\tracts_vec1_start.trk  (42 tracts, 552 points)
+      figure    ../results/c450_mae\compare_vec1.png
+      html      ../results/c450_mae\descent_vec1.html
+      refined   ../results/c450_mae\refined_vec1_vec1.nii.gz
+      timelog   ../results/c450_mae\timelog_vec1.txt
+
+==============================================================================
+  turn=relax  (alpha  turn fraction [0,1])
+       variant       L     theta      alpha       loss   offset         r   cover  tracts
+          vec1    3.45     7.42d     0.4029   0.301732   83.1%   -0.0182 10.83%      44
+
+  the descent moved L by vec1 13.7%
+  WARNING offset is 83% of the loss at the optimum: this objective is
+          dominated by how much of the tissue the tracts COVER, not by where they
+          went. See tdi_mse.decompose and the standing result in cone_objective.
+==============================================================================
+  wrote ../results/c450_mae\descent_loop.json
+  all outputs in ../results/c450_mae
