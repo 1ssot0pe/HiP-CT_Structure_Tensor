@@ -114,3 +114,47 @@ done, not what was intended.
 
 - Closed the question: the TDI residual carries no usable information about
   whether a junction holds one fibre or two (phantom or on real data) .
+
+## 2026-08-13 — Stage 4 vec2 zero-fill removed; the rho answer is grid-limited
+
+- Fixed a silent zero-fill in `4_optimising_parameters/sigma_rho_match.py`. It
+  loaded the Stage 3 field with `refined.vec2 = z["vec2"] if "vec2" in z else
+  np.zeros_like(z["vec1"])`, so a field with no second direction produced a
+  full-size all-zero `refined_vec2.nii.gz` — a file that reads on disk exactly
+  like a computed result. `vec2` is now `None` when absent and every consumer
+  handles that explicitly.
+- Made the absence self-explaining. The run prints which of the two causes it
+  can distinguish from the recorded state: the run used `--variant vec1`, so no
+  second direction was ever carried, or Stage 2 produced none on the chunk
+  (`n_two_dir_voxels = 0`).
+- Stopped writing `refined_vec2.nii.gz` unless a second direction exists, and
+  deleted any stale copy from a previous run — otherwise a zero volume sits
+  beside fresh outputs looking current.
+- Recorded `has_vec2` and `n_vec2_voxels` in `stage4_sigma_rho.json`, so a
+  downstream reader cannot infer "exists and is zero" from a missing file.
+- Verified on a re-run against `results/acc_r12`: `removed stale
+  refined_vec2.nii.gz from an earlier run`, `has_vec2 False`,
+  `n_vec2_voxels 0`, `paths written ['refined_vec1', 'best_simple_e3']`. No
+  `refined_vec2.nii.gz` on disk; the 854-byte zero volume is gone.
+- Established why vec2 was empty, which is upstream of superposition entirely:
+  `triage` grants `BUCKET_CANDIDATE` only to the label `crossing`, and
+  `DenseField.build` writes `vec2` only for that bucket. Superposition and
+  `demote()` are subtractive — they zero an existing `vec2` and drop `n_dirs`
+  to 1, and never create one. The chunk simply had no `crossing` patches.
+
+- Found that the Stage 4 rho answer is limited by the grid, not measured by it.
+  The same refined field gives rho = 1.7818 on a 7x7 grid and rho = 2.0000 on a
+  5x5 grid. Both are one grid step above Stage 1's rho = 1.4142; the two grids
+  place that step differently. The median error barely moves with the change —
+  14.140 deg at n=7 against 14.353 deg at n=5 — so neighbouring grid points are
+  near-equivalent and the surface is flat at this spacing.
+- Corrected the earlier reading accordingly: the result is "rho shifted upward
+  by roughly one step", NOT "rho = 1.78". Locating it needs a finer grid.
+- Recorded the stronger statement the sweep supports: the refined field is
+  ~14 deg from the closest plain structure tensor anywhere on the grid, so the
+  best-matching (sigma, rho) is a weak summary of it. Stage 3 now produces a
+  field a single structure tensor cannot reproduce, which is a more informative
+  outcome than the scale shift.
+- Control unchanged and exact: sweeping against the Stage 2 field returns
+  sigma = 1.0000, rho = 1.4142 at 0.000 deg median error, confirming Stage 2's
+  field IS the plain tensor at Stage 1's own pick and that the sweep is sound.

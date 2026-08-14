@@ -183,7 +183,49 @@ def main(run_dir, variant="vec1", n=7, mode="adaptive", outdir=None,
     dense, _D, tissue, _FA, scales = stage2(vol, mode=mode, verbose=False)
 
     L, th, al = d["L"], d["theta"], d["alpha"]
-    refined = CFS.smooth_field(dense, L, th, al)
+    # PREFER THE SAVED FIELD. Stage 3 accumulates -- each iteration relaxes the
+    # PREVIOUS field -- so recomputing `smooth_field(field_0, L*, theta*, alpha*)`
+    # would reproduce only the final step, not the accumulation, and would
+    # silently compare against a field the run never produced. Recomputation is
+    # the fallback for runs made before the field was saved, and it says so.
+    npz = os.path.join(run_dir, f"refined_field_{variant.replace('+', '_')}.npz")
+    if os.path.exists(npz):
+        z = np.load(npz)
+        refined = type("F", (), {})()
+        refined.vec1 = z["vec1"]
+        # NO ZERO-FILL. A missing or all-zero vec2 means the field has no second
+        # direction, and substituting zeros produced a full-size NIfTI of zeros
+        # that reads on disk exactly like a computed result. `vec2` is left as
+        # None and every consumer below has to handle that explicitly, so the
+        # absence is reported instead of being rendered as an answer.
+        refined.vec2 = z["vec2"] if "vec2" in z else None
+        src = f"saved accumulated field ({os.path.basename(npz)})"
+    else:
+        refined = CFS.smooth_field(dense, L, th, al)
+        src = ("RECOMPUTED as one smoothing from field_0 -- the run saved no "
+               "field, so this is only the LAST step, not the accumulation")
+    print(f"  reference field: {src}")
+
+    # Why a second direction is absent matters, and the three causes are
+    # distinguishable from what the run recorded:
+    #   * the run tracked vec1 only, so vec2 was never carried;
+    #   * the chunk had no `crossing` patches, so Stage 2 produced none;
+    #   * it existed and was demoted.
+    v2 = getattr(refined, "vec2", None)
+    n_v2 = 0 if v2 is None else int((np.linalg.norm(np.asarray(v2, float),
+                                                   axis=0) > EPS).sum())
+    has_v2 = n_v2 > 0
+    if not has_v2:
+        why = ("the run used --variant vec1, so no second direction was carried"
+               if variant == "vec1" else
+               f"Stage 2 produced none on this chunk "
+               f"(n_two_dir_voxels={run.get('n_two_dir_voxels', '?')})")
+        print(f"  NO SECOND DIRECTION in the refined field -- {why}.")
+        print(f"    vec2 is NOT written. A second direction requires HOST to "
+              f"label a patch 'crossing'; superposition and demotion only "
+              f"REMOVE one, they never create it.")
+    else:
+        print(f"  refined field carries a second direction at {n_v2} voxels")
     oriented = np.asarray(dense.n_dirs) >= 1
     print(f"  Stage 3 cone: L={L:.3f} vox, theta={np.degrees(th):.3f} deg, "
           f"alpha={DL.fmt_alpha(al, run.get('turn', 'sample'))}")
@@ -214,13 +256,20 @@ def main(run_dir, variant="vec1", n=7, mode="adaptive", outdir=None,
         "refined_vec1": save_nifti(np.moveaxis(np.asarray(refined.vec1), 0, -1),
                                    os.path.join(outdir, "refined_vec1.nii.gz"),
                                    A, vector=True, dtype=np.float32),
-        "refined_vec2": save_nifti(np.moveaxis(np.asarray(refined.vec2), 0, -1),
-                                   os.path.join(outdir, "refined_vec2.nii.gz"),
-                                   A, vector=True, dtype=np.float32),
         "best_simple_e3": save_nifti(np.moveaxis(best["e3"], 0, -1),
                                      os.path.join(outdir, "best_simple_e3.nii.gz"),
                                      A, vector=True, dtype=np.float32),
     }
+    # Written ONLY if there is one. A stale zero-volume from a previous run
+    # would otherwise sit next to the new outputs looking current.
+    stale = os.path.join(outdir, "refined_vec2.nii.gz")
+    if has_v2:
+        paths["refined_vec2"] = save_nifti(
+            np.moveaxis(np.asarray(v2, float), 0, -1), stale, A, vector=True,
+            dtype=np.float32)
+    elif os.path.exists(stale):
+        os.remove(stale)
+        print(f"  removed stale {os.path.basename(stale)} from an earlier run")
 
     print("\n" + "=" * 78)
     print("  RESULT")
@@ -261,6 +310,9 @@ def main(run_dir, variant="vec1", n=7, mode="adaptive", outdir=None,
                best_vs_refined={k: v for k, v in best.items() if k != "e3"},
                best_vs_stage2={k: v for k, v in best2.items() if k != "e3"},
                best_on_range_edge=on_edge,
+               # Explicit, so a consumer reading the JSON cannot infer "vec2
+               # exists and is zero" from a missing file.
+               has_vec2=bool(has_v2), n_vec2_voxels=int(n_v2),
                paths={k: os.path.basename(v) for k, v in paths.items()})
     p = os.path.join(outdir, "stage4_sigma_rho.json")
     with open(p, "w") as f:
