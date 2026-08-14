@@ -1,4 +1,5 @@
 """
+
   (1) The gamma-normalised response sigma^2 * mean(plane energy) peaks at the fibre's own scale ->
       sigma_L. Its rho-stability plateau (where e3 stops changing with rho) ->
       rho_L. Resists over-smoothing via first-interior-local-max, not a
@@ -7,6 +8,7 @@
   (2) The sigma >= ~0.85 vox DISCRETISATION FLOOR (from noise_floor.py T1):
       below it the Gaussian derivative stops being a faithful derivative. A
       hard lower bound the pick must clear.
+
 """
 
 import os
