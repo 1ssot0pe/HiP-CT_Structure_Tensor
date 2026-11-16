@@ -31,8 +31,9 @@ import sys
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
-for _p in (_ROOT, _HERE):
+_STAGE = os.path.dirname(_HERE)             # 3_global_tractography/
+_ROOT = os.path.dirname(_STAGE)             # repository root
+for _p in (_ROOT, _STAGE, _HERE):
     sys.path.insert(0, _p)
 
 PATH_C = "#eb6834"       # categorical slot 2 -- the descent

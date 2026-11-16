@@ -24,7 +24,8 @@ Stages scored:
 
 import os
 import sys as _sr_sys
-_sr_sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 import numpy as np
 from scipy.ndimage import gaussian_filter
 

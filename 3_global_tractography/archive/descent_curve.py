@@ -33,8 +33,9 @@ import sys
 import numpy as np
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
-for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
+_STAGE = os.path.dirname(_HERE)             # 3_global_tractography/
+_ROOT = os.path.dirname(_STAGE)             # repository root
+for _p in (_ROOT, _STAGE, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
            os.path.join(_ROOT, "2_host_classification")):
     sys.path.insert(0, _p)
 

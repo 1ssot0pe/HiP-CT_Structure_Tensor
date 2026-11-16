@@ -18,7 +18,8 @@ Checks, for SAME-size and DIFFERENT-size fibre variants:
 """
 
 import os as _sr_os, sys as _sr_sys
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 import numpy as np
 

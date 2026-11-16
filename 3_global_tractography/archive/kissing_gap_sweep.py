@@ -1,5 +1,6 @@
 import os as _sr_os, sys as _sr_sys
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 from core.kissing_phantom import build_kissing
 from test_kissing_phantom import classify_grid, tractography_gap_test

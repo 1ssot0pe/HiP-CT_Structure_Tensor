@@ -29,8 +29,9 @@ import os
 import sys
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
-_ROOT = os.path.dirname(_HERE)
-for _p in (_ROOT, _HERE):
+_STAGE = os.path.dirname(_HERE)             # 3_global_tractography/
+_ROOT = os.path.dirname(_STAGE)             # repository root
+for _p in (_ROOT, _STAGE, _HERE):
     sys.path.insert(0, _p)
 
 
@@ -53,7 +54,8 @@ from core.host_geometry_test import _dir_inplane
 # GLOBAL   (was phase3.py)
 # ============================================================================
 
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 matplotlib.use("Agg")
 
@@ -379,7 +381,8 @@ def run_global(save="phase3.png"):
 # I74   (was phase3.py)
 # ============================================================================
 
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 matplotlib.use("Agg")
 
@@ -541,7 +544,8 @@ def run_i74(crop=96, stride=5, save="phase3.png"):
 # VALIDATE3D   (was phase3.py)
 # ============================================================================
 
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 
 
@@ -593,7 +597,8 @@ def run_validate3d(crop=64, stride=4):
 # REALNOISE   (was phase3.py)
 # ============================================================================
 
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 
 
@@ -663,7 +668,8 @@ def run_realnoise(crop=64, stride=4):
 # GENERATIVE   (was phase3.py)
 # ============================================================================
 
-_sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
+_sr_stage = _sr_os.path.dirname(_sr_os.path.dirname(_sr_os.path.abspath(__file__)))  # 3_global_tractography/
+_sr_sys.path[:0] = [_sr_os.path.dirname(_sr_stage), _sr_stage]  # repo root (core), stage modules
 
 
 
