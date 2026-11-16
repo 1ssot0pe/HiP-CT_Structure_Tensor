@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "Optimising the Structure Tensor Analysis of White Matter Fibres in Synchrotron Tomography"
+type: software
+authors:
+  - alias: ISSY
+    affiliation: "Department of Medical Physics and Biomedical Engineering, University College London"
+repository-code: "https://github.com/1ssot0pe/Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography"
+license: MIT
+keywords:
+  - structure tensor
+  - HiP-CT
+  - synchrotron tomography
+  - white matter
+  - fibre orientation
+  - tractography
+  - scale selection
