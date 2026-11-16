@@ -421,9 +421,9 @@ def main():
     log(f"SUMMARY: certified sigma~{sig_c:.2g}, rho~{rho_c:.2g}"
         + (f" (certifier VALID on self-test)" if ok else
            " (certifier self-test: see T3)" if ok is not None else ""))
-    open("HALFMAP_RESULTS.md", "w").write(
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "HALFMAP_RESULTS.md"), "w").write(
         "# Half-map analysis results\n\n```\n" + "\n".join(LOG) + "\n```\n")
-    log("Wrote HALFMAP_RESULTS.md")
+    log("Wrote noise_model/HALFMAP_RESULTS.md")
 
 
 if __name__ == "__main__":

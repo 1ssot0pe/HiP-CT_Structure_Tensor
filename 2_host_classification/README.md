@@ -5,10 +5,11 @@ so it cannot describe a place where two fibres cross. This folder decides, for e
 patch, whether the cheap one-direction answer can be trusted, and runs the
 expensive multi-fibre method (HOST-FOD) only where it cannot.
 
-The engine (`host_fod.py`, `selfcalib_threshold.py`, `model_ladder.py`) lives at
-the repo root, because the tractography code uses it too. The files in this folder
-are the gate and classification logic built on top. They reach the root engine via
-a `sys.path.insert` at the top of each file.
+The engine (`host_fod.py`, `selfcalib_threshold.py`, `model_ladder.py`) lives in
+`core/`, because the tractography code uses it too. The files in this folder are
+the gate and classification logic built on top. They import the engine as
+`from core.host_fod import ...`, after a `sys.path.insert` of the repository root
+at the top of each file.
 
 # Terms
 
@@ -213,13 +214,13 @@ kept only as a diagnostic.
 
 These do not run in the pipeline. They are why it looks the way it does.
 
-1. Does gating make sense on this data? — `selfcalib_threshold.py` (root). Checks
+1. Does gating make sense on this data? — `core/selfcalib_threshold.py`. Checks
    the real i74 c_s histogram has a low-c_s bulk and a separable high-c_s tail with
    a valley between. If it were one smooth smear, no c_s gate could work. It also
    derives a threshold from the histogram's shape: that is the override in step 3,
    not the default.
 
-2. What are the high-c_s voxels? — `model_ladder.py` (root). Calibrates c_s against
+2. What are the high-c_s voxels? — `core/model_ladder.py`. Calibrates c_s against
    known structures (1 fibre; 2 fibres at 30/60/90°; 3 coplanar; dispersed cones;
    pure noise) at matched σ, ρ and noise, then overlays the real i74 distribution to
    read off what high-c_s tissue most resembles.
@@ -241,8 +242,7 @@ These do not run in the pipeline. They are why it looks the way it does.
 
 # How to run
 
-From the repo root, e.g.
-`$PY -u 2_host_classification\gate_protocol.py`.
+From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u 2_host_classification/gate_protocol.py`.
 
 | Script | Needs | What it does |
 |---|---|---|
@@ -252,7 +252,7 @@ From the repo root, e.g.
 | `refined_field.py` | i74 for `i74` / `gated` | `validate` (default), `i74`, or `gated` as the first argument |
 | `visualize_i74_orientations.py` | i74 volume | orientation glyphs over one real slice |
 
-# Engine at repo root
+# Engine in `core/`
 
 `host_fod.py` (`analyse` / `classify`), `host_geometry_test.py` (phantom suite),
 `selfcalib_threshold.py` (the c_s guard), `model_ladder.py` (c_s calibration),

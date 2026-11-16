@@ -6,9 +6,9 @@ The whole reason this stage exists: i74 has pervasively high sphericity (lots of
 voxels look like crossings), and we need to know how much of that is genuine
 structure versus the structure tensor reacting to noise.
 
-The noise *library* (`noise_floor.py`) stays at the **repo root** — the
+The noise *library* (`core/noise_floor.py`) lives in `core/` — the
 tractography stage imports it too. The files here are the experiments that use
-it. Each reaches the root libs via a `sys.path.insert` at the top.
+it. Each reaches `core/` via a `sys.path.insert` of the repository root at the top.
 
 # Terms (read first)
 
@@ -36,7 +36,7 @@ it. Each reaches the root libs via a `sys.path.insert` at the top.
 # The pipeline, in order
 
 1. **Is the high sphericity just white noise?** — `run_noise_floor.py` (uses the
-   root `noise_floor.py` lib). Runs the T1–T9 battery on i74: does correcting for
+   `core/noise_floor.py` lib). Runs the T1–T9 battery on i74: does correcting for
    a white-noise floor collapse the high-c_s fraction? **Result: white-noise form
    FALSIFIED** — c_s barely moves, so the complexity is not a white-noise
    artifact. But the *correlated* form couldn't be tested on i74 (no half-maps;
@@ -63,11 +63,11 @@ it. Each reaches the root libs via a `sys.path.insert` at the top.
    lung noise's. **Result: SURVIVES** (slopes −4.04 vs −4.01) — but the match is
    almost certainly the shared HiP-CT reconstruction roll-off, so only the
    *isotropic* spectral shape transfers; the anisotropy stays unverifiable. See
-   the cross-organ caveat in `BAYES_TRACTOGRAPHY.md`.
+   the cross-organ caveat in [BAYES_TRACTOGRAPHY.md](../docs/archive/BAYES_TRACTOGRAPHY.md).
 
 # How to run
 
-From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u noise_model\run_lung_multiblock.py`.
+From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u noise_model/run_lung_multiblock.py`.
 
 | Script | Needs | Note |
 |---|---|---|
@@ -81,11 +81,15 @@ From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELIN
 `lung_A.npy` / `lung_B.npy` are large and **gitignored** — rebuild them with
 `build_lung_slab.py` rather than committing them.
 
-# Shared at repo root
+# Shared in `core/`
 
-`noise_floor.py` (the N-matrix / power-spectrum library, used here and by the
-tractography stage), plus `reconstruction.py` and `orthogonality_residual.py`.
-Files here import them via `sys.path.insert` to root.
+`core/noise_floor.py` (the N-matrix / power-spectrum library, used here and by
+the tractography stage), plus `core/reconstruction.py` and
+`core/orthogonality_residual.py`.
+
+Recorded outputs: [HALFMAP_RESULTS.md](HALFMAP_RESULTS.md) (synthetic
+self-test) and [LUNG_HALFMAP_RESULTS.md](LUNG_HALFMAP_RESULTS.md) (real lung
+half-maps), rewritten by `half_map_analysis.py` and `run_lung_halfmap.py`.
 
 `debias.py` (the analysis-time de-biasing layer) was deleted in the `simple`
 pass — it was never imported by anything. `noise_floor.structure_tensor_field`

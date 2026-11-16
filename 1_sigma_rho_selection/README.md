@@ -5,9 +5,9 @@ Picks two scales the structure tensor needs on i74:
 **rho** (the integration scale — how far to average the tensor before reading a direction).
 
 Self-contained folder: files import each other flat
-(`from pick_sigma_rho import ...`) and reach repo-root modules
-(`reconstruction`, `orthogonality_residual`) via a `sys.path.insert` at the top
-of each file. Run any script from anywhere.
+(`from pick_sigma_rho import ...`) and reach the shared kernels in `core/`
+(`core.reconstruction`, `core.orthogonality_residual`) via a `sys.path.insert`
+of the repository root at the top of each file. Run any script from anywhere.
 
 # Terms 
 
@@ -47,7 +47,7 @@ of each file. Run any script from anywhere.
 1. **Prove it in 2D** — `toy2d/`. Test the two rules (Lindeberg response → σ,
    angular drift → ρ) on a 2D phantom with known directions. They track the
    truth; a naive alternative didn't. Now a **standalone experiment**: it used
-   to be dragged into every pipeline run because root `crossing_shape_3d.py`
+   to be dragged into every pipeline run because `core/crossing_shape_3d.py`
    imported `coherence_sigma.knee_sigma`. That function is copied into
    `crossing_shape_3d.py`, so nothing outside this folder imports `toy2d/`.
 
@@ -80,7 +80,7 @@ of each file. Run any script from anywhere.
 
 # How to run
 
-From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u sigma_rho_selection\sigma_rho_global.py`.
+From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u 1_sigma_rho_selection/sigma_rho_global.py`.
 
 | Script | Needs | Output |
 |---|---|---|

@@ -79,10 +79,10 @@ populations, and how many iterations it takes.
 | mass ratio + local calibration | `mass_conservation/mass_conservation_validate.py` — `local_calibration`, `_patch_at`, `CROSS_HALF=14`, `KISS_HALF=8`, `THRESH=1.5` |
 | labelled 3D phantoms | same file — `raw_localized_crossing`, `raw_kissing` |
 | noise (synthetic + real half-map) | same file — `anoise`, `real_noise` (needs `lung_A/B.npy`) |
-| patch detection / FOD peaks | root `host_fod.py` — `analyse`, `classify`, `patch_gradients`, `directional_energy` |
+| patch detection / FOD peaks | `core/host_fod.py` — `analyse`, `classify`, `patch_gradients`, `directional_energy` |
 | a streamline stepper to adapt | `phase1_kissing_crossing.py` — `track3d`, `local_fibreness` (greedy; needs stochastic sampling added) |
 | joint energy / link inference | `phase3_global.py` — `greedy_forest`, `anneal`, `candidate_links` (2D; the *pattern* transfers) |
-| sphere directions | root `fod_dipy.py` — `SPHERE` |
+| sphere directions | `core/fod_dipy.py` — `SPHERE` |
 
 ## Planned new files
 

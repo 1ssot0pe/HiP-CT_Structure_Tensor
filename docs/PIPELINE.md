@@ -4,64 +4,174 @@ What runs, in order, with the file, input and output of each step. The file
 lists below are **measured**, not assumed: they are the modules Python actually
 loads during a run.
 
+Setup (environment, data location) is in the [main README](../README.md#setup).
+All commands run from the repository root.
+
 ```powershell
-.\run_all.ps1                  # all three steps, stops at the first failure
+.\run_all.ps1                  # all three checks, stops at the first failure
 .\run_all.ps1 -Quick -SkipI74  # ~1 min smoke test, no real data needed
 ```
 
 Or run the steps yourself, in this order — each is more trustworthy than the
 next, so a failure early makes the later ones meaningless:
 
-```
-$PY 3_global_tractography/test_frame_convention.py   # known answer
-$PY 3_global_tractography/run_pipeline.py            # known truth
-$PY 3_global_tractography/run_pipeline.py --i74      # no ground truth
+```bash
+python 3_global_tractography/test_frame_convention.py   # known answer
+python 3_global_tractography/run_pipeline.py            # known truth
+python 3_global_tractography/run_pipeline.py --i74      # no ground truth
 ```
 
-`$PY` is the venv interpreter — see § 0. Results go to `results/` at the repo
-root. The first two exit non-zero on failure, so they work as checks, not just
-as output to read.
+Results go to `results/` at the repository root. The first two exit non-zero
+on failure, so they work as checks, not just as output to read; CI runs both on
+every push.
 
 ---
 
-## 0. Setup
+## Logic flow (`run_pipeline.py`)
 
-### The venv lives OUTSIDE this repo
+Each step asks one question. The **decisions** are what the pipeline is; the
+boxes are just where they happen.
 
-This folder is inside OneDrive. A venv is ~400 MB of small files; leaving it
-here means OneDrive re-syncs it constantly, which is what corrupted the previous
-in-repo `.venv` (an interrupted install left an environment with `numpy` but not
-`scipy` or `dipy`).
+```
+                    core.reconstruction.load_volume()      real scan, no truth
+                    core.localized_phantoms.raw_*()        phantom, known truth
+                                   │
+                                   ▼   vol (z, y, x) float32
 
-```powershell
-# PowerShell — one time
-python -m venv $env:USERPROFILE\venvs\hipct-structure-tensor
-$PY = "$env:USERPROFILE\venvs\hipct-structure-tensor\Scripts\python.exe"
-& $PY -m pip install -r requirements.txt
+┌─ STEP 1 · At what scale do we measure? ─────────────  1_sigma_rho_selection
+│
+│    A structure tensor has two knobs, and the tissue sets both:
+│
+│      first peak of the Lindeberg response  →  σ    how wide a gradient
+│      where angular drift flattens          →  ρ    how far to average
+│
+│    σ too small measures noise; too large blurs neighbouring fibres.
+│    ρ too small leaves direction jittery; too large averages across fibres.
+│    Picked per 32³ block, because the best σ varies ~1–6 across a volume.
+│
+│    ? does the block hold tissue    block mean ≥ 5% of the volume max
+│      ├─ yes → pick (σ, ρ) for it, and use that
+│      └─ no  → BACKGROUND. skipped before any scale pick is attempted;
+│               those patches fall back to σ = ρ = 0.85  ⚠ WARNS
+│
+│    A sparse volume can fail this on every block — then Step 1 never ran,
+│    and the whole run is on one fixed scale. Cost, measured: ~20° of
+│    angular error on the kissing phantom.
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼   sigma_map, rho_map
+
+┌─ STEP 2 · Can ONE direction be trusted here? ───────  2_host_classification
+│
+│    A tensor gives one direction per voxel. Where two fibres cross, that
+│    answer is not imprecise — it is meaningless. Find those places, and
+│    spend the expensive method only there.
+│
+│    per patch (half = 14):   host_fod.analyse(σ_grad = 4.0)
+│                               → c_s   how much it has NO dominant direction
+│                               → FA    how strongly directional it is
+│
+│    ? c_s ≤ FA  AND  fewer than 3 peaks        ← both from the same
+│      │                                          eigenvalues, so no
+│      │                                          threshold to tune
+│      ├─ yes → SINGLE.  keep Step 1's e3, one direction, done
+│      │
+│      └─ no  → ROUTE TO HOST-FOD, at a different scale:
+│               analyse(σ_grad = 2.5) → up to 2 directions
+│               classify() → single, crossing, dispersed,
+│                            disorganised, complex
+│
+│    Three scales, not interchangeable:  σ≈1.0 for direction,
+│    5.0 for the gate, 2.5 for peaks. At 1.0 the gate never fires;
+│    at 5.0 the second peak is already smoothed away. All three are
+│    certified, not written down — select_scales.py picks the first
+│    from the data, certify_gate_scales.py picks the other two
+│    against phantoms with known truth.
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼   GatedField → results/unified_field_*.npz
+
+┌─ STEP 3 · Real crossing, or fibres just touching? ── 3_global_tractography
+│
+│  (a) MEASURE — from the image, once per junction. Brightness adds:
+│
+│        S = (I_c − I₀) ⁄ ((I_a − I₀) + (I_b − I₀))
+│
+│        S ≈ 1.0   both fibres deposit here      →  CROSSING
+│        S ≈ 0.5   only one is really here       →  TANGENCY
+│        decision at 0.75, ±0.10 reported as AMBIGUOUS
+│
+│  (b) FIT — θ = (step, angle, seed density, link weight)
+│
+│        ┌───────────────────────────────────────────────────────┐
+│        │                                                       │
+│        ▼                                                       │
+│      integrate streamlines through the field                   │
+│        └─ S is a WALL here: a path may run ALONG a tangency,   │
+│           never THROUGH it                                     │
+│        │                                                       │
+│        ▼                                                       │
+│      rasterise → D_rec    arc-length weighted, so density 2    │
+│        │                  literally means two fibres           │
+│        ▼                                                       │
+│      L = MSE(D_rec, D_obs)        does it explain the image?   │
+│          + verdict penalty        does it obey S?              │
+│        │                            CROSSING wants density 2   │
+│        │                            TANGENCY wants density ≤ 1 │
+│        ▼                                                       │
+│      coordinate descent — one knob at a time, keep what helps ─┘
+│        (no gradient: streamlines terminate discretely, so L is
+│         flat, then jumps. There is no slope to follow.)
+│
+│      stop when a full sweep improves nothing
+└──────────────────────────────────────────────────────────────────────────
+                                   │
+                                   ▼
+
+     results/pipeline_results.json    S + verdict per junction, fitted θ
+     results/unified_field_*.npz      the orientation field
+     results/field_*.png              greyscale + orientations, to check by eye
+     stdout                           PASS / FAIL, or a verdict with no
+                                      correctness claim on real data
 ```
 
-```bash
-# Git Bash — one time
-python -m venv "$USERPROFILE/venvs/hipct-structure-tensor"
-PY="$USERPROFILE/venvs/hipct-structure-tensor/Scripts/python.exe"
-$PY -m pip install -r requirements.txt
+**Where the loop closes.** S is measured once from the image and never revised.
+θ adapts to S; S never adapts to θ. So a wrong verdict is optimised *toward*,
+not away from — the honest limit of the current design.
+
+## What `run_pipeline.py` loads
+
+Traced from a real run of the phantom validation:
+
+```
+run_pipeline.py                                  the only entry point
+ ├─ core/reconstruction.py       load_volume         → vol
+ │  or core/localized_phantoms.py raw_* phantoms     → vol + known truth
+ │
+ ├─ sigma_rho_gated_field.py                       STEP 1 + 2
+ │   ├─ sigma_rho_adaptive.py → pick_sigma_rho.py → core/orthogonality_residual.py
+ │   └─ core/host_fod.py → two_orientation_test.py → crossing_shape_3d.py
+ │                                                 → kissing_phantom.py
+ ├─ self_optimising_tractography.py                STEP 3
+ │   └─ tract_density.py
+ └─ render_field.py                                figures
 ```
 
-`requirements.txt` is the 9 packages the code imports, derived from the import
-statements. `requirements-dev.txt` adds the notebook, the Human Organ Atlas
-download tooling and lint tools — install only if you need them.
+Each run writes `results/field_*.png` — the greyscale image with the recovered
+orientations drawn on top, so a run can be checked by eye, not just read.
 
-### Point the code at your volume
+This is the crossing/kissing validation path. The Stage 3 optimisation loop
+(`descent_loop.py`) and Stage 4 are separate entry points; see below.
 
-`reconstruction.py`, top of file:
+---
 
-```python
-DEFAULT_VOLUME_DIR = Path(r"C:\path\to\your\volume_folder")   # folder of *.tif slices
-VOXEL_SIZE_UM      = 16.5
-```
+## 0. Pointing the code at a volume
+
+Set `HIPCT_VOLUME_DIR` to the folder of `*.tif` slices (default: `data/i74/`).
+The voxel size is `VOXEL_SIZE_UM` in `core/reconstruction.py` (20 µm for i74).
 
 `load_volume(crop=(a, b))` carves a central cube `[a:b]` **on all three axes**.
-That one edit feeds every step below.
+That one setting feeds every step below.
 
 ---
 
@@ -70,7 +180,7 @@ That one edit feeds every step below.
 | | |
 |---|---|
 | **Question** | What are we measuring? |
-| **File** | `reconstruction.py` — real data · `localized_phantoms.py` — synthetic |
+| **File** | `core/reconstruction.py` — real data · `core/localized_phantoms.py` — synthetic |
 | **In** | folder of TIFF slices, `crop` · or phantom geometry parameters |
 | **Out** | `vol` — float32 array indexed `(z, y, x)` |
 
@@ -86,7 +196,7 @@ look identical — that is the whole problem the pipeline exists to solve.
 | | |
 |---|---|
 | **Question** | How wide a region should we measure over? |
-| **Files** | `1_sigma_rho_selection/sigma_rho_adaptive.py` → `pick_sigma_rho.py` → `orthogonality_residual.py` |
+| **Files** | `1_sigma_rho_selection/sigma_rho_adaptive.py` → `pick_sigma_rho.py` → `core/orthogonality_residual.py` |
 | **In** | `vol`, `block=32` |
 | **Out** | `sigma_map`, `rho_map`, block edges `zs, ys, xs` |
 
@@ -114,7 +224,7 @@ one global value is wrong nearly everywhere.
 | | |
 |---|---|
 | **Question** | Can the cheap one-direction answer be trusted here? |
-| **Files** | `2_host_classification/sigma_rho_gated_field.py` → `host_fod.py` → `two_orientation_test.py`, `crossing_shape_3d.py` |
+| **Files** | `2_host_classification/sigma_rho_gated_field.py` → `core/host_fod.py` → `core/two_orientation_test.py`, `core/crossing_shape_3d.py` |
 | **In** | `vol`, the (σ, ρ) maps, patch half-width 14, `stride` |
 | **Out** | `GatedField` → `results/unified_field_*.npz` |
 
@@ -238,6 +348,47 @@ Two things are **not** searched, because neither has a minimum to find:
 
 ---
 
+## Step 3, continued — the optimisation loop
+
+| | |
+|---|---|
+| **Question** | Which tracking parameters make the tractogram explain the image, and what field results? |
+| **Files** | `3_global_tractography/descent_loop.py` → `smooth_tracker.py`, `gradient_optimise.py`, `tdi_mse.py`, `viz_export.py` |
+| **In** | i74 chunk (`--centre`, `--radius`) or the crossing phantom (`--dataset crossing`) |
+| **Out** | `results/<run>/descent_loop.json`, `refined_field_vec1.npz` (with `--refine-field`), `.trk` tractograms, NIfTI, HTML viewers |
+
+A gradient descent on the search cone (lookahead L, turn limit θ, step α),
+scored by MSE or MAE (`--metric`) between the preprocessed image and the
+normalised track-density image. With `--refine-field` the field is relaxed by
+the optimised cone after each accepted iteration, and the accumulated field is
+written out for Stage 4. Details and measured findings:
+[3_global_tractography/README.md](../3_global_tractography/README.md) (section 3d).
+
+```bash
+python 3_global_tractography/descent_loop.py --radius 24 --seeds 5000 \
+    --turn relax --refine-field --variant vec1 --outdir results/seed_5000
+```
+
+---
+
+## Step 4 — Which single (σ, ρ) reproduces the refined field?
+
+| | |
+|---|---|
+| **Question** | Is there a plain structure tensor, at one (σ, ρ), that gives the same directions as the refined field? |
+| **Files** | `4_optimising_parameters/sigma_rho_match.py`, `coarse_to_fine.py` |
+| **In** | a Stage 3 run directory holding `refined_field_vec1.npz` |
+| **Out** | `stage4_sigma_rho.json` — angular error over the (σ, ρ) grid and the best pair |
+
+See [4_optimising_parameters/README.md](../4_optimising_parameters/README.md).
+
+```bash
+python 4_optimising_parameters/sigma_rho_match.py --run results/seed_5000 --n 7
+python 4_optimising_parameters/coarse_to_fine.py  --run results/seed_5000 --levels 3
+```
+
+---
+
 ## What comes out
 
 | Output | Meaning |
@@ -279,10 +430,10 @@ noise — the only clean way to see noise on its own.
 
 | Step | Command | Result |
 |---|---|---|
-| Cache the slabs | `$PY noise_model/build_lung_slab.py` | `lung_A/B.npy` (gitignored) |
-| Measure | `$PY noise_model/half_map_analysis.py --a EVEN --b ODD --vox 16.5 --crop 256` | noise is **correlated** (slope ≈ −3.5, not white's −5) and **anisotropic** (λ1/λ3 ≈ 1.5–1.9) |
-| Correct | `$PY noise_model/run_lung_subtractN.py` | subtracts the measured N from the tensor |
-| Decide | `$PY 3_global_tractography/phase3_generative.py` | noise-whitened likelihood; selects the true geometry |
+| Cache the slabs | `python noise_model/build_lung_slab.py` | `lung_A/B.npy` (gitignored) |
+| Measure | `python noise_model/half_map_analysis.py --a EVEN --b ODD --vox 16.5 --crop 256` | noise is **correlated** (slope ≈ −3.5, not white's −5) and **anisotropic** (λ1/λ3 ≈ 1.5–1.9) |
+| Correct | `python noise_model/run_lung_subtractN.py` | subtracts the measured N from the tensor |
+| Decide | `python 3_global_tractography/archive/phase3.py generative` | noise-whitened likelihood; selects the true geometry |
 
 Check the printed `corr(A, B)` first — if the two halves are not well
 registered, nothing downstream means anything.

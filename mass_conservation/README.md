@@ -7,10 +7,10 @@ of both fibres (mass conserved, ratio ≈ 2×). At a kissing pair's closest
 approach *neither* centreline goes through, so the intensity can never exceed
 about **one** fibre's value (ratio < 1×) — no matter how small the gap.
 
-This stage reuses the HOST crossing certifiers from `global_tractography/`
-(`phase2_i74_demote`, `phase1_kissing_crossing`) and the phantom/kernel code at
-the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
-`reconstruction.py`). Files here reach both via a `sys.path.insert` at the top.
+This stage reuses the HOST crossing certifiers from `3_global_tractography/`
+(`peak_straightness`, `fibre_continuity`) and the phantom/kernel code in
+**`core/`** (`crossing_shape_3d`, `kissing_phantom`, `host_fod`,
+`reconstruction`). Files here reach both via a `sys.path.insert` at the top.
 
 # Terms (read first)
 
@@ -42,8 +42,8 @@ the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
    generalises.
 
    > **The phantom builders have moved out.** `raw_localized_crossing`,
-   > `raw_kissing` and the `CROSS_*` / `KISS_HALF` constants now live at the
-   > repo root in `localized_phantoms.py`, beside the other shared phantom
+   > `raw_kissing` and the `CROSS_*` / `KISS_HALF` constants now live in
+   > `core/localized_phantoms.py`, beside the other shared phantom
    > code. They are the *live pipeline's* validation fixtures — imported by
    > `run_pipeline.py`, `self_optimising_tractography.py` and
    > `sigma_rho_gated_field.py` — so keeping them here made three upstream
@@ -75,7 +75,7 @@ the **repo root** (`crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
 
 # How to run
 
-From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u mass_conservation\mass_conservation_validate.py`.
+From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u mass_conservation/mass_conservation_validate.py`.
 
 | Script | Needs | What it shows |
 |---|---|---|
@@ -88,10 +88,10 @@ From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELIN
 
 # Dependencies
 
-Reaches *up* to the repo root (`crossing_shape_3d`, `kissing_phantom`, `host_fod`,
-`reconstruction`) and *into* `3_global_tractography/` (`phase2_i74_demote`,
-`phase1_kissing_crossing`) — a one-way downstream→upstream reach via
-`sys.path.insert`. All five i74 scripts here import
-`phase2_i74_demote.collect_crossings`, so those two files cannot be treated as
-tractography-only evidence. `lung_A/B.npy` is gitignored; rebuild it with
+Reaches *up* to `core/` (`crossing_shape_3d`, `kissing_phantom`, `host_fod`,
+`reconstruction`) and *into* `3_global_tractography/` (`peak_straightness`,
+`fibre_continuity`; formerly `phase2_i74_demote` and `phase1_kissing_crossing`)
+— a one-way downstream→upstream reach via `sys.path.insert`. The i74 scripts
+here import `peak_straightness.collect_crossings`, so those two files cannot be
+treated as tractography-only evidence. `lung_A/B.npy` is gitignored; rebuild it with
 `noise_model/build_lung_slab.py`.

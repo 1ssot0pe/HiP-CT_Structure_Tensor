@@ -7,9 +7,14 @@ apart — you have to follow the fibres and see whether both actually continue. 
 over-calls crossings on i74; this stage demotes the ones that don't hold up.
 
 Shared phantom + kernel code (`crossing_shape_3d.py`, `kissing_phantom.py`,
-`host_fod.py`, `noise_floor.py`, `reconstruction.py`) stays at the **repo root** —
-this stage and `mass_conservation/` both use it. Files here reach root via a
-`sys.path.insert` at the top.
+`host_fod.py`, `noise_floor.py`, `reconstruction.py`) lives in **`core/`** —
+this stage and `mass_conservation/` both use it. Files here put the repository
+root on `sys.path` at the top and import `from core.<module> import ...`.
+
+> **Phases 1–3 below are history.** They record how the crossing/kissing
+> question was answered; most of their scripts were removed once the findings
+> were written up (see [Archived](#archived)). Phase 1 and Phase 2 survive
+> under new names: `fibre_continuity.py` and `peak_straightness.py`.
 
 # Terms (read first)
 
@@ -37,31 +42,33 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
 
 # The pipeline, in order
 
-1. **The two phantoms** — `crossing_shape_3d.py` + `kissing_phantom.py` *(root)*
+1. **The two phantoms** — `core/crossing_shape_3d.py` + `core/kissing_phantom.py`
    build a true crossing and a kissing pair with **known** geometry, so every
    method below can be checked against truth before touching real data.
-   `localized_phantoms.py` *(root)* builds the two the **live pipeline**
+   `core/localized_phantoms.py` builds the two the **live pipeline**
    validates against: a *localized* crossing (second family bounded to a zone,
    so single-family tissue exists in the same volume) and a curved kissing
    pair. These used to sit in `mass_conservation/`, which made this stage
    depend on a downstream folder.
 
-2. **Phase 1 — can a tracker tell them apart?** — `phase1_kissing_crossing.py`.
+2. **Phase 1 — can a tracker tell them apart?** — `fibre_continuity.py`
+   (originally `phase1_kissing_crossing.py`).
    A continuity tracker traverses a real crossing but terminates at a kissing
    boundary. **Closed for wide angles**; narrow crossings stay unresolvable (a
    stated limit). Also the `local_fibreness` / `V` primitives Phase 2 builds on.
 
-3. **Phase 2 — demote spurious crossings on real i74** — `phase2_i74_demote.py`
-   (forward-support straightness certifier). Walk both peaks of each HOST
+3. **Phase 2 — demote spurious crossings on real i74** — `peak_straightness.py`,
+   originally `phase2_i74_demote.py` (forward-support straightness certifier). Walk both peaks of each HOST
    crossing; a real one traces a straight persistent line, a spurious one
    wanders. It demotes ~76% of HOST crossings — but a *local* per-peak certifier
    proved insufficient, which motivated Phase 3. Exports `collect_crossings`,
    which all five `mass_conservation/` i74 scripts import.
 
-4. **Phase 3 — the joint global model** — `phase3_global.py` (the model),
+4. **Phase 3 — the joint global model** — consolidated into
+   `archive/phase3.py`. The original scripts were `phase3_global.py` (the model),
    `phase3_i74.py` (on real i74), `phase3_validate3d.py` (3D phantom, kissing=0
    at every angle), `phase3_realnoise.py` (**real noise degrades true-crossing
-   confirm 89%→57%**), `phase3_generative.py` (the noise-calibrated generative
+   confirm 89%→57%**) and `phase3_generative.py` (the noise-calibrated generative
    likelihood — selects the true geometry 100%, beats a white-noise model at
    high noise).
 
@@ -162,7 +169,7 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
    back at zero.
 
    *The objective.* `tdi_mse.py`. Both sides are put on [0, 1] before they are
-   compared — the image by percentile clip + rescale (`preprocess.py`), the TDI
+   compared — the image by percentile clip + rescale (`core/preprocess.py`), the TDI
    by `log10(1 + D)` + rescale — so the residual is a plain mean square with no
    fitted scale and no fitted intercept. That fixes the scale mismatch that made
    the previous raw number meaningless (0.327 against a `mean(I²)` of 0.314);
@@ -284,7 +291,7 @@ this stage and `mass_conservation/` both use it. Files here reach root via a
 
 # How to run
 
-From the repo root, with `$PY` set to the interpreter in your venv (see `PIPELINE.md` § 0 — the venv lives **outside** this folder, because it is OneDrive-synced), e.g. `$PY -u 3_global_tractography\run_pipeline.py`.
+From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u 3_global_tractography/run_pipeline.py`.
 Phantom-based scripts need no real data; the i74 ones need the volume.
 
 | Script | Needs | What it shows |
@@ -313,17 +320,18 @@ not for this stage — see the reach-in note below.
 code moved.** `archive/README.md` says what each one established and how to
 re-run it. Nothing outside `archive/` imports anything inside it.
 
-Deleted in an earlier `simple` pass (findings recorded above and in
-`BAYES_TRACTOGRAPHY.md`): `phase1_kissing_crossing`, `phase2_i74_demote`,
-`phase3_i74`, `phase3_realnoise`, `phase3_generative`, `phase1b_global`,
-`phase1c_directional`, `phase1d_generalize`, `phase2b_validate`,
-`phase3_calibrated`, and the figure-only scripts `*_arrows.py` /
-`phantom_overview.py`.
+Deleted in August 2026, with the findings recorded above and in
+[BAYES_TRACTOGRAPHY.md](../docs/archive/BAYES_TRACTOGRAPHY.md): `phase3_global`,
+`phase3_i74`, `phase3_validate3d`, `phase3_realnoise`, `phase3_generative`,
+`phase1b_global`, `phase1c_directional`, `phase1d_generalize`,
+`phase2b_validate`, `phase3_calibrated`, and the figure-only scripts
+`*_arrows.py` / `phantom_overview.py`. To recover one, find its last version in
+git history, e.g. `git log --all --oneline -- '*phase3_generative.py'`.
 
-# Shared at repo root, and the one downstream reach-in
+# Shared in `core/`, and the one downstream reach-in
 
-Kernels at root: `crossing_shape_3d.py`, `kissing_phantom.py`, `host_fod.py`,
-`host_geometry_test.py`, `noise_floor.py`, `reconstruction.py`, `fod_dipy.py`.
+Kernels in `core/`: `crossing_shape_3d`, `kissing_phantom`, `host_fod`,
+`host_geometry_test`, `noise_floor`, `reconstruction`, `fod_dipy`.
 The `mass_conservation/` stage reaches *into* this folder for
-`phase1_kissing_crossing` and `phase2_i74_demote` (it reuses those certifiers) —
+`fibre_continuity` and `peak_straightness` (it reuses those certifiers) —
 a one-way downstream→upstream dependency, via `sys.path.insert`.

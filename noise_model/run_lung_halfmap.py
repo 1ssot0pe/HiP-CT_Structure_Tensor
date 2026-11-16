@@ -63,10 +63,10 @@ def main():
     log("-" * 66); H.task3_certify(A, B, log)
     log("-" * 66); H.task4_resolution(A, B, log, vox_um=VOX_UM)
     log("=" * 66)
-    open("LUNG_HALFMAP_RESULTS.md", "w").write(
+    open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "LUNG_HALFMAP_RESULTS.md"), "w").write(
         "# Lung half-map analysis (LADAF-2022-13, 16.547 um)\n\n```\n"
         + "\n".join(LOG) + "\n```\n")
-    log("Wrote LUNG_HALFMAP_RESULTS.md")
+    log("Wrote noise_model/LUNG_HALFMAP_RESULTS.md")
 
 
 if __name__ == "__main__":

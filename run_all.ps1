@@ -35,8 +35,8 @@
     Small, fast settings for a smoke test (radius 16, 1 iteration).
 
 .PARAMETER Python
-    Interpreter to use. Defaults to the venv outside this repo -- see PIPELINE.md
-    section 0 for why it does not live in the project folder.
+    Interpreter to use. Defaults to the venv outside this repo -- see README.md,
+    'Setup', for why it does not live in the project folder.
 
 .EXAMPLE
     .\run_all.ps1
@@ -106,7 +106,7 @@ function Invoke-Step {
 # --- preflight -------------------------------------------------------------
 if (-not (Test-Path $Python)) {
     Write-Host "Python not found at: $Python" -ForegroundColor Red
-    Write-Host "Create the venv first (see PIPELINE.md section 0):" -ForegroundColor Yellow
+    Write-Host "Create the venv first (see README.md, Setup):" -ForegroundColor Yellow
     Write-Host '  python -m venv $env:USERPROFILE\venvs\hipct-structure-tensor'
     Write-Host '  & "$env:USERPROFILE\venvs\hipct-structure-tensor\Scripts\python.exe" -m pip install -r requirements.txt'
     exit 1
