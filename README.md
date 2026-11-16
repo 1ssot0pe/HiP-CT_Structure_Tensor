@@ -1,6 +1,6 @@
 # Optimising the Structure Tensor Analysis of White Matter Fibres in Synchrotron Tomography
 
-[![CI](https://github.com/1ssot0pe/Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography/actions/workflows/ci.yml/badge.svg)](https://github.com/1ssot0pe/Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography/actions/workflows/ci.yml)
+[![CI](https://github.com/1ssot0pe/HiP-CT_Structure_Tensor/actions/workflows/ci.yml/badge.svg)](https://github.com/1ssot0pe/HiP-CT_Structure_Tensor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 A pipeline for reading white-matter fibre orientation from Hierarchical
