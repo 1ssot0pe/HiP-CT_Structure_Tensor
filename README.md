@@ -1,212 +1,155 @@
-# Optimising Structure Tensors
+# Optimising the Structure Tensor Analysis of White Matter Fibres in Synchrotron Tomography
 
-UCL MPBE Summer 2026.
+[![CI](https://github.com/1ssot0pe/Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography/actions/workflows/ci.yml/badge.svg)](https://github.com/1ssot0pe/Optimising-the-Structure-Tensor-Analysis-of-White-Matter-Fibres-in-Synchrotron-Tomography/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-Reads fibre orientation out of HiP-CT volumes. The core problem: a structure
-tensor returns **one** direction per voxel, but where two fibres cross there is
-no single correct direction. This pipeline finds those places, and decides which
-of them are real crossings rather than fibres that merely touch.
+A pipeline for reading white-matter fibre orientation from Hierarchical
+Phase-Contrast Tomography (HiP-CT) volumes, built during a UCL Medical Physics
+and Biomedical Engineering summer project (2026).
 
-```powershell
-.\run_all.ps1                  # regression check -> phantoms -> real volume
-.\run_all.ps1 -Quick -SkipI74  # ~1 min smoke test, no data needed
+The structure tensor gives one orientation per voxel and has two scale
+parameters: the differentiation scale **σ** and the integration scale **ρ**.
+Both are usually set by hand. This pipeline:
+
+1. chooses σ and ρ from the data,
+2. finds where one orientation per voxel is not enough (fibre crossings) and
+   resolves up to two orientations there,
+3. checks those orientations with tractography, telling real crossings from
+   fibres that only touch, and refines the orientation field, and
+4. finds the single (σ, ρ) whose plain structure tensor best reproduces the
+   refined field.
+
+## Key result
+
+On a 48³-voxel chunk of the i74 brain volume (20 µm voxels), the refined field
+is best reproduced at **σ = 1.00, ρ = 3.79**. This holds for every seed count
+from 1,000 to 5,000 and for both MSE and MAE as the Stage 3 objective. Stage 1's
+data-driven pick on the same chunk was ρ = 1.41.
+
+![Median angular error against ρ for five seed counts; every curve has its minimum at ρ = 3.79](docs/figures/stage4_rho_sweep.png)
+
+Caveats: ρ is located only to the grid spacing (~20%). Smaller 24³ chunks put
+the minimum between ρ = 1.8 and 3.1, so the optimum varies by region. About 20°
+of median angular error remains at the optimum. Details are in
+[4_optimising_parameters/README.md](4_optimising_parameters/README.md).
+
+## The four stages
+
+| Stage | Question | Folder | Output |
+|---|---|---|---|
+| **1** Scale | How wide a region should the tensor measure over? | [`1_sigma_rho_selection/`](1_sigma_rho_selection/) | σ, ρ per 32³ block (Lindeberg scale selection) |
+| **2** Gate | Can one orientation be trusted here? | [`2_host_classification/`](2_host_classification/) | per-voxel field: `vec1` everywhere, `vec2` at resolved crossings (higher-order structure tensor) |
+| **3** Resolve | Real crossing, or fibres just touching? Which tracking parameters explain the image? | [`3_global_tractography/`](3_global_tractography/) | crossing/kissing verdict per junction; optimised tractogram; refined field |
+| **4** Optimise | Which single (σ, ρ) reproduces the refined field? | [`4_optimising_parameters/`](4_optimising_parameters/) | best (σ, ρ) and its angular error |
+
+Two supporting studies give independent evidence:
+[`mass_conservation/`](mass_conservation/) (crossing vs kissing from
+brightness alone) and [`noise_model/`](noise_model/) (the imaging noise,
+measured from half-reconstructions).
+
+The step-by-step walkthrough, with inputs, outputs and the logic flow of each
+stage, is in [docs/PIPELINE.md](docs/PIPELINE.md).
+
+## Setup
+
+Python 3.13. From the repository root:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
 ```
 
-Setup and the full step-by-step are in [PIPELINE.md](PIPELINE.md).
+`requirements-dev.txt` adds the notebook kernel, the Human Organ Atlas download
+tools and the formatters; it is only needed for those.
 
-## The four steps
+> If the repository sits in a synced folder (OneDrive, Dropbox), create the
+> virtual environment outside it. Syncing thousands of small files can corrupt
+> an environment mid-install. `run_all.ps1` expects one at
+> `%USERPROFILE%\venvs\hipct-structure-tensor` by default; pass `-Python` to
+> use another.
 
-| Step | Question | Output |
+## Data
+
+The real-data steps use HiP-CT volumes from the
+[Human Organ Atlas](https://human-organ-atlas.esrf.fr/). No data is
+redistributed here.
+
+| Volume | Used by | Point the code at it with |
 |---|---|---|
-| **0** Load | What are we measuring? | `vol (z,y,x)` |
-| **1** Scale | How wide a region should we measure over? | σ, ρ per 32³ block |
-| **2** Gate | Can one direction be trusted here? | orientation field + routing mask |
-| **3** Resolve | Real crossing, or fibres just touching? | S + verdict per junction |
+| i74 brain, sensitivity chunk (folder of `*.tif` slices, 20 µm) | Stages 1–4, `mass_conservation/` | `HIPCT_VOLUME_DIR` (default `data/i74/`) |
+| LADAF-2022-13 left lung, two half-reconstructions (16.547 µm) | `noise_model/` | `LUNG_HALF_A_DIR`, `LUNG_HALF_B_DIR` |
 
-## Logic flow
+Everything else runs on synthetic phantoms with known ground truth and needs no
+download.
 
-Each step asks one question. The **decisions** are what the pipeline is; the
-boxes are just where they happen.
+## Running
 
-```
-                    reconstruction.load_volume()      real scan, no truth
-                    localized_phantoms.raw_*()        phantom, known truth
-                                   │
-                                   ▼   vol (z, y, x) float32
+```bash
+# Checks with a known answer -- no data needed (this is what CI runs)
+python 3_global_tractography/test_frame_convention.py
+python 3_global_tractography/run_pipeline.py --radius 16 --iters 1
 
-┌─ STEP 1 · At what scale do we measure? ─────────────  1_sigma_rho_selection
-│
-│    A structure tensor has two knobs, and the tissue sets both:
-│
-│      first peak of the Lindeberg response  →  σ    how wide a gradient
-│      where angular drift flattens          →  ρ    how far to average
-│
-│    σ too small measures noise; too large blurs neighbouring fibres.
-│    ρ too small leaves direction jittery; too large averages across fibres.
-│    Picked per 32³ block, because the best σ varies ~1–6 across a volume.
-│
-│    ? does the block hold tissue    block mean ≥ 5% of the volume max
-│      ├─ yes → pick (σ, ρ) for it, and use that
-│      └─ no  → BACKGROUND. skipped before any scale pick is attempted;
-│               those patches fall back to σ = ρ = 0.85  ⚠ WARNS
-│
-│    A sparse volume can fail this on every block — then Step 1 never ran,
-│    and the whole run is on one fixed scale. Cost, measured: ~20° of
-│    angular error on the kissing phantom.
-└──────────────────────────────────────────────────────────────────────────
-                                   │
-                                   ▼   sigma_map, rho_map
+# Stages 1-3 on real data
+python 3_global_tractography/run_pipeline.py --i74
 
-┌─ STEP 2 · Can ONE direction be trusted here? ───────  2_host_classification
-│
-│    A tensor gives one direction per voxel. Where two fibres cross, that
-│    answer is not imprecise — it is meaningless. Find those places, and
-│    spend the expensive method only there.
-│
-│    per patch (half = 14):   host_fod.analyse(σ_grad = 4.0)
-│                               → c_s   how much it has NO dominant direction
-│                               → FA    how strongly directional it is
-│
-│    ? c_s ≤ FA  AND  fewer than 3 peaks        ← both from the same
-│      │                                          eigenvalues, so no
-│      │                                          threshold to tune
-│      ├─ yes → SINGLE.  keep Step 1's e3, one direction, done
-│      │
-│      └─ no  → ROUTE TO HOST-FOD, at a different scale:
-│               analyse(σ_grad = 2.5) → up to 2 directions
-│               classify() → single, crossing, dispersed,
-│                            disorganised, complex
-│
-│    Three scales, not interchangeable:  σ≈1.0 for direction,
-│    5.0 for the gate, 2.5 for peaks. At 1.0 the gate never fires;
-│    at 5.0 the second peak is already smoothed away. All three are
-│    certified, not written down — select_scales.py picks the first
-│    from the data, certify_gate_scales.py picks the other two
-│    against phantoms with known truth.
-└──────────────────────────────────────────────────────────────────────────
-                                   │
-                                   ▼   GatedField → results/unified_field_*.npz
-
-┌─ STEP 3 · Real crossing, or fibres just touching? ── 3_global_tractography
-│
-│  (a) MEASURE — from the image, once per junction. Brightness adds:
-│
-│        S = (I_c − I₀) ⁄ ((I_a − I₀) + (I_b − I₀))
-│
-│        S ≈ 1.0   both fibres deposit here      →  CROSSING
-│        S ≈ 0.5   only one is really here       →  TANGENCY
-│        decision at 0.75, ±0.10 reported as AMBIGUOUS
-│
-│  (b) FIT — θ = (step, angle, seed density, link weight)
-│
-│        ┌───────────────────────────────────────────────────────┐
-│        │                                                       │
-│        ▼                                                       │
-│      integrate streamlines through the field                   │
-│        └─ S is a WALL here: a path may run ALONG a tangency,   │
-│           never THROUGH it                                     │
-│        │                                                       │
-│        ▼                                                       │
-│      rasterise → D_rec    arc-length weighted, so density 2    │
-│        │                  literally means two fibres           │
-│        ▼                                                       │
-│      L = MSE(D_rec, D_obs)        does it explain the image?   │
-│          + verdict penalty        does it obey S?              │
-│        │                            CROSSING wants density 2   │
-│        │                            TANGENCY wants density ≤ 1 │
-│        ▼                                                       │
-│      coordinate descent — one knob at a time, keep what helps ─┘
-│        (no gradient: streamlines terminate discretely, so L is
-│         flat, then jumps. There is no slope to follow.)
-│
-│      stop when a full sweep improves nothing
-└──────────────────────────────────────────────────────────────────────────
-                                   │
-                                   ▼
-
-     results/pipeline_results.json    S + verdict per junction, fitted θ
-     results/unified_field_*.npz      the orientation field
-     results/field_*.png              greyscale + orientations, to check by eye
-     stdout                           PASS / FAIL, or a verdict with no
-                                      correctness claim on real data
+# Stage 3 optimisation loop, then Stage 4
+python 3_global_tractography/descent_loop.py --radius 24 --seeds 5000 \
+    --turn relax --refine-field --variant vec1 --outdir results/seed_5000
+python 4_optimising_parameters/sigma_rho_match.py --run results/seed_5000
 ```
 
-**Where the loop closes.** S is measured once from the image and never revised.
-θ adapts to S; S never adapts to θ. So a wrong verdict is optimised *toward*,
-not away from — the honest limit of the current design.
+On Windows, `.\run_all.ps1` runs the checks and the real-data step in order and
+stops at the first failure (`-Quick -SkipI74` for a one-minute smoke test).
 
-## What actually runs
+Outputs go to `results/`. Only small JSON summaries are tracked in git. The
+full outputs of the recorded runs (tractograms, fields, interactive viewers) are
+attached to the GitHub release.
 
-Traced from a real run — 13 modules, not the 56 in the repo:
+## Repository layout
 
 ```
-run_pipeline.py                                  the only entry point
- ├─ reconstruction.py            load_volume         → vol
- │  or localized_phantoms.py     raw_* phantoms      → vol + known truth
- │
- ├─ sigma_rho_gated_field.py                       STEP 1 + 2
- │   ├─ sigma_rho_adaptive.py → pick_sigma_rho.py → orthogonality_residual.py
- │   └─ host_fod.py → two_orientation_test.py → crossing_shape_3d.py
- │                                                 → kissing_phantom.py
- ├─ self_optimising_tractography.py                STEP 3
- │   └─ tract_density.py
- └─ render_field.py                                figures
+core/                      shared kernels: volume loading, structure tensor,
+                           HOST-FOD, phantoms, noise library
+1_sigma_rho_selection/     Stage 1
+2_host_classification/     Stage 2
+3_global_tractography/     Stage 3 (archive/ holds superseded experiments)
+4_optimising_parameters/   Stage 4
+mass_conservation/         supporting study: brightness-based crossing test
+noise_model/               supporting study: half-map noise measurement
+notebooks/                 initial structure tensor exploration
+docs/                      pipeline walkthrough, work log, report draft, figures
+results/                   JSON summaries of recorded runs
+tools/                     repository checks used by CI
 ```
 
-Each run writes `results/field_*.png` — the greyscale image with the recovered
-orientations drawn on top, so a run can be checked by eye, not just read.
+Each folder's README walks through its scripts in order and records what each
+experiment found, including approaches that were tried and ruled out.
 
-Everything else in the repo is either a library for one of these, or a
-standalone experiment recording a finding. Nothing is orphaned.
+## Status and limitations
 
-## Root engine
+- Stages 1–3 are validated on phantoms with known truth. On real data there is
+  no ground truth, so results are reported as measurements, not as correct
+  answers.
+- The Stage 4 optimum is consistent across seed counts and metrics on one chunk
+  but varies between regions (see above).
+- The track-density target `λ1 − λ3` cannot tell one bright fibre from two
+  dim crossing ones.
+- Crossings of three or more fibres are labelled `complex` and not resolved.
+- i74 has no half-reconstructions, so its noise model is borrowed from lung
+  data; only the isotropic spectral shape is shown to transfer.
 
-Shared by every folder. The count is how many tracked files import it.
+The work log is in [docs/WORKLOG.md](docs/WORKLOG.md). Approaches that were
+tried and ruled out are recorded in
+[docs/archive/BAYES_TRACTOGRAPHY.md](docs/archive/BAYES_TRACTOGRAPHY.md).
 
-| File | Function | In → Out |
-|---|---|---|
-| `reconstruction.py` (18) | data gateway; volume path + voxel size live here | TIFF folder, `crop` → `vol` |
-| `orthogonality_residual.py` (6) | the plain structure tensor | `(vol, σ, ρ)` → `e3` |
-| `crossing_shape_3d.py` (15) | tube/coord primitives, `shape_measures`, `knee_sigma` | params → `vol`; `(vol,σ,ρ)` → c_l/c_p/c_s |
-| `kissing_phantom.py` (5) | curved bundles that touch but never cross | `(gap, curv)` → `vol` |
-| `localized_phantoms.py` (4) | the two phantoms the pipeline validates against | params → `vol` + truth |
-| `two_orientation_test.py` (3) | `patch_gradients` primitive | `(patch, σ_grad)` → scatter `G` |
-| **`host_fod.py` (18)** | **the HOST-FOD kernel** | `analyse(patch, σ_grad)` → metrics; `classify(m)` → label |
-| `noise_floor.py` (8) | N-matrix / power-spectrum library | `(I, σ)` → `N` |
-| `host_geometry_test.py` (6) | labelled phantom suite | params → `vol` + truth |
-| `selfcalib_threshold.py` (4) | self-calibrating c_s guard | `(vol,σ,ρ)` → c_s field |
-| `model_ladder.py` (2) | c_s calibration against known geometries | known dirs → c_s ladder |
-| `fod_dipy.py` (1) | dipy FOD cross-check | `patch` → dipy peaks |
+## Citation
 
-`classify` returns `single` / `crossing` / `dispersed` / `disorganised` /
-`complex`. `complex` means the method gave up — filters selecting `== "single"`
-correctly exclude it.
+If you use this code, please cite it using [CITATION.cff](CITATION.cff) (GitHub
+shows a "Cite this repository" button). If you use Human Organ Atlas data,
+also follow the Atlas's own citation guidance for the datasets you use.
 
-## Folders
+## Licence
 
-| | |
-|---|---|
-| `1_sigma_rho_selection/` | choosing σ and ρ, and the evidence they are right |
-| `2_host_classification/` | the routing gate and its alternatives |
-| `3_global_tractography/` | crossing vs kissing; the Step-3 loop; the entry point |
-| `mass_conservation/` | the same question answered by brightness instead |
-| `noise_model/` | measuring the noise, so "real or noise?" gets a number |
-
-Each folder has a README with its ordered walkthrough and what each experiment
-found. Files reach the root engine via a `sys.path.insert`, so any script runs
-from anywhere.
-
-## Status
-
-| Step | Runs on any volume? | Note |
-|---|---|---|
-| 1 σ, ρ | yes (edit `reconstruction.py`) | ground-truth-free |
-| 2 gate | yes | self-calibrates; no tuned threshold |
-| 3 resolve | yes | mechanism-validated on phantoms |
-| noise | needs even/odd half-maps | check `corr(A,B)` first |
-
-Main open items: the noise-calibrated likelihood is validated as a model
-selector but not yet wired into link-scoring; `D_obs = λ1 − λ3` cannot tell one
-bright fibre from two dim crossing ones. Full caveats in [PIPELINE.md](PIPELINE.md);
-the record of what was tried and falsified is in
-[archive/BAYES_TRACTOGRAPHY.md](archive/BAYES_TRACTOGRAPHY.md).
+Code: [MIT](LICENSE). The licence covers this repository's code only, not the
+HiP-CT data it analyses.
