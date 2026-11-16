@@ -23,6 +23,7 @@ lung_B.npy
 results/**
 !results/**/
 !results/**/*.json
+*.npz
 *.nii
 *.nii.gz
 pipeline_results.json

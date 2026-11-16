@@ -89,13 +89,30 @@ of the repository root at the top of each file. Run any script from anywhere.
    the σ grid or pooling. An experiment, not a pipeline step: step 5's block
    map is still what Stage 2 uses.
 
-8. **Does the choice of ρ matter?** — `rho_range_sensitivity.py`. On a 96³
-   i74 core, e3 at ρ = 2.0 and ρ = 3.5 (the credible range at the time) differ
+8. **Is a per-voxel σ worth it?** — `adaptive_sigma_benefit.py` (+
+   `render_adaptive_benefit.py` for the figure). Uses step 7's σ\* map as the
+   σ at every voxel and measures how far that moves e3, against controls, over
+   877,039 certified voxels of a 96³ i74 core:
+
+   | change to e3 (median) | |
+   |---|---|
+   | adaptive σ, floored at 0.85, at ρ = 3.46 | **0.17°** |
+   | σ 0.85 → 0.90, same ρ (two picks already treated as interchangeable) | 1.12° |
+   | adaptive σ without the floor, at ρ = 3.46 | 3.44° |
+   | ρ 0.85 → 3.46, fixed σ | **39.8°** |
+
+   **σ is closed.** 98.6% of certified σ\* sit below the 0.85
+   discretisation floor (median 0.69, 5th–95th percentile 0.64–0.78), so once floored the per-voxel map changes nothing
+   that matters. The unfloored difference is structureless sub-floor noise, not
+   signal. ρ is where the leverage is. Recorded output:
+   `adaptive_sigma_benefit_results.json`.
+
+9. **Does the choice of ρ matter?** — `rho_range_sensitivity.py`. On the same
+   96³ core, e3 at ρ = 2.0 and ρ = 3.5 (the credible range at the time) differ
    by a median **15.5°**, and the ρ ladder from 0.85 to 5.0 never plateaus. So
    ρ, not σ, is the scale that moves the field. This is what Stage 4 picks up.
-   Recorded output: `rho_range_sensitivity_results.json`. *The script cannot
-   currently run:* it imports helpers from `adaptive_sigma_benefit.py`, which
-   was never committed and has been lost.
+   Recorded output: `rho_range_sensitivity_results.json`. Reuses step 8's
+   helpers, so both need the i74 volume.
 
 # How to run
 
@@ -109,7 +126,9 @@ From the repository root, with the environment from the [main README](../README.
 | `sigma_rho_robustness.py` | i74 volume + `lung_A.npy` / `lung_B.npy` | 3 PNGs |
 | `lindeberg_feature_size.py` | i74 volume (`--calibrate`: nothing) | per-voxel σ\* map + `_meta.json`; calibration in `lindeberg_feature_size_calib.json` |
 | `render_feature_size_map.py` | output of the above | feature-size heat map PNG |
-| `rho_range_sensitivity.py` | i74 volume + the lost `adaptive_sigma_benefit.py` | `rho_range_sensitivity_results.json` (recorded) |
+| `adaptive_sigma_benefit.py` | i74 volume (+ step 7's calibration) | `adaptive_sigma_benefit_results.json` (recorded) + `_fields.npz` |
+| `render_adaptive_benefit.py` | output of the above | `adaptive_sigma_benefit.png` |
+| `rho_range_sensitivity.py` | i74 volume | `rho_range_sensitivity_results.json` (recorded) + PNG |
 
 # Downstream consumers outside this folder
 

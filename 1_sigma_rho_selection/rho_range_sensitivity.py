@@ -62,9 +62,6 @@ sys.path.insert(0, _HERE)
 from core.reconstruction import VOXEL_SIZE_UM, DEFAULT_VOLUME_DIR
 from lindeberg_feature_size import (SIGMAS, RHO_RATIO, TRUNCATE, RESP_SMOOTH,
                                     AIR_FRAC, scale_select, kernel_halo)
-# NOTE: adaptive_sigma_benefit.py was never committed and has been lost, so this
-# script cannot currently run. Its recorded output is
-# rho_range_sensitivity_results.json, kept as the record of the finding.
 from adaptive_sigma_benefit import (load_block, e3_constant, angle_deg, crop,
                                     summarise, SIGMA_FLOOR)
 
