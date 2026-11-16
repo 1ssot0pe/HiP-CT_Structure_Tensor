@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/1ssot0pe/HiP-CT_Structure_Tensor/actions/workflows/ci.yml/badge.svg)](https://github.com/1ssot0pe/HiP-CT_Structure_Tensor/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24289711.svg)](https://doi.org/10.5281/zenodo.24289711)
 
 A pipeline for reading white-matter fibre orientation from Hierarchical
 Phase-Contrast Tomography (HiP-CT) volumes, built during a UCL Medical Physics
@@ -145,8 +146,16 @@ tried and ruled out are recorded in
 
 ## Citation
 
-If you use this code, please cite it using [CITATION.cff](CITATION.cff) (GitHub
-shows a "Cite this repository" button). If you use Human Organ Atlas data,
+If you use this code, please cite it:
+
+> Hezhao, I. and Keenlyside, A. (2026). *Optimising the Structure Tensor
+> Analysis of White Matter Fibres in Synchrotron Tomography*. Zenodo.
+> https://doi.org/10.5281/zenodo.24289711
+
+That DOI always resolves to the latest release; each release also has its own
+(v1.0.0: [10.5281/zenodo.24289712](https://doi.org/10.5281/zenodo.24289712)).
+GitHub's "Cite this repository" button gives the same reference in other
+formats, from [CITATION.cff](CITATION.cff). If you use Human Organ Atlas data,
 also follow the Atlas's own citation guidance for the datasets you use.
 
 ## Licence
