@@ -53,22 +53,85 @@ def curved_bundle(C, pts, radius):
     return np.exp(-d2 / (2 * radius ** 2))
 
 
-def build_kissing(same_size=True, gap=8.0, curv=0.028):
+def add_poisson(vol, bg=0.02, photons=2000.0, seed=0):
+    """Shot noise on a non-zero background -- what a real reconstruction has.
+
+    The noiseless phantom is a sum of Gaussian tubes, so beyond ~21 voxels it
+    underflows float32 to EXACTLY zero over half the volume. A structure tensor
+    there is the zero matrix: no direction exists, and an eigensolver asked for
+    one returns whatever rounding noise it decomposed. That is what put
+    single-voxel direction streaks in the empty corners.
+
+    A real scan never has this problem, because the background is not zero and
+    not constant. Reproducing that is more honest than special-casing it:
+
+        counts ~ Poisson((vol + bg) * photons)  ->  intensity = counts / photons
+
+    Poisson alone would not do it -- Poisson(0) is exactly 0 -- so the constant
+    `bg` pedestal is the part that matters. Background noise is then
+    sqrt(bg / photons) in intensity units; at the defaults that is 0.3% of the
+    fibre peak.
+
+    Returns float32; values are NOT renormalised, so the fibre peak stays ~1 + bg
+    and callers that use `vol.max()` as a reference see what they expect.
+    """
+    rng = np.random.default_rng(seed)
+    lam = np.clip((vol.astype(np.float64) + bg) * photons, 0.0, None)
+    return (rng.poisson(lam) / photons).astype(np.float32)
+
+
+def build_kissing(same_size=True, gap=8.0, curv=0.028, bg=0.0, photons=2000.0,
+                  seed=0, halo=0):
     """Two curved fibres bulging toward each other, closest in the middle (gap),
-    tangent there. same_size -> both radius 1.6; else A thin 1.1, B thick 2.6."""
-    C = _coords(SHAPE)
+    tangent there. same_size -> both radius 1.6; else A thin 1.1, B thick 2.6.
+
+    bg > 0 adds Poisson shot noise on a `bg` pedestal (see `add_poisson`).
+    Default 0.0 leaves the phantom exactly as it was for existing callers.
+
+    halo > 0 grows the volume by `halo` voxels on every face AND lengthens the
+    fibres so they run out through the enlarged boundary rather than stopping
+    at it. Process the padded volume, then crop the halo away: every voxel kept
+    was measured with a full filter footprint of real data. Without it the
+    outer shell is measured against whatever the filter's boundary mode
+    invents -- 30 voxels deep for the gate (a 16-voxel gradient kernel at
+    sigma_grad=4 feeding a 14-voxel box), which on an 80-voxel cube is most of
+    the volume.
+
+    `ymax` grows with the halo so the curve still leaves the box; at halo=0 it
+    is 34.0 exactly as before, so existing callers see an unchanged phantom.
+    """
+    shape = tuple(s + 2 * halo for s in SHAPE)
+    C = _coords(shape)
 
     rA, rB = (1.6, 1.6)
 
-    ptsA, ptsB = _curve_pts(-1, gap, curv), _curve_pts(+1, gap, curv)
+    ymax = 34.0 + halo
+    n = int(round(140 * ymax / 34.0))          # keep the point spacing constant
+    ptsA = _curve_pts(-1, gap, curv, ymax=ymax, n=n)
+    ptsB = _curve_pts(+1, gap, curv, ymax=ymax, n=n)
     A = curved_bundle(C, ptsA, rA)   # ) on the left
     B = curved_bundle(C, ptsB, rB)   # ( on the right
-    
+
     # honest minimum true gap between the two curve centrelines (not just the
     # parametric tip separation) -- report it so we KNOW they don't touch
     dmin = float(np.min(np.linalg.norm(ptsA[:, None, :] - ptsB[None, :, :], axis=-1)))
-    
-    return _finalise(A + B), dict(rA=rA, rB=rB, gap=gap, curv=curv, true_min_gap=dmin)
+
+    vol = _finalise(A + B)
+    meta = dict(rA=rA, rB=rB, gap=gap, curv=curv, true_min_gap=dmin, bg=bg,
+                halo=halo, shape=shape, ymax=ymax)
+    if bg > 0:
+        vol = add_poisson(vol, bg=bg, photons=photons, seed=seed)
+        meta.update(photons=photons, seed=seed,
+                    bg_noise=float(np.sqrt(bg / photons)))
+    return vol, meta
+
+
+def crop_halo(arr, halo):
+    """Drop `halo` voxels from every face of the first three axes."""
+    if halo <= 0:
+        return arr
+    s = (slice(halo, -halo),) * 3
+    return arr[s]
 
 
 if __name__ == "__main__":
