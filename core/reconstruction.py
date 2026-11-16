@@ -17,6 +17,7 @@ Pipeline position:
 Scope: reconstruction only. No FSC / no (sigma, rho) loop here.
 """
 
+import os
 import sys
 import time
 from itertools import product
@@ -75,9 +76,13 @@ def grid_cells(n_sigma, n_rho):
 # of single-slice TIFFs; stacking gives an (Nz, Ny, Nx) uint8 volume. RAM is the
 # binding constraint (see notebook), so we truncate to a cube by default.
 
-DEFAULT_VOLUME_DIR = Path(
-    r"C:\Users\issyh\Downloads\sensitivity_chunk_IC_768\sensitivity_chunk_IC_768"
-)
+#
+# Point the pipeline at your copy by setting HIPCT_VOLUME_DIR to the folder of
+# *.tif slices; otherwise it looks in data/i74/ at the repository root.
+DEFAULT_VOLUME_DIR = Path(os.environ.get(
+    "HIPCT_VOLUME_DIR",
+    Path(__file__).resolve().parent.parent / "data" / "i74",
+))
 VOXEL_SIZE_UM = 20.0  # isotropic voxel edge, subject i74
 
 # Fraction of the volume max below which a voxel is treated as air. It is one
@@ -136,7 +141,9 @@ def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float,
     folder = Path(folder)
     files = sorted(folder.glob("*.tif"))
     if not files:
-        raise FileNotFoundError(f"no *.tif slices found in {folder}")
+        raise FileNotFoundError(
+            f"no *.tif slices found in {folder}. Set HIPCT_VOLUME_DIR to the "
+            f"folder holding the volume's TIFF slices (see README, 'Data').")
     volume = np.stack([tifffile.imread(f) for f in files])
     if crop is not None:
         a, b = crop

@@ -507,9 +507,11 @@ if __name__ == "__main__":
 
     # Synthetic anti-parallel-cylinders phantom (single stacked TIFF). No ground
     # truth field, so this is the R surface alone (no angular-error panel).
-    PHANTOM_TIF = Path(
-        r"C:\Users\issyh\OneDrive\Desktop\Stack_Synthetic_Data_Anti-Parallel_Cylinders_Random_Dia_512X512.tif"
-    )
+    import os
+    PHANTOM_TIF = Path(os.environ.get(
+        "PHANTOM_TIF",
+        "Stack_Synthetic_Data_Anti-Parallel_Cylinders_Random_Dia_512X512.tif",
+    ))
 
     # sigma/rho grid: 0..30 inclusive, step 4  -> 0, 4, 8, 12, 16, 20, 24, 28.
     SIGMAS = tuple(float(v) for v in np.arange(0.0, 30.0 + 1e-9, 4.0))

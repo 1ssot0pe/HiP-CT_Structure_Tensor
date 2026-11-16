@@ -16,8 +16,10 @@ import os
 import numpy as np
 import tifffile
 
-A_DIR = r"C:\Users\issyh\Downloads\full-volume_2-0_16.547um_LADAF-2022-13_lung-left_overview__0001"
-B_DIR = r"C:\Users\issyh\Downloads\full-volume_2-1_16.547um_LADAF-2022-13_lung-left_overview__0001"
+# Folders of the two half-reconstructions (Human Organ Atlas, LADAF-2022-13 left
+# lung, 16.547 um overview, "full-volume_2-0" and "full-volume_2-1").
+A_DIR = os.environ.get("LUNG_HALF_A_DIR", "full-volume_2-0_16.547um_LADAF-2022-13_lung-left_overview__0001")
+B_DIR = os.environ.get("LUNG_HALF_B_DIR", "full-volume_2-1_16.547um_LADAF-2022-13_lung-left_overview__0001")
 VOX_UM = 16.547
 W = 512  # in-plane crop half-window is W//2; read cost is fixed anyway
 OUT = os.environ.get("LUNG_SLAB_DIR", ".")
@@ -29,6 +31,9 @@ _zpos = lambda t: float(t.replace("p", "."))
 def main():
     a = {_tok(f): f for f in glob.glob(A_DIR + "/*.tif*")}
     b = {_tok(f): f for f in glob.glob(B_DIR + "/*.tif*")}
+    if not a or not b:
+        raise SystemExit(f"no TIFF slices found (A_DIR={A_DIR!r}, B_DIR={B_DIR!r}); "
+                         "set LUNG_HALF_A_DIR and LUNG_HALF_B_DIR to the two half-map folders")
     common = sorted(set(a) & set(b), key=_zpos)
     print(f"matched z-slices: {len(common)}  (A={len(a)}, B={len(b)}); "
           f"z {_zpos(common[0]):.3f}..{_zpos(common[-1]):.3f}")
