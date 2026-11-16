@@ -81,6 +81,7 @@ From the repository root, with the environment from the [main README](../README.
 |---|---|---|
 | `crossing_vs_kissing_metrics.py` | phantom | candidate-metric shortlist |
 | `mass_conservation_validate.py` | phantom + `lung_A/B.npy` | the 100% / 0% phantom proof |
+| `mass_conservation_summary.py` | nothing | bar chart of the validation's recorded ratios (by noise and by gap); numbers are copied from that run's log, so it does not re-run the sweep |
 | `real_i74_mass_conservation.py` | i74 volume | 0% fire fraction on real crossings |
 | `i74_calibration_bias_check.py` | i74 volume | the selection-bias finding |
 | `i74_directional_calibration.py` / `i74_global_density_calibration.py` | i74 volume | the two fix attempts |

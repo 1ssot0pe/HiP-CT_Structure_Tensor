@@ -78,6 +78,25 @@ of the repository root at the top of each file. Run any script from anywhere.
    there's no bug. (b) *Region drift* — the finding behind step 5.
    (c) *High-pass* — a peak-finder sanity check.
 
+7. **A scale per voxel** — `lindeberg_feature_size.py` (map) +
+   `render_feature_size_map.py` (figure). The voxel-continuous version of step
+   5: a Lindeberg scale pick at every voxel, giving a feature-size heat map in
+   µm. Three settings were each necessary: the *first* interior maximum (not the
+   global one), a σ grid reaching down to 0.5, and pooling the response at 2σ
+   before peak-finding. On a 256³ i74 patch: 94% of tissue certified, median
+   feature size 57 µm (σ\* ≈ 0.70). Calibrated on known-width tubes
+   (`--calibrate`, σ\* = 0.578 × width, R² 0.987); re-calibrate after changing
+   the σ grid or pooling. An experiment, not a pipeline step: step 5's block
+   map is still what Stage 2 uses.
+
+8. **Does the choice of ρ matter?** — `rho_range_sensitivity.py`. On a 96³
+   i74 core, e3 at ρ = 2.0 and ρ = 3.5 (the credible range at the time) differ
+   by a median **15.5°**, and the ρ ladder from 0.85 to 5.0 never plateaus. So
+   ρ, not σ, is the scale that moves the field. This is what Stage 4 picks up.
+   Recorded output: `rho_range_sensitivity_results.json`. *The script cannot
+   currently run:* it imports helpers from `adaptive_sigma_benefit.py`, which
+   was never committed and has been lost.
+
 # How to run
 
 From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u 1_sigma_rho_selection/sigma_rho_global.py`.
@@ -88,6 +107,9 @@ From the repository root, with the environment from the [main README](../README.
 | `sigma_rho_global.py` | i74 volume | `sigma_rho_global.png` |
 | `sigma_rho_adaptive.py` | i74 volume | `sigma_rho_adaptive_map.png` |
 | `sigma_rho_robustness.py` | i74 volume + `lung_A.npy` / `lung_B.npy` | 3 PNGs |
+| `lindeberg_feature_size.py` | i74 volume (`--calibrate`: nothing) | per-voxel σ\* map + `_meta.json`; calibration in `lindeberg_feature_size_calib.json` |
+| `render_feature_size_map.py` | output of the above | feature-size heat map PNG |
+| `rho_range_sensitivity.py` | i74 volume + the lost `adaptive_sigma_benefit.py` | `rho_range_sensitivity_results.json` (recorded) |
 
 # Downstream consumers outside this folder
 
