@@ -51,6 +51,21 @@ measured from half-reconstructions).
 The step-by-step walkthrough, with inputs, outputs and the logic flow of each
 stage, is in [docs/PIPELINE.md](docs/PIPELINE.md).
 
+### Pipeline variants
+
+Stage 2 comes in three forms. The default decides per patch; the other two
+decide at every voxel and cost more compute.
+
+| Variant | Entry point | Decides | Gate | Use for |
+|---|---|---|---|---|
+| **Standard** | `3_global_tractography/run_pipeline.py` | per patch (stride-6 grid) | c_s > FA | the validated end-to-end pipeline |
+| **Per-voxel, redesigned** | `2_host_classification/run_dense_stage12.py` | every voxel, Gaussian window | λ3/λ2 | the best per-voxel decision on real data |
+| **Per-voxel, patch-exact** | `2_host_classification/export_nifti.py` | every voxel, box window | c_s > FA | the standard pipeline's answer at full resolution, as MRtrix-style NIfTI (kissing phantom) |
+
+The patch-exact variant was contributed by Andrew Keenlyside. How the three
+differ, and when to use which, is in
+[2_host_classification/README.md](2_host_classification/README.md#part-d--per-voxel-variants).
+
 ## Setup
 
 Python 3.13. From the repository root:

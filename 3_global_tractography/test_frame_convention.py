@@ -261,7 +261,7 @@ def run(verbose=True):
     for axis, name in AXES:
         vol = single_fibre(axis)
         _check("patch", recovered_direction(vol), axis, name, failures, verbose)
-        _check("dense", dense_direction(vol), axis, name, failures, verbose)
+        _check("export", dense_direction(vol), axis, name, failures, verbose)
     if verbose:
         print("-" * 78)
         if failures:

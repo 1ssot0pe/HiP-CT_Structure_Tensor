@@ -240,6 +240,54 @@ These do not run in the pipeline. They are why it looks the way it does.
    patch. No ground truth exists, so this is a qualitative map of where the pipeline
    is confident, where it resolves a crossing, and where it gives up.
 
+# Part D — per-voxel variants
+
+Parts A–C decide per **patch** on a stride-6 grid and fill each patch's answer
+over its neighbourhood. Two variants compute Stage 2 at **every voxel**
+instead. Both cost more compute. They answer the per-voxel question
+differently.
+
+| | Redesigned per-voxel | Patch-exact per-voxel |
+|---|---|---|
+| Entry point | `run_dense_stage12.py` | `export_nifti.py` |
+| Engine | `dense_host.py`, `dense_gate.py` | `patch_exact_dense.py` (Andrew Keenlyside) |
+| Window | Gaussian, sliding over real data | box, identical to `host_fod.analyse` |
+| Gradient cutoff | 10% of the volume maximum (one global threshold) | 10% of each box's own maximum, as `analyse` (quantised into 24 bins) |
+| Gate | λ3/λ2, ranked by fire fraction | c_s > FA, as the patch pipeline |
+| HOST order | 8 | certified order (6) |
+| Input | i74 chunk (`--centre`, `--radius`) | kissing phantom (`--gap`, `--bg`, `--halo`) |
+| Output | `vec1`/`vec2`, labels, gate mask (NIfTI) | MRtrix-style `peaks` (6 components), `ndirs`, `measured`, c_s, FA (NIfTI) |
+| Checked by | phantom table in its docstring | `--validate`: compares with `host_fod.analyse` at sample voxels |
+
+**When to use which.**
+- **Patch-exact** answers "what would the patch pipeline say at this voxel?",
+  without the 6-voxel blocks that patch filling leaves around branching points.
+  Use it to see the patch pipeline's decisions at full resolution.
+- **Redesigned** answers "what is the best per-voxel decision?". It was built
+  after measuring that c_s > FA separates crossings from single fibres only
+  weakly once evaluated per voxel (AUC 0.709 against 0.998 for λ3/λ2; see
+  `run_dense_stage12.py` and `dense_host.py`).
+
+Both read the certified window and gradient scales from
+`1_sigma_rho_selection/gate_scales.json`, so they never disagree on scale.
+
+**Patch-exact details.** The box-window sums become separable filters: 6 for
+the gate's scatter matrix and 28 moment images for the order-6 ODF, so
+`host_fod.analyse` (~0.25 s per patch, ~35 h for every voxel of an 80³ cube)
+is never called per voxel. Two kissing-phantom options added with it:
+- `--bg` puts Poisson shot noise on a small pedestal, because a noiseless
+  phantom underflows to exactly zero where the tensor has no direction.
+- `--halo` builds, measures and then crops a padded volume, so no exported
+  voxel is measured against a filter boundary.
+
+Voxels whose tensor is indistinguishable from background noise are marked in
+`kissing_measured.nii.gz`. Nothing is interpolated or filled.
+
+```bash
+python 2_host_classification/export_nifti.py --validate     # kissing phantom
+python 2_host_classification/run_dense_stage12.py --radius 24   # i74 chunk
+```
+
 # How to run
 
 From the repository root, with the environment from the [main README](../README.md#setup) active, e.g. `python -u 2_host_classification/gate_protocol.py`.
@@ -251,6 +299,8 @@ From the repository root, with the environment from the [main README](../README.
 | `gate_protocol.py` | nothing (synthetic) | train/test comparison of cheap gate signals; writes `gate_threshold.json` |
 | `refined_field.py` | i74 for `i74` / `gated` | `validate` (default), `i74`, or `gated` as the first argument |
 | `visualize_i74_orientations.py` | i74 volume | orientation glyphs over one real slice |
+| `run_dense_stage12.py` | i74 volume | redesigned per-voxel Stages 1–2 (see Part D) |
+| `export_nifti.py` | nothing (synthetic) | patch-exact per-voxel Stage 2 on the kissing phantom, as NIfTI (see Part D) |
 
 # Engine in `core/`
 

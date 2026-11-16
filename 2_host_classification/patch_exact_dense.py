@@ -1,4 +1,9 @@
-"""dense_field.py -- Step 2 evaluated at EVERY voxel, not on a patch grid.
+"""patch_exact_dense.py -- Step 2 evaluated at EVERY voxel, not on a patch grid.
+
+The PATCH-EXACT per-voxel variant: it reproduces `host_fod.analyse` (box
+window, 10%-of-max gradient cutoff, c_s > FA gate) at every voxel. Compare
+`dense_host.py`, the redesigned per-voxel path (Gaussian window, lambda3/lambda2
+gate) that `run_dense_stage12.py` uses.
 
 `build_gated_field` answers per patch on a stride-6 grid. Reading that back as a
 voxel image means stamping one patch's answer over its whole 6x6x6
@@ -54,12 +59,21 @@ from scipy import ndimage
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.dirname(_HERE)
-for _p in (_ROOT, _HERE):
+for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from host_fod import SPHERE
-from sigma_rho_gated_field import (GATE_HALF, GATE_SIGMA_GRAD, DIR_SIGMA_GRAD,
-                                   HOST_ORDER)
+from core.host_fod import SPHERE
+from core.reconstruction import AIR_FRAC   # build_gated_field's air test: patch.max() < AIR_FRAC * peak
+from certify_gate_scales import load_gate_scales
+
+# The same certified scales the patch pipeline reads (gate_scales.json), so both
+# paths gate and resolve peaks at one set of values. Re-certify with
+# 1_sigma_rho_selection/certify_gate_scales.py.
+_GS = load_gate_scales()
+GATE_HALF = int(_GS["gate_half"])
+GATE_SIGMA_GRAD = float(_GS["gate_sigma_grad"])
+DIR_SIGMA_GRAD = float(_GS["dir_sigma_grad"])
+HOST_ORDER = int(_GS["host_order"])
 
 EPS = 1e-12
 MAG_FRAC = 0.1        # host_fod/two_orientation_test keep threshold
@@ -67,7 +81,6 @@ REL = 0.30            # host_fod.analyse relative_peak_threshold
 MIN_SEP = 30.0        # host_fod.analyse min_separation_angle (degrees)
 SHARPEN = 3.0         # host_fod.analyse sharpen
 MIN_GRADS = 40        # analyse returns None below this many kept gradients
-AIR_FRAC = 0.05       # build_gated_field's air test: patch.max() < 0.05 * peak
 LEVELS = 24           # threshold quantisation bins
 SLAB = 16             # z-slab for the eigh pass
 CHUNK = 20000         # voxels per ODF evaluation chunk
@@ -387,7 +400,7 @@ def validate_against_patches(vol, n_sample=40, half=GATE_HALF, seed=0,
     direction matching, so what this function measures is that boundary
     difference, not an error in the expansion.
     """
-    from host_fod import analyse
+    from core.host_fod import analyse
 
     c_s, fa, _ = dense_gate(vol, half=half, verbose=False)
     gated = c_s > fa

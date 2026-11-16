@@ -20,9 +20,9 @@ That put rectangular blocks in the output either side of every branching point
 and left the c_s/FA decision piecewise-constant on 6-voxel cells.
 
 Nothing here uses a patch grid. c_s and FA are continuous fields
-(`dense_field.dense_gate`), the gate is thresholded per voxel, and HOST's
+(`patch_exact_dense.dense_gate`), the gate is thresholded per voxel, and HOST's
 directions are computed per voxel at the voxels that pass
-(`dense_field.dense_host`). See `dense_field` for how the per-patch arithmetic
+(`patch_exact_dense.dense_host`). See `patch_exact_dense` for how the per-patch arithmetic
 becomes a box filter, and for the check that it reproduces `host_fod.analyse`.
 
 Peak 1 where the gate does NOT fire is Step 1's own e3, measured per voxel from
@@ -93,9 +93,9 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from kissing_phantom import build_kissing, crop_halo
+from core.kissing_phantom import build_kissing, crop_halo
 from sigma_rho_adaptive import compute_adaptive_map, SIGMA_FLOOR
-from dense_field import (dense_gate, dense_host, tissue_windows, GATE_HALF,
+from patch_exact_dense import (dense_gate, dense_host, tissue_windows, GATE_HALF,
                          GATE_SIGMA_GRAD, AIR_FRAC, validate_against_patches)
 
 # Every voxel the gate touches: a gradient kernel of ceil(truncate * sigma_grad)
