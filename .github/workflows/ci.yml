@@ -1,0 +1,40 @@
+name: CI
+
+# The same known-answer and known-truth checks as `run_all.ps1 -Quick -SkipI74`,
+# on Linux. No real data is needed: both steps run on synthetic phantoms.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      MPLBACKEND: Agg
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Compile every file
+        run: python -m compileall -q -x '/\.venv' .
+
+      - name: Check imports resolve across the repository
+        run: python tools/check_imports.py .
+
+      - name: Frame convention (known answer)
+        run: python 3_global_tractography/test_frame_convention.py
+
+      - name: Phantom validation (known truth)
+        run: >
+          python -u 3_global_tractography/run_pipeline.py
+          --radius 16 --stride 8 --iters 1 --no-figures
