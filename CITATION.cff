@@ -3,8 +3,13 @@ message: "If you use this software, please cite it using the metadata below."
 title: "Optimising the Structure Tensor Analysis of White Matter Fibres in Synchrotron Tomography"
 type: software
 authors:
-  - alias: ISSY
+  - given-names: Isabella
+    family-names: Hezhao
+    orcid: "https://orcid.org/0009-0002-9265-6113"
     affiliation: "Department of Medical Physics and Biomedical Engineering, University College London"
+  - given-names: Andrew
+    family-names: Keenlyside
+    # orcid: "https://orcid.org/0000-0000-0000-0000"
 repository-code: "https://github.com/1ssot0pe/HiP-CT_Structure_Tensor"
 license: MIT
 keywords:
