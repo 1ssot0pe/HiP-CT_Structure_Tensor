@@ -119,7 +119,7 @@ core/                      shared kernels: volume loading, structure tensor,
 mass_conservation/         supporting study: brightness-based crossing test
 noise_model/               supporting study: half-map noise measurement
 notebooks/                 initial structure tensor exploration
-docs/                      pipeline walkthrough, work log, report draft, figures
+docs/                      pipeline walkthrough, work log, figures
 results/                   JSON summaries of recorded runs
 tools/                     repository checks used by CI
 ```
