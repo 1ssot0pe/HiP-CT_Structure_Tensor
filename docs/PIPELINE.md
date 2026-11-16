@@ -167,8 +167,9 @@ This is the crossing/kissing validation path. The Stage 3 optimisation loop
 
 ## 0. Pointing the code at a volume
 
-Set `HIPCT_VOLUME_DIR` to the folder of `*.tif` slices (default: `data/i74/`).
-The voxel size is `VOXEL_SIZE_UM` in `core/reconstruction.py` (20 µm for i74).
+Set `HIPCT_VOLUME_DIR` to the folder of `*.tif` slices (default: `data/i74/`;
+relative paths resolve from the repository root) and `HIPCT_VOXEL_UM` to its
+voxel size (default 20 µm, i74). See [Using any dataset](../README.md#using-any-dataset).
 
 `load_volume(crop=(a, b))` carves a central cube `[a:b]` **on all three axes**.
 That one setting feeds every step below.

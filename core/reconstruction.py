@@ -77,13 +77,29 @@ def grid_cells(n_sigma, n_rho):
 # binding constraint (see notebook), so we truncate to a cube by default.
 
 #
-# Point the pipeline at your copy by setting HIPCT_VOLUME_DIR to the folder of
-# *.tif slices; otherwise it looks in data/i74/ at the repository root.
-DEFAULT_VOLUME_DIR = Path(os.environ.get(
-    "HIPCT_VOLUME_DIR",
-    Path(__file__).resolve().parent.parent / "data" / "i74",
-))
-VOXEL_SIZE_UM = 20.0  # isotropic voxel edge, subject i74
+# Which volume to analyse is set by two environment variables, so any dataset
+# can be used without editing code:
+#
+#   HIPCT_VOLUME_DIR  folder of *.tif slices. A relative path is resolved
+#                     against the REPOSITORY ROOT, not the current directory,
+#                     so `data/my_scan` means the same thing whichever folder
+#                     a script is launched from. Default: data/i74
+#   HIPCT_VOXEL_UM    isotropic voxel edge in micrometres. Default: 20 (i74).
+#                     Written into every NIfTI / .trk header, and used to
+#                     convert scales to physical units.
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def resolve_data_path(path):
+    """Absolute paths pass through; relative ones are taken from the repo root."""
+    p = Path(os.path.expandvars(str(path))).expanduser()
+    return p if p.is_absolute() else REPO_ROOT / p
+
+
+DEFAULT_VOLUME_DIR = resolve_data_path(
+    os.environ.get("HIPCT_VOLUME_DIR", "data/i74"))
+VOXEL_SIZE_UM = float(os.environ.get("HIPCT_VOXEL_UM", "20.0"))
 
 # Fraction of the volume max below which a voxel is treated as air. It is one
 # constant because it was three: `sigma_rho_gated_field.build_gated_field`,

@@ -84,6 +84,43 @@ redistributed here.
 Everything else runs on synthetic phantoms with known ground truth and needs no
 download.
 
+### Using any dataset
+
+The volume is a folder of single-slice `*.tif` files, chosen with two
+environment variables:
+
+| Variable | Meaning | Default |
+|---|---|---|
+| `HIPCT_VOLUME_DIR` | folder of `*.tif` slices | `data/i74` |
+| `HIPCT_VOXEL_UM` | isotropic voxel size in µm (written into NIfTI and `.trk` headers) | `20` |
+
+A **relative** `HIPCT_VOLUME_DIR` is resolved from the repository root, so
+the same value works whichever folder you run a script from. Put each dataset
+in its own folder under `data/` (ignored by git) and switch between them:
+
+```powershell
+# PowerShell -- this terminal only
+$env:HIPCT_VOLUME_DIR = "data/lung_overview"
+$env:HIPCT_VOXEL_UM   = "16.547"
+python 3_global_tractography/run_pipeline.py --i74
+```
+
+```bash
+# bash -- this terminal only
+export HIPCT_VOLUME_DIR=data/lung_overview HIPCT_VOXEL_UM=16.547
+python 3_global_tractography/run_pipeline.py --i74
+```
+
+Absolute paths (`D:\scans\brain_01`) and `~` also work, which is the better
+choice for large volumes kept outside the repository. To make a setting
+permanent on Windows, run `setx HIPCT_VOLUME_DIR "D:\scans\brain_01"` once and
+open a new terminal (VS Code needs a full restart to pick it up).
+
+Real-data scripts analyse a cube cut from the volume (`--centre`, `--radius`;
+`load_volume` defaults to `crop=(200, 456)`). Check that it fits inside a
+smaller volume. The `--i74` flag means "real data" and reads whatever
+`HIPCT_VOLUME_DIR` points at.
+
 ## Running
 
 ```bash
