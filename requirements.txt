@@ -1,17 +1,17 @@
-# Everything the pipeline itself imports. Derived from the actual `import`
-# statements across all tracked .py files -- not a `pip freeze` dump.
+# Runtime dependencies: everything the pipeline imports, derived from the
+# import statements across the tracked .py files (not a `pip freeze` dump).
 #
 #   python -m venv <path outside any synced folder>
-#   <path>/Scripts/python.exe -m pip install -r requirements.txt
+#   <venv>/Scripts/python.exe -m pip install -r requirements.txt
 #
-# scikit-image is needed by 2_host_classification/refined_field.py (TV denoising)
-# and was missing from the original freeze.
+# Tested with Python 3.13.
 
 dipy==1.12.1
 matplotlib==3.10.7
 nibabel==5.4.2
 numpy==2.3.5
-scikit-image==0.25.2
+plotly>=5.0          # interactive HTML viewers written by descent_loop.py
+scikit-image==0.25.2 # TV denoising in 2_host_classification/refined_field.py
 scipy==1.17.0
 structure-tensor==0.3.4
 tifffile==2026.7.31
