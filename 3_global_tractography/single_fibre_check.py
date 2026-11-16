@@ -172,9 +172,9 @@ def _selftest(verbose=True):
     from dense_field import DenseField
     from sigma_rho_gated_field import build_gated_field
     from select_scales import select_scales
-    from tensor import field_for
-    from reconstruction import tissue_mask
-    from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+    from core.tensor import field_for
+    from core.reconstruction import tissue_mask
+    from core.localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
                                     CROSS_R1, CROSS_TAPER)
 
     R = 24

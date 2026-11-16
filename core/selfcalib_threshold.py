@@ -19,8 +19,8 @@ import sys
 import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
-from orthogonality_residual import crop_margin, _crop3
-from crossing_shape_3d import onset_sigma, SIGMAS_STRESS
+from core.orthogonality_residual import crop_margin, _crop3
+from core.crossing_shape_3d import onset_sigma, SIGMAS_STRESS
 
 EPS = 1e-12
 
@@ -41,7 +41,7 @@ def sphericity_field(vol, sigma, rho, truncate=4.0, subtract_N=None):
     measured (no half-maps), so this is only sound for data with half-maps;
     see noise_model/README.md."""
     if subtract_N is not None:
-        import noise_floor as _nf
+        from core import noise_floor as _nf
         S = _nf.structure_tensor_field(vol, sigma, rho, subtract_N=subtract_N, truncate=truncate)
         l1, l2, l3, _e3, _clip = _nf.eig_fields(S, psd_clip=True, want_vec=False)
         cs = 3.0 * l3 / (l1 + l2 + l3 + EPS)
@@ -55,7 +55,7 @@ def sphericity_field(vol, sigma, rho, truncate=4.0, subtract_N=None):
 
 
 def load_interior(dtype=np.float32):
-    from reconstruction import load_volume
+    from core.reconstruction import load_volume
     full = load_volume(crop=None, dtype=np.uint8)
     vol = full[INTERIOR].astype(dtype)
     del full

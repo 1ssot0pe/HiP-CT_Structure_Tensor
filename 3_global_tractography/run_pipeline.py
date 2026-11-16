@@ -75,10 +75,10 @@ from dense_field import DenseField
 from field_export import export_field, export_difference
 from render_field import render_field
 from sigma_rho_gated_field import build_gated_field, DEFAULT_STRIDE
-from reconstruction import VOXEL_SIZE_UM, tissue_mask
-from nifti_io import nifti_affine, save_nifti, save_vector_field
-from tensor import tensor_field, field_for
-from localized_phantoms import (raw_localized_crossing, raw_kissing,
+from core.reconstruction import VOXEL_SIZE_UM, tissue_mask
+from core.nifti_io import nifti_affine, save_nifti, save_vector_field
+from core.tensor import tensor_field, field_for
+from core.localized_phantoms import (raw_localized_crossing, raw_kissing,
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 sys.path.insert(0, os.path.join(_ROOT, "1_sigma_rho_selection"))
@@ -425,7 +425,7 @@ def run_i74(centre=(384, 384, 384), radius=48, block=32, stride=DEFAULT_STRIDE,
     this is where the superposition metric gets its first real test: it should
     demote a substantial fraction of them (S well below 0.75).
     """
-    from reconstruction import load_volume
+    from core.reconstruction import load_volume
     c = tuple(centre)
     # load_volume's `crop` applies to ALL THREE axes, not just z -- slicing the
     # result again with absolute indices produces a zero-size array.

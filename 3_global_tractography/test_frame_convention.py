@@ -39,7 +39,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
 import self_optimising_tractography as S3          # noqa: E402
 from sigma_rho_gated_field import build_gated_field  # noqa: E402
 from select_scales import select_scales             # noqa: E402
-from tensor import field_for                        # noqa: E402
+from core.tensor import field_for                        # noqa: E402
 
 N = 48
 AXES = ((0, "z"), (1, "y"), (2, "x"))

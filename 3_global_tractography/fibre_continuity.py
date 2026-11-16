@@ -31,9 +31,9 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from host_geometry_test import make_kissing_phantom, make_true_crossing_same_angles
-from host_fod import patch_gradients, directional_energy
-from fod_dipy import SPHERE
+from core.host_geometry_test import make_kissing_phantom, make_true_crossing_same_angles
+from core.host_fod import patch_gradients, directional_energy
+from core.fod_dipy import SPHERE
 
 V = SPHERE.vertices                     # (Nverts, 3) in (x, y, z) = (axis2,axis1,axis0)
 BOUND_X = 48                            # x=0 plane in axis2 index (SHAPE//2)

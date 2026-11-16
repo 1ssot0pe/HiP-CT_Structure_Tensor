@@ -60,10 +60,10 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
            os.path.join(_ROOT, "3_global_tractography")):
     sys.path.insert(0, _p)
 
-from tensor import tensor_field                        # noqa: E402
+from core.tensor import tensor_field                        # noqa: E402
 from select_scales import select_scales                # noqa: E402
-from reconstruction import tissue_mask, VOXEL_SIZE_UM  # noqa: E402
-from nifti_io import nifti_affine, save_nifti          # noqa: E402
+from core.reconstruction import tissue_mask, VOXEL_SIZE_UM  # noqa: E402
+from core.nifti_io import nifti_affine, save_nifti          # noqa: E402
 
 EPS = 1e-12
 FALLBACK_FACTOR = 2.0      # range = pick / f .. pick * f when no maps exist

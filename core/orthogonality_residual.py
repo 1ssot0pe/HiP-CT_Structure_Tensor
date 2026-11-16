@@ -75,7 +75,7 @@ from scipy import ndimage
 
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
-from reconstruction import iter_progress, grid_cells
+from core.reconstruction import iter_progress, grid_cells
 
 
 # ---------------------------------------------------------------------------
@@ -389,7 +389,7 @@ def validate(phantom="fanning", shape=(96, 96, 96),
     if phantom == "fanning":
         vol, truth = make_fanning_phantom(shape=shape, **phantom_kw)
     elif phantom == "gray":
-        from reconstruction import make_phantom      # existing generator
+        from core.reconstruction import make_phantom      # existing generator
         vol, truth = make_phantom(shape=shape, **phantom_kw)
     else:
         raise ValueError("phantom must be 'fanning' or 'gray'")

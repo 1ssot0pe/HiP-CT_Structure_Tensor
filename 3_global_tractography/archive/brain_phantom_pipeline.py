@@ -28,10 +28,10 @@ _sr_sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root 
 import numpy as np
 from scipy.ndimage import gaussian_filter
 
-from crossing_shape_3d import _tube_family, _coords
-from host_geometry_test import _dir_inplane, _finalise, _random_dirs
-from host_fod import analyse, classify
-import noise_floor as nf
+from core.crossing_shape_3d import _tube_family, _coords
+from core.host_geometry_test import _dir_inplane, _finalise, _random_dirs
+from core.host_fod import analyse, classify
+from core import noise_floor as nf
 import phase3 as Q
 import phase3 as P
 

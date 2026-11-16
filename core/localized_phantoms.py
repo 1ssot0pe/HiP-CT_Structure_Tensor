@@ -25,8 +25,8 @@ surface is unchanged for the scripts that depend on it.
 
 import numpy as np
 
-from crossing_shape_3d import _tube_family, _coords as _coords_cross
-from kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
+from core.crossing_shape_3d import _tube_family, _coords as _coords_cross
+from core.kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
 
 # Patch half-widths match the ESTABLISHED, already-validated setups elsewhere
 # in the repo: crossing uses half=14 (host_fod.validate's _central_patch, with

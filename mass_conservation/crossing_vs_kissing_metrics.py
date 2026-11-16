@@ -28,9 +28,9 @@ _sr_sys.path.insert(0, _sr_os.path.join(_SR_ROOT, "3_global_tractography"))  # p
 
 import numpy as np
 
-from crossing_shape_3d import _tube_family, _coords as _coords_cross, make_crossing_phantom_3d
-from kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
-from host_fod import analyse, classify
+from core.crossing_shape_3d import _tube_family, _coords as _coords_cross, make_crossing_phantom_3d
+from core.kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
+from core.host_fod import analyse, classify
 
 WIDTH = 1.5   # matches crossing_shape_3d's default tube width; kissing_phantom uses 1.6
 
@@ -49,7 +49,7 @@ def raw_crossing(shape=(64, 64, 64), sep_deg=40.0, spacing=12.0, spacing2=17.0, 
 
 
 def raw_kissing(gap=4.0, curv=0.028, radius=1.6):
-    from crossing_shape_3d import _coords as _c
+    from core.crossing_shape_3d import _coords as _c
     C = _c(KSHAPE)
     ptsA, ptsB = _curve_pts(-1, gap, curv), _curve_pts(+1, gap, curv)
     A = curved_bundle(C, ptsA, radius)

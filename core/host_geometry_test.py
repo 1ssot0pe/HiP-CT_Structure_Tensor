@@ -37,8 +37,8 @@ matcher for the multi-family case.
 
 import numpy as np
 
-from crossing_shape_3d import _tube_family, _coords
-from host_fod import analyse, classify
+from core.crossing_shape_3d import _tube_family, _coords
+from core.host_fod import analyse, classify
 
 EPS = 1e-12
 SHAPE = (96, 96, 96)

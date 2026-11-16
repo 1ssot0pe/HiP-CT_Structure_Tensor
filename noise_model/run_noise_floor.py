@@ -24,7 +24,7 @@ import matplotlib.pyplot as plt
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor)
-import noise_floor as nf
+from core import noise_floor as nf
 
 VOX_UM = 20.0
 SIGMAS = np.array([0.5, 0.7, 1.0, 1.4, 2.0, 2.8, 4.0, 5.7, 8.0])
@@ -44,8 +44,8 @@ def N_white(sigma, sigma_n2):
 
 # ---------------------------------------------------------------------------
 def load_regions():
-    from reconstruction import load_volume
-    from selfcalib_threshold import INTERIOR
+    from core.reconstruction import load_volume
+    from core.selfcalib_threshold import INTERIOR
     full = load_volume(crop=None, dtype=np.uint8)
     interior = full[INTERIOR].astype(np.float64)
     B = 128; best = None

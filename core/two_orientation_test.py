@@ -27,7 +27,7 @@ high-c_s vs low-c_s voxels. Reuses the 3D phantoms + sphericity field.
 import numpy as np
 from scipy import ndimage
 
-from crossing_shape_3d import (make_crossing_phantom_3d, make_single_fibre_3d,
+from core.crossing_shape_3d import (make_crossing_phantom_3d, make_single_fibre_3d,
                                _noise_volume)
 # NOTE: `from selfcalib_threshold import load_interior, sphericity_field` used to
 # sit here. Neither name was referenced anywhere in this file. Because host_fod

@@ -22,8 +22,8 @@ _sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # re
 
 import numpy as np
 
-from kissing_phantom import build_kissing, SHAPE
-from host_fod import analyse, classify
+from core.kissing_phantom import build_kissing, SHAPE
+from core.host_fod import analyse, classify
 import phase3 as Q
 import phase3 as P
 

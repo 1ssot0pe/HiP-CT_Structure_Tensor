@@ -34,8 +34,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from reconstruction import load_volume, DEFAULT_VOLUME_DIR, VOXEL_SIZE_UM
-from host_fod import analyse, classify
+from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR, VOXEL_SIZE_UM
+from core.host_fod import analyse, classify
 from fibre_continuity import local_fibreness, V
 
 HALF = 8                 # local_fibreness patch half-width (matches phase 1)

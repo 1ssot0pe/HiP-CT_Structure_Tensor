@@ -40,8 +40,8 @@ import matplotlib.pyplot as plt
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (reconstruction, noise_floor)
-from reconstruction import load_volume, DEFAULT_VOLUME_DIR
-import noise_floor as nf
+from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
+from core import noise_floor as nf
 
 # high-frequency band (cycles/voxel) where i74 fibre SIGNAL should be gone and
 # what remains is noise-dominated. Fibres at sigma~1-4 vox carry power below

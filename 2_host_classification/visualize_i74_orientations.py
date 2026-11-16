@@ -36,7 +36,7 @@ from matplotlib.lines import Line2D
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (selfcalib_threshold); adaptive_triage is a sibling
-from selfcalib_threshold import load_interior
+from core.selfcalib_threshold import load_interior
 from adaptive_triage import triage_patch_v2
 
 # dataviz reference palette (light)

@@ -1,7 +1,7 @@
 import os as _sr_os, sys as _sr_sys
 _sr_sys.path.insert(0, _sr_os.path.dirname(_sr_os.path.dirname(__file__)))  # repo root (shared kernels)
 
-from kissing_phantom import build_kissing
+from core.kissing_phantom import build_kissing
 from test_kissing_phantom import classify_grid, tractography_gap_test
 
 GAPS = (2.0, 3.0, 4.0, 8.0, 10.0)

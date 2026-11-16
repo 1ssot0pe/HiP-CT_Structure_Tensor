@@ -36,7 +36,7 @@ Inlined so the 2D toy stays a standalone experiment.
 import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
-from orthogonality_residual import fibre_direction, crop_margin, _crop3
+from core.orthogonality_residual import fibre_direction, crop_margin, _crop3
 
 EPS = 1e-12
 

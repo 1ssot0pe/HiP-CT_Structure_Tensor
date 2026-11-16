@@ -46,7 +46,7 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE):
     sys.path.insert(0, _p)
 
-from nifti_io import nifti_affine, save_nifti     # noqa: E402
+from core.nifti_io import nifti_affine, save_nifti     # noqa: E402
 
 EPS = 1e-12
 
@@ -750,7 +750,7 @@ def regenerate_figure(outdir, variant="vec1", tdi_cmap="gray", suffix="_gray",
     """
     import json
     import nibabel as nib
-    from reconstruction import tissue_mask
+    from core.reconstruction import tissue_mask
 
     tag = variant.replace("+", "_")
     with open(os.path.join(outdir, "descent_loop.json")) as f:

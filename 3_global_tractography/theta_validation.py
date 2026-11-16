@@ -59,8 +59,8 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
 
 import dense_tracker as DT                              # noqa: E402
 from cone_descent import stage2, seed, mse_tdi, rings, FLOOR_FRAC  # noqa: E402
-from kissing_phantom import curved_bundle                # noqa: E402
-from crossing_shape_3d import _coords                    # noqa: E402
+from core.kissing_phantom import curved_bundle                # noqa: E402
+from core.crossing_shape_3d import _coords                    # noqa: E402
 
 EPS = 1e-12
 

@@ -39,8 +39,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root
-from reconstruction import load_volume, VOXEL_SIZE_UM
-from orthogonality_residual import fibre_direction, crop_margin
+from core.reconstruction import load_volume, VOXEL_SIZE_UM
+from core.orthogonality_residual import fibre_direction, crop_margin
 
 from pick_sigma_rho import pick_sigma_rho, first_local_max
 

@@ -48,7 +48,7 @@ import sys
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root (host_fod)
-from host_fod import patch_gradients
+from core.host_fod import patch_gradients
 from gate_battery import (make_plus, low_centre_gain, region_of,
                           SHAPE, CROSS_HALF, HALF, Z, CENTERS)
 

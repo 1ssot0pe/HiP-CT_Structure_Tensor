@@ -80,7 +80,7 @@ def preprocess_volume(vol, clip_pct=(1.0, 99.0), mask_air=False, normalise=True,
 
 
 if __name__ == "__main__":
-    from reconstruction import load_volume, DEFAULT_VOLUME_DIR
+    from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
     if DEFAULT_VOLUME_DIR.exists():
         c0 = (768 - 200) // 2
         vol = load_volume(crop=(c0, c0 + 200), dtype=np.uint8)

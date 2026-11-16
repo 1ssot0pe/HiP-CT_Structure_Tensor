@@ -344,12 +344,12 @@ if __name__ == "__main__":
     a = ap.parse_args()
 
     if a.i74:
-        from reconstruction import load_volume
+        from core.reconstruction import load_volume
         lo = a.centre[0] - a.radius
         vol = load_volume(crop=(lo, a.centre[0] + a.radius),
                           dtype=np.uint8).astype(np.float32)
     else:
-        from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+        from core.localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
                                         CROSS_R1, CROSS_TAPER)
         vol = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5,
                                      CROSS_R1, CROSS_TAPER)

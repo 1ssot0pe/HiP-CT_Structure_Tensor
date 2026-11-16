@@ -49,7 +49,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection"),
            os.path.join(_ROOT, "3_global_tractography")):
     sys.path.insert(0, _p)
 
-from tensor import tensor_field                        # noqa: E402
+from core.tensor import tensor_field                        # noqa: E402
 from sigma_rho_match import angular_error, scale_range  # noqa: E402
 
 EPS = 1e-12

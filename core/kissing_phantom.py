@@ -18,7 +18,7 @@ across the gap (no merge) -- even though the curves are tangent and close there.
 
 import numpy as np
 
-from crossing_shape_3d import _coords
+from core.crossing_shape_3d import _coords
 
 EPS = 1e-12
 

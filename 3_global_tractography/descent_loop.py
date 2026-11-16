@@ -64,7 +64,7 @@ import cone_field_smooth as CFS                              # noqa: E402
 from cone_descent import stage2, seed, FLOOR_FRAC             # noqa: E402
 from gradient_optimise import Problem, descend                # noqa: E402
 from param_volume import load_chunk, L_RANGE, THETA_RANGE, ALPHA_RANGE  # noqa: E402
-from reconstruction import VOXEL_SIZE_UM                      # noqa: E402
+from core.reconstruction import VOXEL_SIZE_UM                      # noqa: E402
 
 VARIANTS = ("vec1", "vec1+vec2")
 
@@ -102,7 +102,7 @@ def load_setup(dataset, centre, radius, verbose=True):
         vol, origin = load_chunk(centre, radius, verbose=verbose)
         return vol, origin, "i74"
 
-    from localized_phantoms import raw_localized_crossing
+    from core.localized_phantoms import raw_localized_crossing
     n = 2 * int(radius)
     vol = raw_localized_crossing((n, n, n), PHANTOM_SEP_DEG, PHANTOM_SPACING,
                                  PHANTOM_WIDTH).astype(np.float32)

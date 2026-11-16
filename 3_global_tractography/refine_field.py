@@ -81,8 +81,8 @@ import cone_field_smooth as CFS                              # noqa: E402
 import descent_loop as DL                                    # noqa: E402
 from cone_descent import stage2                              # noqa: E402
 from gradient_optimise import descend                        # noqa: E402
-from nifti_io import nifti_affine, save_nifti                # noqa: E402
-from reconstruction import VOXEL_SIZE_UM                     # noqa: E402
+from core.nifti_io import nifti_affine, save_nifti                # noqa: E402
+from core.reconstruction import VOXEL_SIZE_UM                     # noqa: E402
 
 EPS = 1e-12
 GRAD_SIGMA = 1.0        # derivative scale for grad I; see the module docstring

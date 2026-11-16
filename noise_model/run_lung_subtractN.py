@@ -22,7 +22,7 @@ import numpy as np
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor)
-import noise_floor as nf
+from core import noise_floor as nf
 
 SIGMA, RHO, K = 4.0, 4.0, 80
 THR_S, THR_P, THR_L = 0.15, 0.30, 0.40

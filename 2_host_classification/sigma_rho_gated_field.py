@@ -57,9 +57,9 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from host_fod import analyse, classify
-from tensor import tensor_field
-from reconstruction import AIR_FRAC
+from core.host_fod import analyse, classify
+from core.tensor import tensor_field
+from core.reconstruction import AIR_FRAC
 from select_scales import select_scales, scale_at, distinct_scales
 from certify_gate_scales import load_gate_scales
 
@@ -298,7 +298,7 @@ def build_gated_field(vol, scales=None, mode="adaptive", block=DEFAULT_BLOCK,
     # (whole-volume support versus per-block context margins). One
     # implementation, one answer.
     if e3_xyz is None:
-        from tensor import field_for
+        from core.tensor import field_for
         e3_xyz = field_for(vol, scales, invariants=False)["e3"][::-1]
     # tensor_field returns e3 in (z, y, x) components; GatedField stores
     # directions in (x, y, z) to match host_fod, and Stage 3 reverses them back
@@ -387,7 +387,7 @@ def build_gated_field(vol, scales=None, mode="adaptive", block=DEFAULT_BLOCK,
 
 
 def run(block=32, stride=8):
-    from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+    from core.localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
                                     CROSS_R1, CROSS_TAPER)
     print("=" * 78)
     print("GATED ORIENTATION FIELD -- Stage 1 adaptive sigma/rho, gated by c_s > FA")

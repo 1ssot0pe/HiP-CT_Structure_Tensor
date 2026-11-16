@@ -48,9 +48,9 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from reconstruction import load_volume, tissue_mask, VOXEL_SIZE_UM   # noqa: E402
-from nifti_io import nifti_affine, save_nifti, save_vector_field     # noqa: E402
-from tensor import field_for                                        # noqa: E402
+from core.reconstruction import load_volume, tissue_mask, VOXEL_SIZE_UM   # noqa: E402
+from core.nifti_io import nifti_affine, save_nifti, save_vector_field     # noqa: E402
+from core.tensor import field_for                                        # noqa: E402
 from select_scales import select_scales, save_scales, paint_maps, summary  # noqa: E402
 from dense_host import (moment_field, sphere_basis, odf_at, peaks_from_odf,
                         lambda_ratio, gate_mask, DEFAULT_FIRE_FRACTION)  # noqa: E402

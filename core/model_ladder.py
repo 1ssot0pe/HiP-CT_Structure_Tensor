@@ -19,8 +19,8 @@ builder and the dispersed-cone direction sampler.
 
 import numpy as np
 
-from crossing_shape_3d import _tube_family, _coords, _noise_volume
-from selfcalib_threshold import sphericity_field, load_interior
+from core.crossing_shape_3d import _tube_family, _coords, _noise_volume
+from core.selfcalib_threshold import sphericity_field, load_interior
 
 EPS = 1e-12
 SPACINGS = [12.0, 17.0, 21.0, 25.0, 29.0]   # per-family, avoid a shared period

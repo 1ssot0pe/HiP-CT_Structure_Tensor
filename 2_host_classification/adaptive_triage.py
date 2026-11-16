@@ -48,8 +48,8 @@ _ROOT = os.path.dirname(os.path.dirname(__file__))          # repo root (host_fo
 sys.path.insert(0, _ROOT)
 sys.path.insert(0, os.path.join(_ROOT, "1_sigma_rho_selection"))   # pick_sigma_rho
 from pick_sigma_rho import lindeberg_response_3d, first_local_max
-from host_fod import analyse, classify
-from host_geometry_test import (
+from core.host_fod import analyse, classify
+from core.host_geometry_test import (
     make_two_region_phantom, make_messy_crossing, make_kissing_phantom,
     make_true_crossing_same_angles, _patch_at, _ang_err, SHAPE,
 )

@@ -53,14 +53,10 @@ reason `distinct_scales` groups patches by scale: in adaptive mode the cost is
 per DISTINCT (sigma, rho), not per patch, and in global mode it is one call.
 """
 
-import os
-import sys
-
 import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from orthogonality_residual import crop_margin          # noqa: E402
+from core.orthogonality_residual import crop_margin
 
 EPS = 1e-12
 

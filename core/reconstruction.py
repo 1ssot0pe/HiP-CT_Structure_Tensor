@@ -142,7 +142,7 @@ def load_volume(folder=DEFAULT_VOLUME_DIR, crop=(200, 456), dtype=float,
         a, b = crop
         volume = volume[a:b, a:b, a:b]
     if preprocess:
-        from preprocess import preprocess_volume
+        from core.preprocess import preprocess_volume
         return preprocess_volume(volume, clip_pct=clip_pct, mask_air=mask_air,
                                  normalise=True, verbose=verbose)
     return volume.astype(dtype)

@@ -34,8 +34,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from reconstruction import load_volume, DEFAULT_VOLUME_DIR
-from host_fod import analyse, classify
+from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
+from core.host_fod import analyse, classify
 from fibre_continuity import local_fibreness, V
 from peak_straightness import collect_crossings, HALF
 from mass_conservation_validate import local_calibration, THRESH, EPS, _patch_at

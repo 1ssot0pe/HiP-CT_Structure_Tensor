@@ -59,11 +59,11 @@ import self_optimising_tractography as S3               # noqa: E402
 import dense_tracker as DT                              # noqa: E402
 from dense_field import DenseField                      # noqa: E402
 from tract_density import rasterise                     # noqa: E402
-from tensor import field_for                            # noqa: E402
-from reconstruction import tissue_mask, VOXEL_SIZE_UM   # noqa: E402
+from core.tensor import field_for                            # noqa: E402
+from core.reconstruction import tissue_mask, VOXEL_SIZE_UM   # noqa: E402
 from select_scales import select_scales                 # noqa: E402
 from sigma_rho_gated_field import build_gated_field, DEFAULT_STRIDE  # noqa: E402
-from localized_phantoms import (raw_localized_crossing,  # noqa: E402
+from core.localized_phantoms import (raw_localized_crossing,  # noqa: E402
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 EPS = 1e-12
@@ -521,7 +521,7 @@ def main(i74=False, radius=24, centre=(384, 384, 384), quick=False,
     ladder = LADDER_QUICK if quick else LADDER
 
     if i74:
-        from reconstruction import load_volume
+        from core.reconstruction import load_volume
         lo = centre[0] - radius
         vol = load_volume(crop=(lo, centre[0] + radius),
                           dtype=np.uint8).astype(np.float32)

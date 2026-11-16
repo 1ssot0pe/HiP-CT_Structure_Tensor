@@ -65,11 +65,11 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "mass_conservation"),
            os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from host_fod import analyse
+from core.host_fod import analyse
 from sigma_rho_gated_field import (BUCKET_CANDIDATE, BUCKET_SINGLE,
                                   BUCKET_UNRESOLVABLE)
-from tensor import tensor_field, anisotropy as _anisotropy
-from reconstruction import AIR_FRAC, tissue_mask
+from core.tensor import tensor_field, anisotropy as _anisotropy
+from core.reconstruction import AIR_FRAC, tissue_mask
 from tract_density import rasterise, density_at, mse
 from weight_fit import design_matrix, fit_weights
 
@@ -256,7 +256,7 @@ def fields_for(vol, mode="global", block=32, verbose=False):
     adapt to.
     """
     from select_scales import select_scales
-    from tensor import field_for
+    from core.tensor import field_for
     sc = select_scales(vol, mode=mode, block=block, verbose=verbose)
     t = field_for(vol, sc, invariants=False)
     return sc, t["e3"], t["lam"]
@@ -743,7 +743,7 @@ def field_from_gated(gated, vol, I0=None, e3=None, host_only=True, scales=None):
             raise TypeError(
                 "field_from_gated needs an orientation field: pass e3=, or "
                 "scales= from select_scales. There is no default scale.")
-        from tensor import field_for
+        from core.tensor import field_for
         e3 = field_for(vol, scales, invariants=False)["e3"]
     # I0=None now means PER-JUNCTION local baseline, not one global air level.
     # A single air-referenced I_0 made the CROSSING verdict arithmetically
@@ -829,7 +829,7 @@ def validate(n_iter=4, verbose=True):
     # skipped" and exiting 0 -- whenever neither import shape worked. A
     # validation that quietly does nothing is worse than one that crashes, and
     # the fallback only existed because the builders lived in a sibling folder.
-    from localized_phantoms import (raw_localized_crossing, raw_kissing,
+    from core.localized_phantoms import (raw_localized_crossing, raw_kissing,
                                     CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
                                     CROSS_HALF, KISS_HALF)
     print("=" * 84)

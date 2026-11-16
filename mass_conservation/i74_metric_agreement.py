@@ -30,7 +30,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from scipy.stats import pearsonr, spearmanr
 
-from reconstruction import load_volume, DEFAULT_VOLUME_DIR
+from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
 from peak_straightness import collect_crossings, peak_reach, HALF, STRAIGHT_MIN, REACH_MIN
 from mass_conservation_validate import local_calibration, THRESH, EPS
 from real_i74_mass_conservation import _random_shell_positions, N_CAL_TRIES

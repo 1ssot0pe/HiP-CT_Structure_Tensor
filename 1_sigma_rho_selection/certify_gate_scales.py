@@ -93,8 +93,8 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE):
     sys.path.insert(0, _p)
 
-from host_fod import analyse                                      # noqa: E402
-from localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
+from core.host_fod import analyse                                      # noqa: E402
+from core.localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
                                 CROSS_CAL_OFFSETS)
 

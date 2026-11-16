@@ -79,8 +79,8 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from host_fod import SPHERE, EPS                                  # noqa: E402
-from reconstruction import tissue_mask                            # noqa: E402
+from core.host_fod import SPHERE, EPS                                  # noqa: E402
+from core.reconstruction import tissue_mask                            # noqa: E402
 
 _V = SPHERE.vertices
 

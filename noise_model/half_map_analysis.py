@@ -46,8 +46,8 @@ import matplotlib.pyplot as plt
 
 import sys as _sys, os as _os
 _sys.path.insert(0, _os.path.dirname(_os.path.dirname(__file__)))  # repo root (noise_floor, orthogonality_residual, reconstruction)
-import noise_floor as nf
-from reconstruction import (grid_cells, iter_progress, _demo_principal_direction,
+from core import noise_floor as nf
+from core.reconstruction import (grid_cells, iter_progress, _demo_principal_direction,
                             suggested_margin, crop_region)
 
 
@@ -207,7 +207,7 @@ def report_clipping(V, name, log):
 def make_synthetic(shape=(96, 96, 96), noise_sigma=0.25, seed=0):
     """Fanning-phantom signal + two INDEPENDENT noise realisations -> (A, B,
     truth). Gives every task a known answer for the self-test."""
-    from orthogonality_residual import make_fanning_phantom
+    from core.orthogonality_residual import make_fanning_phantom
     S, truth = make_fanning_phantom(shape=shape, noise_sigma=0.0)
     rng = np.random.default_rng(seed)
     A = S + noise_sigma * rng.standard_normal(shape)
@@ -333,7 +333,7 @@ def orientation_fsc(A, B, sigma, rho, nbins=30):
 
 
 def task3_certify(A, B, log, truth=None, save="halfmap_T3_certify.png"):
-    from reconstruction import iter_progress, grid_cells
+    from core.reconstruction import iter_progress, grid_cells
     Q = np.full((SIG_GRID.size, RHO_GRID.size), np.nan)
     for i, j in iter_progress(grid_cells(SIG_GRID.size, RHO_GRID.size),
                               desc="orientation FSC", enable=True):

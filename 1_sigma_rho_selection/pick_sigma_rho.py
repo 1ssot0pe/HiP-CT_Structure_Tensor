@@ -40,8 +40,8 @@ import numpy as np
 from structure_tensor import structure_tensor_3d, eig_special_3d
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root, for the two imports below
-from orthogonality_residual import fibre_direction, crop_margin, _crop3
-from reconstruction import iter_progress
+from core.orthogonality_residual import fibre_direction, crop_margin, _crop3
+from core.reconstruction import iter_progress
 
 
 def lindeberg_response_3d(volume, sigmas, rho=1.0, truncate=4.0, verbose=True):
@@ -173,7 +173,7 @@ if __name__ == "__main__":
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from reconstruction import load_volume, DEFAULT_VOLUME_DIR
+    from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
 
     # Cropped chunk for speed -- full stack is ~768^3, this repo's own
     # reconstruction.py defaults to a 256^3 crop for the same reason, but a

@@ -58,7 +58,7 @@ for _p in (_ROOT, _HERE):
 
 import self_optimising_tractography as S3               # noqa: E402
 from dense_field import fill_invalid                    # noqa: E402
-from localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
+from core.localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 EPS = 1e-12

@@ -68,7 +68,7 @@ for _p in (_ROOT, _HERE):
     sys.path.insert(0, _p)
 
 import smooth_tracker as ST                      # noqa: E402
-from preprocess import preprocess_volume         # noqa: E402
+from core.preprocess import preprocess_volume         # noqa: E402
 
 EPS = 1e-12
 CLIP_PCT = (1.0, 99.0)

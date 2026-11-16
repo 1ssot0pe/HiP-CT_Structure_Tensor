@@ -39,7 +39,7 @@ from dipy.data import get_sphere
 from dipy.reconst.shm import sf_to_sh, sh_to_sf, sph_harm_ind_list
 from dipy.direction import peak_directions
 
-from two_orientation_test import patch_gradients, _central_patch
+from core.two_orientation_test import patch_gradients, _central_patch
 
 EPS = 1e-12
 SH_ORDER = 8
@@ -102,9 +102,9 @@ def classify(m, aniso_iso=0.55, amp2_min=0.45, sep_min=22.0):
 # ---------------------------------------------------------------------------
 
 def validate(noise_sigma=0.3, seeds=(0, 1, 2)):
-    from crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
+    from core.crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
                                    _noise_volume)
-    from model_ladder import make_multifibre, _inplane, _cone_dirs
+    from core.model_ladder import make_multifibre, _inplane, _cone_dirs
 
     def patch_of(kind, seed):
         if kind == "single":

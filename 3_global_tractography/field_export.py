@@ -59,7 +59,7 @@ import numpy as np
 _HERE = os.path.dirname(os.path.abspath(__file__))
 for _p in (os.path.dirname(_HERE), _HERE):
     sys.path.insert(0, _p)
-from nifti_io import nifti_affine, save_nifti, save_vector_field  # noqa: F401,E402
+from core.nifti_io import nifti_affine, save_nifti, save_vector_field  # noqa: F401,E402
 
 EPS = 1e-12
 

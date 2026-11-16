@@ -48,8 +48,8 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 
-from crossing_shape_3d import _tube_family, _coords
-from host_fod import patch_gradients, analyse
+from core.crossing_shape_3d import _tube_family, _coords
+from core.host_fod import patch_gradients, analyse
 
 EPS = 1e-12
 

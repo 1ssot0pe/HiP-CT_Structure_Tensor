@@ -56,7 +56,7 @@ for _p in (_ROOT, _HERE):
     sys.path.insert(0, _p)
 
 import self_optimising_tractography as S3                        # noqa: E402
-from localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
+from core.localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER)
 
 # i74's measured intensity statistics, from the 96^3 crop at (384, 384, 384).

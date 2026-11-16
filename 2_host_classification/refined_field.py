@@ -38,7 +38,7 @@ warnings.filterwarnings("ignore")
 
 import numpy as np
 
-from host_fod import analyse
+from core.host_fod import analyse
 
 EPS = 1e-12
 SIGMAS = np.array([1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0])   # dense, for persistence
@@ -164,9 +164,9 @@ def spatial_regularize(field, ang_tol=25.0, min_support=2):
 # ---------------------------------------------------------------------------
 
 def validate(noise_sigma=0.3, seeds=(0, 1, 2)):
-    from crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
+    from core.crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
                                    _noise_volume)
-    from two_orientation_test import _central_patch
+    from core.two_orientation_test import _central_patch
 
     print("=" * 74)
     print("MULTI-SCALE PERSISTENCE validation (do genuine crossings survive?)")
@@ -232,7 +232,7 @@ def _panel(ax, sl, field, title):
 def run_i74(save=None, denoise="none"):
     """denoise: 'none' (TV was found to over-smooth/erase striations) or 'tv'."""
     import time
-    from selfcalib_threshold import load_interior
+    from core.selfcalib_threshold import load_interior
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -250,7 +250,7 @@ def run_i74(save=None, denoise="none"):
     grid = [(cy, cx) for cy in centers for cx in centers]
     print(f"i74 slice z={Z_SLICE}, {len(grid)} patches, denoise={denoise}, sigma grid={SIGMAS.tolist()}")
 
-    from reconstruction import iter_progress
+    from core.reconstruction import iter_progress
     cells = [(gi, cy, gj, cx) for gi, cy in enumerate(centers)
              for gj, cx in enumerate(centers)]
     before, after0 = {}, {}
@@ -293,7 +293,7 @@ def cheap_gate(patch, sigma_ref=3.0):
     smallest eigenvalue = energy in the least-gradient direction (the HOST
     trigger); e3 = its eigenvector = single-fibre direction, in the (axis2,
     axis1, axis0) basis the glyph drawing uses."""
-    from host_fod import patch_gradients
+    from core.host_fod import patch_gradients
     G = patch_gradients(patch, sigma_ref)
     if G.shape[0] < 40:
         return 0.0, None
@@ -305,7 +305,7 @@ def cheap_gate(patch, sigma_ref=3.0):
 
 def run_i74_gated(threshold_pct=55, save="i74_lambda3_gated.png"):
     import time
-    from selfcalib_threshold import load_interior
+    from core.selfcalib_threshold import load_interior
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -323,7 +323,7 @@ def run_i74_gated(threshold_pct=55, save="i74_lambda3_gated.png"):
             for gj, cx in enumerate(centers)]
     print(f"i74 slice z={Z_SLICE}, {len(grid)} patches, lambda3 HOST-gate")
 
-    from reconstruction import iter_progress
+    from core.reconstruction import iter_progress
     rows = []          # per patch: lam3, e3, HOST label/dirs, cy, cx, keys
     t0 = time.time()
     t_host = 0.0

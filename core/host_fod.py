@@ -40,7 +40,7 @@ try:
     SPHERE = get_sphere(name="repulsion724")
 except TypeError:                                 # older dipy: positional only
     SPHERE = get_sphere("repulsion724")
-from two_orientation_test import patch_gradients, _central_patch
+from core.two_orientation_test import patch_gradients, _central_patch
 
 EPS = 1e-12
 _V = SPHERE.vertices
@@ -179,9 +179,9 @@ def classify(m, aniso_iso=0.9, amp2_min=0.4, sep_min=30.0, cs_single=None):
 # ---------------------------------------------------------------------------
 
 def _patch_of(kind, seed, noise):
-    from crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
+    from core.crossing_shape_3d import (make_single_fibre_3d, make_crossing_phantom_3d,
                                    _noise_volume)
-    from model_ladder import make_multifibre, _inplane, _cone_dirs
+    from core.model_ladder import make_multifibre, _inplane, _cone_dirs
     if kind == "single":
         v, tr = make_single_fibre_3d(theta_deg=20.0, noise_sigma=noise, seed=seed)
     elif kind == "noise":

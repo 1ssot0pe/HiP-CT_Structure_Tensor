@@ -57,8 +57,8 @@ import matplotlib.pyplot as plt
 _ROOT = os.path.dirname(os.path.dirname(__file__))
 sys.path.insert(0, _ROOT)  # repo root
 sys.path.insert(0, os.path.join(_ROOT, "mass_conservation"))  # real_noise helper (lung_A/B)
-from reconstruction import load_volume, VOXEL_SIZE_UM
-from orthogonality_residual import fibre_direction, crop_margin, _crop3
+from core.reconstruction import load_volume, VOXEL_SIZE_UM
+from core.orthogonality_residual import fibre_direction, crop_margin, _crop3
 from mass_conservation_validate import real_noise  # lung_A/B measured noise
 
 from pick_sigma_rho import (lindeberg_response_3d, first_local_max,

@@ -32,8 +32,8 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
-from reconstruction import load_volume, DEFAULT_VOLUME_DIR
-from host_fod import analyse, classify
+from core.reconstruction import load_volume, DEFAULT_VOLUME_DIR
+from core.host_fod import analyse, classify
 from peak_straightness import collect_crossings, HALF
 from mass_conservation_validate import local_calibration, local_ratio_threshold, THRESH, EPS
 

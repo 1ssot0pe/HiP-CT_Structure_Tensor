@@ -70,7 +70,7 @@ def _bar_eta(done, total, t0, width=28):
 
 
 def load_chunk(centre=384, radius=24, verbose=True):
-    from reconstruction import load_volume
+    from core.reconstruction import load_volume
     lo, hi = centre - radius, centre + radius
     vol = load_volume(crop=(lo, hi), dtype=np.uint8).astype(np.float32)
     if verbose:

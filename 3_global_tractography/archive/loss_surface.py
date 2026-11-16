@@ -156,7 +156,7 @@ def main(i74=False, n=12, radius=48, stride=6, seed_density=32.0, n_seeds=1,
     print("=" * 88)
 
     if i74:
-        from reconstruction import load_volume
+        from core.reconstruction import load_volume
         lo = 384 - radius
         vol = load_volume(crop=(lo, 384 + radius),
                           dtype=np.uint8).astype(np.float32)
@@ -165,7 +165,7 @@ def main(i74=False, n=12, radius=48, stride=6, seed_density=32.0, n_seeds=1,
                  else build_gated_field(vol, block=32, stride=stride))
         tag, title = "i74", f"i74 {vol.shape}"
     else:
-        from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+        from core.localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
                                         CROSS_R1, CROSS_TAPER)
         X = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5,
                                    CROSS_R1, CROSS_TAPER)

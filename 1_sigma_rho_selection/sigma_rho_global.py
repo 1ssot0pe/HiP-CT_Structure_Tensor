@@ -19,7 +19,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))  # repo root, for reconstruction
-from reconstruction import load_volume, VOXEL_SIZE_UM
+from core.reconstruction import load_volume, VOXEL_SIZE_UM
 from pick_sigma_rho import (lindeberg_response_3d, first_local_max,
                                     sweep_rho_stability_3d)
 from lindeberg_sigma_phantoms import refined_peak_sigma

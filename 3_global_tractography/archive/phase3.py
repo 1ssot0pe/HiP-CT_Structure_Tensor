@@ -40,13 +40,13 @@ from scipy.ndimage import gaussian_filter
 import matplotlib
 import matplotlib.pyplot as plt
 import argparse
-from reconstruction import load_volume, VOXEL_SIZE_UM
-from host_fod import analyse, classify
-from host_geometry_test import make_true_crossing_same_angles, make_kissing_phantom
+from core.reconstruction import load_volume, VOXEL_SIZE_UM
+from core.host_fod import analyse, classify
+from core.host_geometry_test import make_true_crossing_same_angles, make_kissing_phantom
 import os
-from crossing_shape_3d import _tube_family, _coords
-from host_geometry_test import _dir_inplane, _finalise
-from host_geometry_test import _dir_inplane
+from core.crossing_shape_3d import _tube_family, _coords
+from core.host_geometry_test import _dir_inplane, _finalise
+from core.host_geometry_test import _dir_inplane
 
 
 # ============================================================================
@@ -428,7 +428,7 @@ def seed_segments(vol, stride, max_peaks=2, aniso_min=ANISO_MIN):
 
     aniso_min: the anisotropy gate; pass calibrate_aniso(vol)[0] for the
     data-driven value (defaults to the physical ANISO_MIN)."""
-    from reconstruction import iter_progress
+    from core.reconstruction import iter_progress
     Z, Y, X = vol.shape
     thr = FG_FRAC * vol.max()
     pos, dirs, w, is_cross, seed_id = [], [], [], [], []
@@ -635,7 +635,7 @@ def run_realnoise(crop=64, stride=4):
     shape = (crop, crop, crop)
     noise = real_noise(shape)
     # sanity: is the injected noise actually anisotropic/correlated?
-    import noise_floor as nf
+    from core import noise_floor as nf
     w = np.linalg.eigvalsh(nf.N_matrix(noise, 4.0))
     print(f"  injected noise anisotropy lambda1/lambda3 = {w[-1]/(w[0]+1e-12):.2f} "
           f"(white would be ~1)")

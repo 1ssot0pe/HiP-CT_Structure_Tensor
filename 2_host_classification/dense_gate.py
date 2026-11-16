@@ -107,8 +107,8 @@ _ROOT = os.path.dirname(_HERE)
 for _p in (_ROOT, _HERE, os.path.join(_ROOT, "1_sigma_rho_selection")):
     sys.path.insert(0, _p)
 
-from tensor import tensor_field                          # noqa: E402
-from reconstruction import tissue_mask                   # noqa: E402
+from core.tensor import tensor_field                          # noqa: E402
+from core.reconstruction import tissue_mask                   # noqa: E402
 from certify_gate_scales import load_gate_scales         # noqa: E402
 
 EPS = 1e-12
@@ -273,12 +273,12 @@ if __name__ == "__main__":
     from sigma_rho_gated_field import GatedField
 
     if a.i74:
-        from reconstruction import load_volume
+        from core.reconstruction import load_volume
         lo = a.centre[0] - a.radius
         vol = load_volume(crop=(lo, a.centre[0] + a.radius),
                           dtype=np.uint8).astype(np.float32)
     else:
-        from localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
+        from core.localized_phantoms import (raw_localized_crossing, CROSS_SHAPE,
                                         CROSS_R1, CROSS_TAPER)
         vol = raw_localized_crossing(CROSS_SHAPE, 40.0, 12.0, 1.5,
                                      CROSS_R1, CROSS_TAPER)

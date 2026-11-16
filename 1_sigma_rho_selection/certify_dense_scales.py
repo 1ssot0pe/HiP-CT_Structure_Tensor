@@ -44,7 +44,7 @@ for _p in (_ROOT, _HERE, os.path.join(_ROOT, "2_host_classification")):
 
 from dense_host import (moment_field, sphere_basis, peaks_from_odf,  # noqa: E402
                         odf_at, DEFAULT_ORDER)
-from localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
+from core.localized_phantoms import (raw_localized_crossing, raw_kissing,  # noqa: E402
                                 CROSS_SHAPE, CROSS_R1, CROSS_TAPER,
                                 CROSS_CAL_OFFSETS)
 

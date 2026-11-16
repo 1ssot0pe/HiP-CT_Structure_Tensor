@@ -63,9 +63,9 @@ import numpy as np
 from scipy.ndimage import gaussian_filter
 from tqdm import tqdm
 
-from crossing_shape_3d import _tube_family, _coords as _coords_cross
-from kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
-from host_fod import analyse, classify
+from core.crossing_shape_3d import _tube_family, _coords as _coords_cross
+from core.kissing_phantom import _curve_pts, curved_bundle, SHAPE as KSHAPE
+from core.host_fod import analyse, classify
 
 THRESH = 1.5   # PHYSICAL midpoint of the 1x ("one branch") and 2x ("two branches
                # summed") ratios. Deliberately fixed for the phantom PROOF (an
@@ -121,7 +121,7 @@ def local_ratio_threshold(ratios, physical=THRESH, min_gap=0.5):
 # this module's public surface is unchanged.
 # ---------------------------------------------------------------------------
 
-from localized_phantoms import (raw_kissing, raw_localized_crossing,  # noqa: E402,F401
+from core.localized_phantoms import (raw_kissing, raw_localized_crossing,  # noqa: E402,F401
                                 CROSS_HALF, KISS_HALF, CROSS_SHAPE,
                                 CROSS_R1, CROSS_TAPER, CROSS_CAL_OFFSETS)
 
