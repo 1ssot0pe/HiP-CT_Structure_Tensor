@@ -57,6 +57,10 @@ moved from Stage 2's, and a small error is expected. Treat it as a weak point.
 
 ![Median angular error against ρ for five seed counts](../docs/figures/stage4_rho_sweep.png)
 
+*(a) Median error against ρ for each seed count, minima ringed; (b) error at
+ρ\* against seed count. Regenerate with
+`python docs/figures/make_stage4_rho_sweep.py`.*
+
 What this supports, and what it does not:
 
 - **Consistent across seed count and metric.** On the 48³ chunk every seed

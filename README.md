@@ -29,6 +29,16 @@ data-driven pick on the same chunk was ρ = 1.41.
 
 ![Median angular error against ρ for five seed counts; every curve has its minimum at ρ = 3.79](docs/figures/stage4_rho_sweep.png)
 
+*Stage 4 on the i74 48³ chunk (σ = 1.00, MSE objective).
+**(a)** Median angular error between the refined field and a plain structure
+tensor, at 14 log-spaced ρ, for five seed counts. Open rings mark each curve's
+minimum. The dotted line is Stage 1's ρ. Shading marks where the 4ρ Gaussian
+window exceeds the chunk's half-width.
+**(b)** Median and mean error at ρ\* against seed count.
+Drawn from [`results/seed_rho_curves.json`](results/seed_rho_curves.json) by
+[`docs/figures/make_stage4_rho_sweep.py`](docs/figures/make_stage4_rho_sweep.py);
+a vector PDF sits alongside the PNG.*
+
 Caveats: ρ is located only to the grid spacing (~20%). Smaller 24³ chunks put
 the minimum between ρ = 1.8 and 3.1, so the optimum varies by region. About 20°
 of median angular error remains at the optimum. Details are in
