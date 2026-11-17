@@ -19,6 +19,7 @@ tensor's principal direction `e3`.
 |---|---|
 | `sigma_rho_match.py` | Sweeps an n × n log-spaced (σ, ρ) grid. At each point it computes a plain tensor field and its angular error against the refined field (median, mean, p95 over tissue). Also writes `refined_vec1.nii.gz` and `best_simple_e3.nii.gz` for side-by-side viewing. |
 | `coarse_to_fine.py` | Zooms instead of refining everywhere: sweep coarsely, rebuild the grid around the best cell, repeat. k levels reach the spacing of an n^k grid for k·n² evaluations. It checks its own assumption (one interior minimum along ρ) and reports a best cell on the grid edge as extrapolation, not as an optimum. |
+| `rho_sweep.py` | Sweeps one scale (ρ by default) at a fixed value of the other, for several Stage 3 runs at once, scoring each point exactly as `sigma_rho_match.py` does. Produces the curves behind the headline result. Runs on the same chunk share one volume load and one Stage 2 pass. `--check` compares the output with a recorded JSON and exits non-zero if any value differs by more than `--tol` (0.01°). |
 
 **Search range.** The range comes from Stage 1's per-block picks (min to max of
 `sigma_map` / `rho_map`), not from a guess. If there are too few certified
@@ -40,8 +41,23 @@ python 4_optimising_parameters/sigma_rho_match.py --run results/seed_5000 --n 7
 python 4_optimising_parameters/coarse_to_fine.py  --run results/seed_5000 --levels 3 --n 5
 ```
 
-Outputs go to the run directory: `stage4_sigma_rho.json` and
-`coarse_to_fine_<run>.json`.
+Outputs: `results/stage4/stage4_sigma_rho.json` and
+`results/coarse_to_fine/coarse_to_fine_<run>.json`.
+
+**Reproducing the key result.** Run Stage 3 with 1,000–5,000 seeds (or unzip
+the v1.0.0 release archive into `results/`), then:
+
+```bash
+python 4_optimising_parameters/rho_sweep.py \
+    --runs results/seed_1000 results/seed_2000 results/seed_3000 \
+           results/seed_4000 results/seed_5000 \
+    --labels 1000 2000 3000 4000 5000 \
+    --out results/seed_rho_curves_rerun.json --check results/seed_rho_curves.json
+```
+
+Defaults: ρ from 0.7071 to 8 in 14 log-spaced steps at σ = 1.00, the grid of
+the recorded result. `--axis sigma --fixed 3.792 --lo 0.4 --hi 3.0 --n 11`
+gives the σ sweep at ρ\* (`results/sigma_sweep_r24.json`).
 
 ## Results so far (i74, centre 384)
 
@@ -77,6 +93,8 @@ What this supports, and what it does not:
 - **About 20° remains.** No single (σ, ρ) reproduces the refined field closely,
   which is itself a finding: Stage 3 produces a field a plain tensor cannot.
 
-The ρ line sweeps behind this table (14 log-spaced ρ at fixed σ = 1.00) were
-run as one-off commands. Their results are in the JSON files above, but the
-code that produced them is not yet a script in this folder.
+The ρ curves behind this table were first run as one-off commands.
+`rho_sweep.py` is the script form: its ρ and σ grids match the recorded ones
+bit for bit, and it scores each point with the same code. Run it with
+`--check` (needs the i74 volume and dipy) to confirm a rerun reproduces the
+recorded numbers.
