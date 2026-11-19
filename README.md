@@ -35,10 +35,11 @@ Phase-Contrast Tomography (HiP-CT) of human brain white matter.
 
 | Stage | What it does | Code |
 |---|---|---|
-| **1. Scale selection** | Chooses σ and ρ for each 32³ block (Lindeberg scale selection). | [`1_sigma_rho_selection/`](1_sigma_rho_selection/) |
-| **2. Crossing gate** | Finds voxels where one orientation is not enough and fits up to two there (higher-order structure tensor). | [`2_host_classification/`](2_host_classification/) |
-| **3. Tractography** | Tracks fibres through the field, separates crossings from fibres that only touch, and refines the field. | [`3_global_tractography/`](3_global_tractography/) |
-| **4. Optimisation** | Finds the single (σ, ρ) whose plain structure tensor best matches the refined field. | [`4_optimising_parameters/`](4_optimising_parameters/) |
+| **1.&nbsp;Scale&nbsp;selection** | Chooses σ and ρ for each 32³ block (Lindeberg scale selection). | [`1_sigma_rho_selection/`](1_sigma_rho_selection/) |
+| **2.&nbsp;Crossing&nbsp;gate** | Finds voxels where one orientation is not enough and fits up to two there (higher-order structure tensor). | [`2_host_classification/`](2_host_classification/) |
+| **3.&nbsp;Tractography** | Tracks fibres through the field, separates crossings from fibres that only touch, and refines the field. | [`3_global_tractography/`](3_global_tractography/) |
+| **4.&nbsp;Optimisation** | Finds the single (σ, ρ) whose plain structure tensor best matches the refined field. | [`4_optimising_parameters/`](4_optimising_parameters/) |
+
 
 Two side studies support the pipeline.
 [`mass_conservation/`](mass_conservation/) tells crossings from touching
