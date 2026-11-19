@@ -71,10 +71,14 @@ gives the σ sweep at ρ\* (`results/sigma_sweep_r24.json`).
 † That MAE run made a single field update from 77 seeds, so its field barely
 moved from Stage 2's, and a small error is expected. Treat it as a weak point.
 
-![Median angular error against ρ for five seed counts](../docs/figures/stage4_rho_sweep.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../docs/figures/stage4_rho_sweep_dark.png">
+  <img src="../docs/figures/stage4_rho_sweep.png" width="760" alt="Median angular error against ρ; minimum of 20.2° at ρ = 3.79 for every seed count">
+</picture>
 
-*(a) Median error against ρ for each seed count, minima ringed; (b) error at
-ρ\* against seed count. Regenerate with
+*Median error against ρ for the 5,000-seed run (line) and the range over
+1,000–5,000 seeds (band); the minimum is marked. Beyond ρ ≈ 6 the 4ρ window
+exceeds the chunk's half-width. Regenerate with
 `python docs/figures/make_stage4_rho_sweep.py`.*
 
 What this supports, and what it does not:
