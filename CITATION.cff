@@ -10,6 +10,7 @@ authors:
   - given-names: Andrew
     family-names: Keenlyside
     orcid: "https://orcid.org/0000-0002-6059-2103"
+    affiliation: "UCL Hawkes Institute, University College London"
 doi: 10.5281/zenodo.24289711
 repository-code: "https://github.com/1ssot0pe/HiP-CT_Structure_Tensor"
 license: MIT
