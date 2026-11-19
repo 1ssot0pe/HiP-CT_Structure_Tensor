@@ -36,7 +36,7 @@ Phase-Contrast Tomography (HiP-CT) of human brain white matter.
 | Stage | What it does | Code |
 |---|---|---|
 | 1.&nbsp;Scale&nbsp;selection | Chooses σ and ρ for each 32³ block (Lindeberg scale selection). | [`1_sigma_rho_selection/`](1_sigma_rho_selection/) |
-| 2.&nbsp;Crossing&nbsp;gate | Finds voxels where one orientation is not enough and fits up to two there with the higher-order structure tensor ([HOST](#how-host-is-used)). | [`2_host_classification/`](2_host_classification/) |
+| 2.&nbsp;Crossing&nbsp;gate | Finds voxels where one orientation is not enough and fits up to two there with the higher-order structure tensor ([HOST](2_host_classification/README.md#how-host-is-used-in-the-pipeline)). | [`2_host_classification/`](2_host_classification/) |
 | 3.&nbsp;Tractography | Tracks fibres through the field, separates crossings from fibres that only touch, and refines the field. | [`3_global_tractography/`](3_global_tractography/) |
 | 4.&nbsp;Optimisation | Finds the single (σ, ρ) whose plain structure tensor best matches the refined field. | [`4_optimising_parameters/`](4_optimising_parameters/) |
 
@@ -45,34 +45,6 @@ Two side studies support the pipeline.
 fibres using image brightness alone. [`noise_model/`](noise_model/) measures
 the imaging noise from half-reconstructions. [docs/PIPELINE.md](docs/PIPELINE.md) lists the inputs,
 outputs and decisions of each stage.
-
-### How HOST is used
-
-A structure tensor gives one orientation per voxel, so it cannot describe two
-fibres that cross. The higher-order structure tensor (HOST; Schultz,
-Weickert and Seidel, 2009) can. Fibres lie along the minima of its order-6 directional
-energy, E₆(**u**) = ⟨(**ĝ**·**u**)⁶⟩, which can have more than one minimum.
-HOST costs about 80 times more per patch than the plain tensor, so the pipeline
-runs it only where it is needed and then checks its answers.
-
-1. **Gate (Stage 2).** For each 29³-voxel patch, the gradient scatter matrix
-   gives two numbers: sphericity c<sub>s</sub> (no dominant direction) and
-   fractional anisotropy FA (strongly directional). If c<sub>s</sub> ≤ FA, the
-   patch keeps the plain tensor's orientation. The rule needs no tuned
-   threshold.
-2. **Fit (Stage 2).** Otherwise, HOST finds the orientation peaks and labels
-   the patch `single`, `crossing`, `dispersed`, `disorganised` or `complex`.
-   `complex` (three or more peaks) is left unresolved.
-3. **Track (Stage 3).** The field holds one orientation (`vec1`) at every voxel
-   and HOST's second orientation (`vec2`) at crossings. The tracker follows
-   whichever of the two better matches its heading.
-4. **Check (Stage 3).** A brightness test and global tractography decide
-   whether each HOST crossing is real. A false crossing loses its `vec2`.
-
-HOST over-calls crossings on i74: on a central 96³ crop, a global tractography
-model confirmed only about a quarter of them
-([evidence](docs/archive/BAYES_TRACTOGRAPHY.md)). Step 4 exists for this
-reason. Details: [2_host_classification/README.md](2_host_classification/README.md).
 
 <details>
 <summary>Stage 2 variants</summary>
@@ -251,12 +223,6 @@ found. Approaches that did not work are recorded in
 - Crossings of three or more fibres are labelled `complex` and not resolved.
 - i74 has no half-reconstructions, so its noise model comes from lung data.
   Only the isotropic part of the noise spectrum is shown to transfer.
-
-## References
-
-Schultz, T., Weickert, J. and Seidel, H.-P. (2009). A higher-order structure
-tensor. In D. H. Laidlaw and J. Weickert (eds.), *Visualization and Processing
-of Tensor Fields: Advances and Perspectives*, pp. 263–280. Springer, Berlin.
 
 ## Citation
 

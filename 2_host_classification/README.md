@@ -11,6 +11,39 @@ the gate and classification logic built on top. They import the engine as
 `from core.host_fod import ...`, after a `sys.path.insert` of the repository root
 at the top of each file.
 
+# How HOST is used in the pipeline
+
+A structure tensor gives one orientation per voxel, so it cannot describe two
+fibres that cross. The higher-order structure tensor (HOST; Schultz, Weickert
+and Seidel, 2009) can. Fibres lie along the minima of its order-6 directional
+energy, E₆(**u**) = ⟨(**ĝ**·**u**)⁶⟩, which can have more than one minimum.
+HOST costs about 80 times more per patch than the plain tensor, so the pipeline
+runs it only where it is needed and then checks its answers.
+
+1. **Gate (Stage 2).** For each 29³-voxel patch, the gradient scatter matrix
+   gives two numbers: sphericity c<sub>s</sub> (no dominant direction) and
+   fractional anisotropy FA (strongly directional). If c<sub>s</sub> ≤ FA, the
+   patch keeps the plain tensor's orientation. The rule needs no tuned
+   threshold. (Part A, step 3.)
+2. **Fit (Stage 2).** Otherwise, HOST finds the orientation peaks and labels
+   the patch `single`, `crossing`, `dispersed`, `disorganised` or `complex`.
+   `complex` (three or more peaks) is left unresolved. (Part A, step 4.)
+3. **Track (Stage 3).** The field holds one orientation (`vec1`) at every voxel
+   and HOST's second orientation (`vec2`) at crossings. The tracker follows
+   whichever of the two better matches its heading.
+4. **Check (Stage 3).** A brightness test and global tractography decide
+   whether each HOST crossing is real. A false crossing loses its `vec2`.
+
+HOST over-calls crossings on i74: on a central 96³ crop, a global tractography
+model confirmed only about a quarter of them
+([evidence](../docs/archive/BAYES_TRACTOGRAPHY.md)). Step 4 exists for this
+reason.
+
+Reference: Schultz, T., Weickert, J. and Seidel, H.-P. (2009). A higher-order
+structure tensor. In D. H. Laidlaw and J. Weickert (eds.), *Visualization and
+Processing of Tensor Fields: Advances and Perspectives*, pp. 263–280.
+Springer, Berlin.
+
 # Terms
 
 Voxel / patch — a voxel is one 3D pixel (20 µm on i74). A patch is a small cube
