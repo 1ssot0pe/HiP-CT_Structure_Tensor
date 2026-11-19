@@ -209,7 +209,7 @@ def draw(theme):
             lw=2.4, solid_capstyle="round"))
     side_key(fig, t, tx, y_hi, line_swatch(t["one"]), "one\ndirection")
     side_key(fig, t, tx, y_lo, line_swatch(t["two"]), "two\ndirections")
-    note(fig, t, x0, x1, ynote, "higher-order tensor only where needed")
+    note(fig, t, x0, x1, ynote, r"HOST only where $c_s$ > FA")
 
     # ---- 3. Tractography ----------------------------------------------
     x0, x1 = xs[3]
